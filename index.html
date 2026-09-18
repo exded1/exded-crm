@@ -161,6 +161,21 @@
     </form>
   </dialog>
 
+  <!-- Proforma: схема оплаты -->
+  <dialog id="dlg-plan" class="modal" aria-labelledby="plan-title">
+    <form id="form-plan" class="modal-box" autocomplete="off">
+      <h2 id="plan-title">Proforma: как платит клиент</h2>
+      <p class="sub" id="plan-sum"></p>
+      <div class="chips" id="plan-keys"></div>
+      <label class="f" id="plan-custom-wrap" hidden><span>Первый платёж, %</span><input name="custom" inputmode="numeric" value="50"></label>
+      <p class="hint" id="plan-preview"></p>
+      <footer class="modal-foot">
+        <button type="button" class="btn ghost" data-close>Отмена</button>
+        <button type="submit" class="btn primary">Создать Proforma</button>
+      </footer>
+    </form>
+  </dialog>
+
   <!-- Настройки -->
   <dialog id="dlg-settings" class="modal" aria-labelledby="set-title">
     <div class="modal-box">
