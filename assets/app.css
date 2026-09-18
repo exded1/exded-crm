@@ -564,6 +564,12 @@ dialog::backdrop { background: rgba(20, 20, 19, .42); }
 .buys time { grid-column: 1 / -1; font-size: 12.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
 .buys p { grid-column: 1; font-size: 14.5px; overflow-wrap: anywhere; }
 .buys b { grid-column: 2; grid-row: 2; font-variant-numeric: tabular-nums; }
+.orders { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.orders li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+.orders b { font-variant-numeric: tabular-nums; }
+.orders time { font-size: 12.5px; color: var(--ink-3); }
+.order-sum { margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; }
+.order-link { flex: 0 0 100%; font-size: 13px; color: var(--orange-ink); }
 /* у клиента на доске больше одной карточки: подписываем номер сделки,
    слева тонкая полоса — глазу видно, что это не дубль компании, а её вторая сделка */
 .card-dealmark { display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: var(--line-2); vertical-align: middle; }
