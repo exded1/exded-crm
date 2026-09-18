@@ -4112,8 +4112,10 @@ window.CrmSupabaseStore = (() => {
     return out.length ? `<div class="card-ways">${out.join('')}</div>` : '';
   }
 
-  // Сумма на карточке: вписанная руками главнее, пусто — показываем итог позиций
+  // Деньги сделки: вписанная руками сумма главнее, пусто — итог позиций.
+  // Одно правило и для карточки, и для итога колонки, чтобы цифры не расходились.
   const itemsSum = (d) => Math.round(itemsTotal(d) * 100) / 100;
+  const dealMoney = (d) => (Number.isFinite(d.amount) ? d.amount : itemsSum(d));
   function cardSum(d) {
     if (Number.isFinite(d.amount)) return fmtMoney(d.amount);
     const s = itemsSum(d);
@@ -4247,7 +4249,7 @@ window.CrmSupabaseStore = (() => {
       $$(`[data-count="${s}"]`).forEach((el) => { el.textContent = groups[s].length; });
       const sumEl = $(`[data-sum="${s}"]`);
       if (sumEl) {
-        const sum = groups[s].reduce((acc, x) => acc + (Number.isFinite(x.d.amount) ? x.d.amount : 0), 0);
+        const sum = groups[s].reduce((acc, x) => acc + dealMoney(x.d), 0);
         sumEl.textContent = sum ? fmtMoney(Math.round(sum)) : '';
       }
     }
