@@ -173,6 +173,22 @@
     </div>
   </dialog>
 
+  <!-- Пароль на удаление сделки с документами -->
+  <dialog id="dlg-deal-pwd" class="modal" aria-labelledby="dpw-title">
+    <form id="form-deal-pwd" class="modal-box" autocomplete="off">
+      <h2 id="dpw-title">Удалить сделку с документами?</h2>
+      <p class="sub" id="dpw-text"></p>
+      <label class="f" id="dpw-old-wrap"><span id="dpw-old-label">Пароль</span><input type="password" name="old" autocomplete="current-password"></label>
+      <label class="f" id="dpw-new-wrap" hidden><span>Придумайте пароль</span><input type="password" name="new" autocomplete="new-password"></label>
+      <label class="f" id="dpw-new2-wrap" hidden><span>Повторите</span><input type="password" name="new2" autocomplete="new-password"></label>
+      <p class="form-error" id="dpw-error" role="alert"></p>
+      <footer class="modal-foot">
+        <button type="button" class="btn ghost" data-close>Отмена</button>
+        <button type="submit" class="btn danger" id="dpw-go" disabled>Удалить</button>
+      </footer>
+    </form>
+  </dialog>
+
   <!-- Proforma: схема оплаты -->
   <dialog id="dlg-plan" class="modal" aria-labelledby="plan-title">
     <form id="form-plan" class="modal-box" autocomplete="off">
@@ -203,6 +219,10 @@
       </div>
       <div class="stack">
         <button type="button" class="btn" id="btn-log">История изменений</button>
+        <div class="set-row">
+          <span>Пароль для удаления сделок с документами</span>
+          <button type="button" class="btn small" id="btn-deal-pwd">Изменить</button>
+        </div>
         <button type="button" class="btn" id="btn-export">Скачать резервную копию</button>
         <button type="button" class="btn" id="btn-import">Загрузить из копии</button>
         <input type="file" id="import-file" accept=".json,application/json" hidden>

@@ -3084,6 +3084,25 @@ window.CrmSupabaseStore = (() => {
         const { error } = await sb.from('crm_log').insert(rows);
         if (error) throw new Error(error.message);
       },
+      // Пароль на удаление сделки с документами: хранится и проверяется в базе,
+      // наружу уходит только «да»/«нет». Хэш браузеру не отдаётся.
+      async dealPwdIsSet() {
+        const { data, error } = await sb.rpc('deal_pwd_is_set');
+        if (error) throw new Error(error.message.includes('deal_pwd_is_set')
+          ? 'В базе нет пароля удаления. Запустите файл 4_parol-udaleniya-sdelok.sql.'
+          : error.message);
+        return Boolean(data);
+      },
+      async dealPwdCheck(pass) {
+        const { data, error } = await sb.rpc('deal_pwd_check', { p_pass: String(pass || '') });
+        if (error) throw new Error(error.message);
+        return Boolean(data);
+      },
+      async dealPwdSet(oldPass, newPass) {
+        const { data, error } = await sb.rpc('deal_pwd_set', { p_old: String(oldPass || ''), p_new: String(newPass || '') });
+        if (error) throw new Error(error.message);
+        return Boolean(data);
+      },
       async logRead({ limit = 300 } = {}) {
         const { data, error } = await sb.from('crm_log')
           .select('id,at,actor,client_id,client_name,kind,text')
@@ -4708,9 +4727,9 @@ ${badge}
     if (!on || c.deals.length < 2) return '';
     const docs = dealDocNos(d);
     const why = docs.length
-      ? `Нельзя удалить: выпущены документы ${docs.join(', ')}`
+      ? `Удалить сделку «${dealTitle(d)}» — выпущены документы ${docs.join(', ')}, спросим пароль`
       : `Удалить сделку «${dealTitle(d)}»`;
-    return `<button type="button" class="deal-del${docs.length ? ' is-off' : ''}" data-act="deal-del" data-deal="${esc(d.id)}"${docs.length ? ' aria-disabled="true"' : ''} aria-label="${esc(why)}" title="${esc(why)}">${ICON.close}</button>`;
+    return `<button type="button" class="deal-del${docs.length ? ' has-docs' : ''}" data-act="deal-del" data-deal="${esc(d.id)}" aria-label="${esc(why)}" title="${esc(why)}">${ICON.close}</button>`;
   }
 
   function dealsHTML(c, cur) {
@@ -5381,9 +5400,9 @@ ${badge}
       if (act === 'deal-del') {
         const d2 = c.deals.find((x) => x.id === btn.dataset.deal);
         if (!d2 || c.deals.length < 2) return;
-        const docs = dealDocNos(d2);
-        if (docs.length) { toast(`Нельзя удалить: выпущены документы ${docs.join(', ')}`, 'err'); return; }
-        openDealDel(c.id, d2.id);
+        // по сделке есть документы — спрашиваем пароль, иначе обычное подтверждение
+        if (dealDocNos(d2).length) openDealPwd(c.id, d2.id);
+        else openDealDel(c.id, d2.id);
         return;
       }
       if (act === 'deal-add') {
@@ -5655,7 +5674,11 @@ ${badge}
       if (!old) { add(`новая сделка ${logVal(dealTitle(d))}`); continue; }
       logDealLines(old, d, pre, add);
     }
-    for (const [id, d] of dWas) if (!dNow.has(id)) add(`сделка ${logVal(dealTitle(d))} удалена`);
+    for (const [id, d] of dWas) {
+      if (dNow.has(id)) continue;
+      const nos = (d.docs || []).map((x) => x.no).filter(Boolean);
+      add(`сделка ${logVal(dealTitle(d))} удалена${nos.length ? ` (были документы ${nos.join(', ')})` : ''}`);
+    }
     return out;
   }
 
@@ -5688,17 +5711,18 @@ ${badge}
   function openDealDel(clientId, dealId) {
     const c = state.clients.get(clientId);
     const d = dealOf(c, dealId);
-    if (!c || !d || c.deals.length < 2 || dealDocNos(d).length) return;
+    if (!c || !d || c.deals.length < 2 || dealDocNos(d).length) return;   // с документами — другое окно
     dealDelCtx = { clientId, dealId, title: dealTitle(d) };
     $('#deal-del-text').textContent = `Удалить сделку «${dealDelCtx.title}»? Вместе с позициями и суммами. Отменить нельзя.`;
     $('#dlg-deal-del').showModal();
     fitSheets();
   }
 
-  function removeDeal(clientId, dealId) {
+  function removeDeal(clientId, dealId, { force = false } = {}) {
     const c = state.clients.get(clientId);
     const d = dealOf(c, dealId);
-    if (!c || !d || c.deals.length < 2 || dealDocNos(d).length) return;
+    if (!c || !d || c.deals.length < 2) return;
+    if (dealDocNos(d).length && !force) return;   // сделка с документами — только через пароль
     const title = dealTitle(d);
     const idx = c.deals.findIndex((x) => x.id === dealId);
     const deals = clone(c.deals).filter((x) => x.id !== dealId);
@@ -5723,6 +5747,165 @@ ${badge}
       dlg.close();
       removeDeal(clientId, dealId);
     });
+  }
+
+  /* ===================================================================
+     Пароль на удаление сделки, по которой уже выпущены документы.
+     Документы ушли клиенту, поэтому одного подтверждения мало.
+     Пароль живёт в базе (общий для всех устройств и для второго менеджера),
+     открытым текстом нигде не хранится: в базе bcrypt-хэш, сравнение там же.
+     =================================================================== */
+  const PWD_MIN = 4;
+  const PWD_TRIES = 3;
+  const PWD_PAUSE = 60 * 1000;
+  const PWD_KEY = 'exded-crm-pwd-block';
+  let pwdFails = 0;
+  let pwdCtx = null;      // { mode: 'ask' | 'create' | 'change', clientId, dealId, title, docs }
+
+  const pwdStore = () => (store && typeof store.dealPwdCheck === 'function' ? store : null);
+  function pwdBlockedFor() {
+    try {
+      const until = Number(localStorage.getItem(PWD_KEY) || 0);
+      return until > Date.now() ? until - Date.now() : 0;
+    } catch { return 0; }
+  }
+  const pwdBlock = () => { try { localStorage.setItem(PWD_KEY, String(Date.now() + PWD_PAUSE)); } catch {} };
+  const pwdUnblock = () => { try { localStorage.removeItem(PWD_KEY); } catch {} };
+
+  function pwdShow(mode) {
+    const f = $('#form-deal-pwd');
+    const ask = mode === 'ask';
+    const change = mode === 'change';
+    $('#dpw-title').textContent = ask ? 'Удалить сделку с документами?' : (change ? 'Пароль для удаления сделок' : 'Задайте пароль');
+    $('#dpw-old-wrap').hidden = mode === 'create';
+    $('#dpw-old-label').textContent = ask ? 'Пароль' : 'Текущий пароль';
+    $('#dpw-new-wrap').hidden = ask;
+    $('#dpw-new2-wrap').hidden = ask;
+    $('#dpw-go').textContent = change ? 'Сохранить' : 'Удалить';
+    $('#dpw-go').className = change ? 'btn primary' : 'btn danger';
+    $('#dpw-error').textContent = '';
+    f.reset();
+    pwdSyncButton();
+  }
+
+  function pwdSyncButton() {
+    const f = $('#form-deal-pwd');
+    const mode = pwdCtx ? pwdCtx.mode : 'ask';
+    const need = mode === 'ask'
+      ? [f.elements.old]
+      : (mode === 'create' ? [f.elements.new, f.elements.new2] : [f.elements.old, f.elements.new, f.elements.new2]);
+    $('#dpw-go').disabled = need.some((el) => !el.value.trim());
+  }
+
+  async function openDealPwd(clientId, dealId) {
+    const c = state.clients.get(clientId);
+    const d = dealOf(c, dealId);
+    if (!c || !d || c.deals.length < 2) return;
+    const left = pwdBlockedFor();
+    if (left) { toast(`Слишком много попыток. Ещё ${Math.ceil(left / 1000)} с.`, 'err'); return; }
+    if (!pwdStore()) { toast('Пароль удаления хранится в базе — в этой версии его нет', 'err'); return; }
+    const docs = dealDocNos(d);
+    let isSet = false;
+    try { isSet = await store.dealPwdIsSet(); } catch (e) { toast((e && e.message) || 'Пароль не проверить', 'err'); return; }
+    pwdCtx = { mode: isSet ? 'ask' : 'create', clientId, dealId, title: dealTitle(d), docs };
+    pwdShow(pwdCtx.mode);
+    $('#dpw-text').textContent = isSet
+      ? `По сделке «${pwdCtx.title}» выпущены документы ${docs.join(', ')}. Они уже ушли клиенту. Удаление уберёт сделку вместе с позициями и суммами. Отменить нельзя. Введите пароль.`
+      : `По сделке «${pwdCtx.title}» выпущены документы ${docs.join(', ')}. Пароль на такие удаления ещё не задан — придумайте его сейчас, от ${PWD_MIN} знаков. Отменить удаление будет нельзя.`;
+    $('#dlg-deal-pwd').showModal();
+    fitSheets();
+  }
+
+  async function openPwdChange() {
+    if (!pwdStore()) { toast('Пароль удаления хранится в базе — в этой версии его нет', 'err'); return; }
+    let isSet = false;
+    try { isSet = await store.dealPwdIsSet(); } catch (e) { toast((e && e.message) || 'Пароль не проверить', 'err'); return; }
+    pwdCtx = { mode: 'change', isSet };
+    pwdShow('change');
+    $('#dpw-old-wrap').hidden = !isSet;
+    $('#dpw-text').textContent = isSet
+      ? 'Этот пароль спрашивают при удалении сделки, по которой выпущены Angebot или Proforma.'
+      : `Пароль ещё не задан. Он спрашивается при удалении сделки с выпущенными документами, от ${PWD_MIN} знаков.`;
+    pwdSyncButton();
+    $('#dlg-deal-pwd').showModal();
+    fitSheets();
+  }
+
+  function bindDealPwd() {
+    const dlg = $('#dlg-deal-pwd');
+    const f = $('#form-deal-pwd');
+    if (!dlg) return;
+    f.addEventListener('input', pwdSyncButton);
+    dlg.addEventListener('click', (e) => { if (e.target === dlg || e.target.closest('[data-close]')) dlg.close(); });
+    dlg.addEventListener('close', () => { pwdCtx = null; f.reset(); });
+
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!pwdCtx) return;
+      const err = $('#dpw-error');
+      const go = $('#dpw-go');
+      const oldPass = f.elements.old.value;
+      const newPass = f.elements.new.value;
+      const newPass2 = f.elements.new2.value;
+      err.textContent = '';
+      go.disabled = true;
+      try {
+        if (pwdCtx.mode === 'ask') {
+          const ok = await store.dealPwdCheck(oldPass);
+          if (!ok) {
+            pwdFails += 1;
+            if (pwdFails >= PWD_TRIES) {
+              pwdFails = 0;
+              pwdBlock();
+              dlg.close();
+              toast('Слишком много попыток', 'err');
+              return;
+            }
+            err.textContent = 'Пароль неверный';
+            f.elements.old.value = '';
+            f.elements.old.focus();
+            return;
+          }
+          pwdFails = 0;
+          pwdUnblock();
+          const { clientId, dealId } = pwdCtx;
+          pwdCtx = null;
+          dlg.close();
+          removeDeal(clientId, dealId, { force: true });
+          return;
+        }
+
+        if (newPass.length < PWD_MIN) { err.textContent = `Пароль короче ${PWD_MIN} знаков`; return; }
+        if (newPass !== newPass2) { err.textContent = 'Пароли не совпали'; return; }
+        const saved = await store.dealPwdSet(pwdCtx.mode === 'change' && pwdCtx.isSet ? oldPass : '', newPass);
+        if (!saved) { err.textContent = 'Текущий пароль неверный'; return; }
+        if (pwdCtx.mode === 'change') {
+          pwdCtx = null;
+          dlg.close();
+          toast('Пароль сохранён');
+          refreshPwdButton();
+          return;
+        }
+        const { clientId, dealId } = pwdCtx;
+        pwdCtx = null;
+        dlg.close();
+        refreshPwdButton();
+        removeDeal(clientId, dealId, { force: true });
+      } catch (e2) {
+        err.textContent = (e2 && e2.message) || 'Не вышло';
+      } finally {
+        go.disabled = false;
+        pwdSyncButton();
+      }
+    });
+  }
+
+  // кнопка в настройках: «Задать», пока пароля нет, дальше «Изменить»
+  async function refreshPwdButton() {
+    const b = $('#btn-deal-pwd');
+    if (!b) return;
+    if (!pwdStore()) { b.textContent = 'Задать'; b.disabled = true; return; }
+    try { b.textContent = (await store.dealPwdIsSet()) ? 'Изменить' : 'Задать'; } catch { b.textContent = 'Изменить'; }
   }
 
   /* ===================================================================
@@ -5841,6 +6024,8 @@ ${badge}
     const dlg = $('#dlg-settings');
     const logBtn = $('#btn-log');
     if (logBtn) logBtn.addEventListener('click', () => { dlg.close(); openLogView(); });
+    const pwdBtn = $('#btn-deal-pwd');
+    if (pwdBtn) pwdBtn.addEventListener('click', () => { dlg.close(); openPwdChange(); });
     const seg = $('#theme-seg');
     if (seg) {
       setTheme(readTheme());
@@ -5850,6 +6035,7 @@ ${badge}
       });
     }
     $('#btn-settings').addEventListener('click', () => {
+      refreshPwdButton();
       $('#set-where').textContent = store.kind === 'claude'
         ? 'Клиенты хранятся в вашем аккаунте Claude и синхронизируются на всех устройствах, где вы вошли. Видите их только вы и те, кому вы дадите право редактирования.'
         : `Вы вошли как ${store.user && store.user.email ? store.user.email : ''}. Клиенты хранятся в вашей базе Supabase.`;
@@ -5965,6 +6151,7 @@ ${badge}
       bindCard();
       bindLost();
       bindDealDel();
+      bindDealPwd();
       bindPlan();
       bindLogView();
       bindSettings();
@@ -6056,7 +6243,8 @@ ${badge}
   }
 
   // для проверок: чистые функции схемы, без данных
-  window.EXDED_CRM_TEST = { normalize, legacyToClients, boardDeals, activeDeal, dealTitle, normalizeDeal, loadCatalog, catalog, catalogFind, catalogBlocked, keepFocusVisible, fitSheets, renderBoardNow: renderBoard, changeLines, logSeen, readTheme, applyTheme, setTheme, docPayload, docSubject, docItemsOf, normalizeDocRec };
+  Object.defineProperty(window, 'EXDED_CRM_TEST_STORE', { get: () => store, configurable: true });
+  window.EXDED_CRM_TEST = { normalize, legacyToClients, boardDeals, activeDeal, dealTitle, normalizeDeal, loadCatalog, catalog, catalogFind, catalogBlocked, keepFocusVisible, fitSheets, renderBoardNow: renderBoard, dealDocNos, changeLines, logSeen, readTheme, applyTheme, setTheme, docPayload, docSubject, docItemsOf, normalizeDocRec };
 
   function init() { registerSW(); boot(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

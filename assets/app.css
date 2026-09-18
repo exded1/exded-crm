@@ -728,6 +728,10 @@ input:not([type=file]), select, textarea {
 .cs-foot { display: flex; align-items: center; gap: 10px; padding: 10px 16px 12px; border-top: 1px solid var(--line); font-size: 13px; color: var(--ink-3); }
 .cs-foot { padding-bottom: max(12px, calc(var(--sab) + 8px)); }
 
+/* строка настройки с кнопкой справа */
+.set-row { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--ink-2); }
+.set-row .btn.small { margin-left: auto; min-height: 34px; padding: 0 12px; font-size: 13.5px; flex: none; }
+
 /* ---------- История изменений ---------- */
 /* ⚠️ ширина задаётся самому диалогу: у .modal[open] она своя, на внутренней коробке не сработает */
 #dlg-log[open] { width: min(720px, calc(100vw - 32px)); }
