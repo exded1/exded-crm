@@ -3064,6 +3064,8 @@ window.CrmSupabaseStore = (() => {
         subscribe();
       },
       async refresh() { try { await loadAll(); } catch {} },
+      // то же самое, но с честной ошибкой: по кнопке «Обновить» надо знать, вышло или нет
+      async pull() { await loadAll(); },
       async save(doc) {
         const body = { ...doc };
         delete body.id;
@@ -4054,6 +4056,20 @@ window.CrmSupabaseStore = (() => {
     return out.length ? `<div class="card-ways">${out.join('')}</div>` : '';
   }
 
+  // Когда завели клиента: коротко и приглушённо, это справка, а не заголовок
+  function bornShort(iso) {
+    if (!iso) return '';
+    const at = new Date(iso);
+    if (Number.isNaN(at.getTime())) return '';
+    const key = dayKey(at);
+    const today = dayKey(new Date());
+    if (key === today) return 'сегодня';
+    if (key === addDaysKey(today, -1)) return 'вчера';
+    const p = tzParts(at);
+    const nowY = tzParts(new Date()).y;
+    return p.y === nowY ? shortDate(at) : `${shortDate(at)} ${p.y}`;
+  }
+
   function cardHTML({ c, d, multi, no, of }) {
     const main = mainContact(c);
     const due = d.next ? dueInfo(d.next) : null;
@@ -4061,6 +4077,7 @@ window.CrmSupabaseStore = (() => {
     const recentReturn = d.returned_at && d.status === 'work' && Date.now() - Date.parse(d.returned_at) < 14 * 86400000;
     const line = str(d.product).trim();
     return `<article class="card${c.vip ? ' is-vip' : ''}${multi ? ' is-multi' : ''}" data-id="${esc(c.id)}" data-deal="${esc(d.id)}" tabindex="0">
+  <p class="card-born">${esc(bornShort(c.created_at))}</p>
   <div class="card-top">
     <button type="button" class="vip${c.vip ? ' on' : ''}" data-act="vip" aria-pressed="${c.vip}" aria-label="VIP клиент">${ICON.star}</button>
     <h3 class="card-co">${esc(title)}</h3>
@@ -4321,6 +4338,8 @@ window.CrmSupabaseStore = (() => {
       if (b) openCard(b.dataset.open, b.dataset.deal);
     });
 
+    const rb = $('#btn-refresh');
+    if (rb) rb.addEventListener('click', () => refreshAll());
     $$('#tabs button').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.tab)));
     let saved = 'work';
     try { saved = localStorage.getItem(TAB_KEY) || 'work'; } catch {}
@@ -4727,7 +4746,7 @@ ${badge}
     if (!on || c.deals.length < 2) return '';
     const docs = dealDocNos(d);
     const why = docs.length
-      ? `Удалить сделку «${dealTitle(d)}» — выпущены документы ${docs.join(', ')}, спросим пароль`
+      ? `Удалить сделку «${dealTitle(d)}» — выпущены документы ${docs.join(', ')}, спросим ПИН-код`
       : `Удалить сделку «${dealTitle(d)}»`;
     return `<button type="button" class="deal-del${docs.length ? ' has-docs' : ''}" data-act="deal-del" data-deal="${esc(d.id)}" aria-label="${esc(why)}" title="${esc(why)}">${ICON.close}</button>`;
   }
@@ -5320,6 +5339,21 @@ ${badge}
         const value = key === 'amount' ? parseAmount(el.value) : el.value;
         patchDeal(c.id, d.id, { [key]: value });
         cardRenderedJSON = JSON.stringify(state.clients.get(c.id));
+        if (key === 'title') {
+          // подпись на таблетке должна совпадать с тем, что спросит удаление
+          const fresh = dealOf(state.clients.get(c.id), d.id);
+          const tab = $('.deal-tab.on .deal-name', body);
+          if (tab && fresh) tab.textContent = dealTitle(fresh);
+          const del = $('.deal-tab.on', body) && $('.deal-tab.on', body).parentElement.querySelector('.deal-del');
+          if (del && fresh) {
+            const nos = dealDocNos(fresh);
+            const why = nos.length
+              ? `Удалить сделку «${dealTitle(fresh)}» — выпущены документы ${nos.join(', ')}, спросим ПИН-код`
+              : `Удалить сделку «${dealTitle(fresh)}»`;
+            del.setAttribute('title', why);
+            del.setAttribute('aria-label', why);
+          }
+        }
         if (key === 'lost_reason') $$('[data-act="lost-reason"]', body).forEach((b) => b.classList.toggle('on', b.dataset.reason === el.value));
       } else if (el.dataset.lbind) {
         patch(c.id, { links: { ...c.links, [el.dataset.lbind]: el.value } });
@@ -5400,7 +5434,7 @@ ${badge}
       if (act === 'deal-del') {
         const d2 = c.deals.find((x) => x.id === btn.dataset.deal);
         if (!d2 || c.deals.length < 2) return;
-        // по сделке есть документы — спрашиваем пароль, иначе обычное подтверждение
+        // по сделке есть документы — спрашиваем ПИН-код, иначе обычное подтверждение
         if (dealDocNos(d2).length) openDealPwd(c.id, d2.id);
         else openDealDel(c.id, d2.id);
         return;
@@ -5722,7 +5756,7 @@ ${badge}
     const c = state.clients.get(clientId);
     const d = dealOf(c, dealId);
     if (!c || !d || c.deals.length < 2) return;
-    if (dealDocNos(d).length && !force) return;   // сделка с документами — только через пароль
+    if (dealDocNos(d).length && !force) return;   // сделка с документами — только через ПИН-код
     const title = dealTitle(d);
     const idx = c.deals.findIndex((x) => x.id === dealId);
     const deals = clone(c.deals).filter((x) => x.id !== dealId);
@@ -5750,12 +5784,12 @@ ${badge}
   }
 
   /* ===================================================================
-     Пароль на удаление сделки, по которой уже выпущены документы.
+     ПИН-код на удаление сделки, по которой уже выпущены документы.
      Документы ушли клиенту, поэтому одного подтверждения мало.
-     Пароль живёт в базе (общий для всех устройств и для второго менеджера),
+     ПИН живёт в базе (общий для всех устройств и для второго менеджера),
      открытым текстом нигде не хранится: в базе bcrypt-хэш, сравнение там же.
      =================================================================== */
-  const PWD_MIN = 4;
+  const PIN_LEN = 4;
   const PWD_TRIES = 3;
   const PWD_PAUSE = 60 * 1000;
   const PWD_KEY = 'exded-crm-pwd-block';
@@ -5776,9 +5810,9 @@ ${badge}
     const f = $('#form-deal-pwd');
     const ask = mode === 'ask';
     const change = mode === 'change';
-    $('#dpw-title').textContent = ask ? 'Удалить сделку с документами?' : (change ? 'Пароль для удаления сделок' : 'Задайте пароль');
+    $('#dpw-title').textContent = ask ? 'Удалить сделку с документами?' : (change ? 'ПИН-код для удаления сделок' : 'Задайте ПИН-код');
     $('#dpw-old-wrap').hidden = mode === 'create';
-    $('#dpw-old-label').textContent = ask ? 'Пароль' : 'Текущий пароль';
+    $('#dpw-old-label').textContent = ask ? 'ПИН-код' : 'Текущий ПИН-код';
     $('#dpw-new-wrap').hidden = ask;
     $('#dpw-new2-wrap').hidden = ask;
     $('#dpw-go').textContent = change ? 'Сохранить' : 'Удалить';
@@ -5788,13 +5822,24 @@ ${badge}
     pwdSyncButton();
   }
 
+  const pinOk = (v) => new RegExp('^[0-9]{' + PIN_LEN + '}$').test(String(v || ''));
+
+  // ⚠️ Смотрим только на ПОКАЗАННЫЕ поля. Раньше проверка ждала «старый пароль»
+  // даже в режиме, где этого поля нет на экране, и кнопка не включалась никогда.
   function pwdSyncButton() {
     const f = $('#form-deal-pwd');
-    const mode = pwdCtx ? pwdCtx.mode : 'ask';
-    const need = mode === 'ask'
-      ? [f.elements.old]
-      : (mode === 'create' ? [f.elements.new, f.elements.new2] : [f.elements.old, f.elements.new, f.elements.new2]);
-    $('#dpw-go').disabled = need.some((el) => !el.value.trim());
+    const shown = (el) => el && !el.closest('label').hidden;
+    const fields = [f.elements.old, f.elements.new, f.elements.new2].filter(shown);
+    const err = $('#dpw-error');
+    let ok = fields.length > 0 && fields.every((el) => pinOk(el.value));
+    // оба новых заполнены, но разные — говорим сразу и не даём сохранить
+    if (ok && shown(f.elements.new) && f.elements.new.value !== f.elements.new2.value) {
+      err.textContent = 'ПИН-коды не совпали';
+      ok = false;
+    } else if (err.textContent === 'ПИН-коды не совпали') {
+      err.textContent = '';
+    }
+    $('#dpw-go').disabled = !ok;
   }
 
   async function openDealPwd(clientId, dealId) {
@@ -5803,29 +5848,29 @@ ${badge}
     if (!c || !d || c.deals.length < 2) return;
     const left = pwdBlockedFor();
     if (left) { toast(`Слишком много попыток. Ещё ${Math.ceil(left / 1000)} с.`, 'err'); return; }
-    if (!pwdStore()) { toast('Пароль удаления хранится в базе — в этой версии его нет', 'err'); return; }
+    if (!pwdStore()) { toast('ПИН-код удаления хранится в базе — в этой версии его нет', 'err'); return; }
     const docs = dealDocNos(d);
     let isSet = false;
-    try { isSet = await store.dealPwdIsSet(); } catch (e) { toast((e && e.message) || 'Пароль не проверить', 'err'); return; }
+    try { isSet = await store.dealPwdIsSet(); } catch (e) { toast((e && e.message) || 'ПИН-код не проверить', 'err'); return; }
     pwdCtx = { mode: isSet ? 'ask' : 'create', clientId, dealId, title: dealTitle(d), docs };
     pwdShow(pwdCtx.mode);
     $('#dpw-text').textContent = isSet
-      ? `По сделке «${pwdCtx.title}» выпущены документы ${docs.join(', ')}. Они уже ушли клиенту. Удаление уберёт сделку вместе с позициями и суммами. Отменить нельзя. Введите пароль.`
-      : `По сделке «${pwdCtx.title}» выпущены документы ${docs.join(', ')}. Пароль на такие удаления ещё не задан — придумайте его сейчас, от ${PWD_MIN} знаков. Отменить удаление будет нельзя.`;
+      ? `По сделке «${pwdCtx.title}» выпущены документы ${docs.join(', ')}. Они уже ушли клиенту. Удаление уберёт сделку вместе с позициями и суммами. Отменить нельзя. Введите ПИН-код.`
+      : `По сделке «${pwdCtx.title}» выпущены документы ${docs.join(', ')}. ПИН-код на такие удаления ещё не задан — придумайте его сейчас, ${PIN_LEN} цифры. Отменить удаление будет нельзя.`;
     $('#dlg-deal-pwd').showModal();
     fitSheets();
   }
 
   async function openPwdChange() {
-    if (!pwdStore()) { toast('Пароль удаления хранится в базе — в этой версии его нет', 'err'); return; }
+    if (!pwdStore()) { toast('ПИН-код удаления хранится в базе — в этой версии его нет', 'err'); return; }
     let isSet = false;
-    try { isSet = await store.dealPwdIsSet(); } catch (e) { toast((e && e.message) || 'Пароль не проверить', 'err'); return; }
+    try { isSet = await store.dealPwdIsSet(); } catch (e) { toast((e && e.message) || 'ПИН-код не проверить', 'err'); return; }
     pwdCtx = { mode: 'change', isSet };
     pwdShow('change');
     $('#dpw-old-wrap').hidden = !isSet;
     $('#dpw-text').textContent = isSet
-      ? 'Этот пароль спрашивают при удалении сделки, по которой выпущены Angebot или Proforma.'
-      : `Пароль ещё не задан. Он спрашивается при удалении сделки с выпущенными документами, от ${PWD_MIN} знаков.`;
+      ? 'Этот ПИН-код спрашивают при удалении сделки, по которой выпущены Angebot или Proforma.'
+      : `ПИН-код ещё не задан. Его спрашивают при удалении сделки с выпущенными документами. Ровно ${PIN_LEN} цифры.`;
     pwdSyncButton();
     $('#dlg-deal-pwd').showModal();
     fitSheets();
@@ -5835,7 +5880,13 @@ ${badge}
     const dlg = $('#dlg-deal-pwd');
     const f = $('#form-deal-pwd');
     if (!dlg) return;
-    f.addEventListener('input', pwdSyncButton);
+    f.addEventListener('input', (e) => {
+      if (e.target && e.target.type === 'password') {
+        const only = e.target.value.replace(/[^0-9]/g, '').slice(0, PIN_LEN);   // буквы и знаки не принимаем
+        if (e.target.value !== only) e.target.value = only;
+      }
+      pwdSyncButton();
+    });
     dlg.addEventListener('click', (e) => { if (e.target === dlg || e.target.closest('[data-close]')) dlg.close(); });
     dlg.addEventListener('close', () => { pwdCtx = null; f.reset(); });
 
@@ -5861,7 +5912,7 @@ ${badge}
               toast('Слишком много попыток', 'err');
               return;
             }
-            err.textContent = 'Пароль неверный';
+            err.textContent = 'ПИН-код неверный';
             f.elements.old.value = '';
             f.elements.old.focus();
             return;
@@ -5875,14 +5926,14 @@ ${badge}
           return;
         }
 
-        if (newPass.length < PWD_MIN) { err.textContent = `Пароль короче ${PWD_MIN} знаков`; return; }
-        if (newPass !== newPass2) { err.textContent = 'Пароли не совпали'; return; }
+        if (!pinOk(newPass)) { err.textContent = 'ПИН-код — ровно ' + PIN_LEN + ' цифры'; return; }
+        if (newPass !== newPass2) { err.textContent = 'ПИН-коды не совпали'; return; }
         const saved = await store.dealPwdSet(pwdCtx.mode === 'change' && pwdCtx.isSet ? oldPass : '', newPass);
-        if (!saved) { err.textContent = 'Текущий пароль неверный'; return; }
+        if (!saved) { err.textContent = 'Текущий ПИН-код неверный'; return; }
         if (pwdCtx.mode === 'change') {
           pwdCtx = null;
           dlg.close();
-          toast('Пароль сохранён');
+          toast('ПИН-код сохранён');
           refreshPwdButton();
           return;
         }
@@ -5900,12 +5951,95 @@ ${badge}
     });
   }
 
-  // кнопка в настройках: «Задать», пока пароля нет, дальше «Изменить»
+  // кнопка в настройках: «Задать», пока ПИН не задан, дальше «Изменить»
   async function refreshPwdButton() {
     const b = $('#btn-deal-pwd');
     if (!b) return;
     if (!pwdStore()) { b.textContent = 'Задать'; b.disabled = true; return; }
     try { b.textContent = (await store.dealPwdIsSet()) ? 'Изменить' : 'Задать'; } catch { b.textContent = 'Изменить'; }
+  }
+
+  /* ===================================================================
+     Обновление доски: кнопка в шапке и жест «потянуть вниз» на телефоне.
+     Данные перезапрашиваются из базы, доска при этом не пересобирается —
+     карточки переиспользуются, мигания нет.
+     =================================================================== */
+  let refreshing = false;
+  const catalogStale = () => !catalog.at || (Date.now() - Date.parse(catalog.at) > CAT_TTL);
+
+  async function refreshAll() {
+    if (refreshing) return false;           // повторные нажатия игнорируем
+    refreshing = true;
+    const btn = $('#btn-refresh');
+    if (btn) { btn.classList.add('is-spin'); btn.disabled = true; }
+    let ok = true;
+    try {
+      if (store && typeof store.pull === 'function') await store.pull();
+      else if (store && typeof store.refresh === 'function') await store.refresh();
+    } catch { ok = false; }
+    try { if (!catalogBlocked() && catalogStale()) await loadCatalog({ background: true }); } catch {}
+    refreshing = false;
+    if (btn) { btn.classList.remove('is-spin'); btn.disabled = false; }
+    if (!ok) toast('Не удалось обновить', 'err');   // данные на экране не трогаем
+    return ok;
+  }
+
+  /* Жест: тянем вниз по доске, прокрученной в самый верх */
+  const PULL_GO = 70;
+  function bindPull() {
+    const board = $('#board');
+    const dot = $('#pull');
+    if (!board || !dot) return;
+    let y0 = 0; let x0 = 0; let list = null; let on = false; let dist = 0;
+
+    const place = (d) => {
+      if (MQ_CALM.matches) return;                 // «уменьшить движение»: кружок не показываем
+      dot.classList.remove('is-back');
+      dot.style.transform = `translateY(${Math.min(d * 0.6, 90) - 46}px)`;
+      dot.style.opacity = String(Math.min(1, d / PULL_GO));
+      dot.classList.toggle('is-ready', d >= PULL_GO);
+    };
+    const hide = () => {
+      dot.classList.add('is-back');
+      dot.classList.remove('is-ready', 'is-run');
+      dot.style.transform = 'translateY(-46px)';
+      dot.style.opacity = '0';
+    };
+
+    board.addEventListener('touchstart', (e) => {
+      on = false; dist = 0;
+      if (!MQ_PHONE.matches && !MQ_TABLET.matches) return;
+      if (document.querySelector('dialog[open]')) return;      // в карточке и окнах жеста нет
+      const t = e.touches[0];
+      y0 = t.clientY; x0 = t.clientX;
+      list = e.target.closest('.col-list');
+      if (!list || list.scrollTop > 0) list = null;            // доска не в самом верху — обычная прокрутка
+    }, { passive: true });
+
+    board.addEventListener('touchmove', (e) => {
+      if (!list || refreshing) return;
+      const t = e.touches[0];
+      const dy = t.clientY - y0;
+      const dx = Math.abs(t.clientX - x0);
+      if (!on) {
+        if (dy < 8 || dx > Math.abs(dy)) { if (dy < 0 || dx > 12) list = null; return; }
+        on = true;
+      }
+      if (list.scrollTop > 0) { on = false; list = null; hide(); return; }
+      dist = dy;
+      // ⚠️ гасим системное «оттянуть страницу» в Safari: без этого сработают оба
+      if (e.cancelable) e.preventDefault();
+      place(dist);
+    }, { passive: false });
+
+    board.addEventListener('touchend', async () => {
+      if (!on) { list = null; return; }
+      on = false; list = null;
+      if (dist < PULL_GO) { hide(); return; }
+      if (!MQ_CALM.matches) { dot.classList.add('is-run'); dot.style.opacity = '1'; dot.style.transform = 'translateY(10px)'; }
+      await refreshAll();
+      hide();
+    }, { passive: true });
   }
 
   /* ===================================================================
@@ -6147,6 +6281,7 @@ ${badge}
     if (!appStarted) {
       appStarted = true;
       bindBoard();
+      bindPull();
       bindNew();
       bindCard();
       bindLost();
@@ -6244,7 +6379,7 @@ ${badge}
 
   // для проверок: чистые функции схемы, без данных
   Object.defineProperty(window, 'EXDED_CRM_TEST_STORE', { get: () => store, configurable: true });
-  window.EXDED_CRM_TEST = { normalize, legacyToClients, boardDeals, activeDeal, dealTitle, normalizeDeal, loadCatalog, catalog, catalogFind, catalogBlocked, keepFocusVisible, fitSheets, renderBoardNow: renderBoard, dealDocNos, changeLines, logSeen, readTheme, applyTheme, setTheme, docPayload, docSubject, docItemsOf, normalizeDocRec };
+  window.EXDED_CRM_TEST = { normalize, legacyToClients, boardDeals, activeDeal, dealTitle, normalizeDeal, loadCatalog, catalog, catalogFind, catalogBlocked, keepFocusVisible, fitSheets, renderBoardNow: renderBoard, dealDocNos, bornShort, refreshAll, changeLines, logSeen, readTheme, applyTheme, setTheme, docPayload, docSubject, docItemsOf, normalizeDocRec };
 
   function init() { registerSW(); boot(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

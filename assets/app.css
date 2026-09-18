@@ -406,6 +406,7 @@ input::placeholder, textarea::placeholder { color: var(--ink-3); }
   padding-left: 9px; border-left: 2px solid var(--line-2);
   font-size: 14px; color: var(--ink);
 }
+.card-born { font-size: 11.5px; color: var(--ink-3); line-height: 1.2; margin-bottom: 1px; }
 .card-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin-top: 2px; font-size: 13px; color: var(--ink-3); }
 .card-person { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .due {
@@ -441,15 +442,18 @@ input::placeholder, textarea::placeholder { color: var(--ink-3); }
 /* «Позвонить или скопировать» — коротко и на месте, рядом с кнопкой */
 .way-ask {
   position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 5;
-  display: flex; align-items: center; gap: 6px; padding: 6px;
+  display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 6px; padding: 6px;
+  max-width: min(260px, calc(100vw - 24px));
   border: 1px solid var(--line); border-radius: 12px; background: var(--surface);
   box-shadow: var(--shadow-float); white-space: nowrap;
 }
-.way-ask-num { font-size: 12.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+/* номер — главное в подсказке, кнопки рядом его не перебивают */
+/* номер занимает свою строку: так он крупнее кнопок и подсказка не вылезает за карточку */
+.way-ask-num { flex: 1 0 100%; padding: 0 4px 2px; font-size: 15px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
 .way-ask-btn {
   display: inline-flex; align-items: center; min-height: 30px; padding: 0 10px;
   border: 1px solid var(--line); border-radius: 9px; background: var(--surface);
-  font-size: 13px; font-weight: 600; color: var(--ink); text-decoration: none;
+  font-size: 13px; font-weight: 600; color: var(--ink-2); text-decoration: none;
 }
 @media (hover: hover) { .way-ask-btn:hover { background: var(--surface-2); } }
 
@@ -727,6 +731,25 @@ input:not([type=file]), select, textarea {
 .log .icon-btn svg { width: 16px; height: 16px; }
 .cs-foot { display: flex; align-items: center; gap: 10px; padding: 10px 16px 12px; border-top: 1px solid var(--line); font-size: 13px; color: var(--ink-3); }
 .cs-foot { padding-bottom: max(12px, calc(var(--sab) + 8px)); }
+
+/* Обновление: кнопка в шапке и кружок при жесте «потянуть вниз» */
+@keyframes spin { to { transform: rotate(360deg); } }
+#btn-refresh.is-spin svg { animation: spin 900ms linear infinite; }
+#btn-refresh[disabled] { opacity: .5; }
+.pull {
+  position: fixed; left: 50%; top: 0; z-index: 30; pointer-events: none;
+  display: grid; place-items: center; width: 34px; height: 34px;
+  margin-left: -17px; border-radius: 50%;
+  background: var(--surface); box-shadow: var(--shadow-card); color: var(--ink-2);
+  opacity: 0; transform: translateY(-46px);
+}
+.pull svg { width: 17px; height: 17px; }
+.pull.is-ready { color: var(--orange-ink); }
+.pull.is-run svg { animation: spin 900ms linear infinite; }
+.pull.is-back { transition: transform 180ms ease-out, opacity 180ms ease-out; }
+
+/* ПИН: четыре цифры, набирать удобнее крупно */
+.pin { max-width: 140px; letter-spacing: .32em; font-size: 17px !important; font-variant-numeric: tabular-nums; }
 
 /* строка настройки с кнопкой справа */
 .set-row { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--ink-2); }
