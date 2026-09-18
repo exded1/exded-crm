@@ -3150,6 +3150,10 @@ window.CrmSupabaseStore = (() => {
   const CAT_TTL = 24 * 60 * 60 * 1000;         // держим каталог сутки, обновляем в фоне
   const CAT_URL = 'https://exded.com/wp-json/wc/store/v1/products';
   const TAB_KEY = 'exded-crm-tab';
+  const THEME_KEY = 'exded-crm-theme';
+  const MQ_DARK = window.matchMedia('(prefers-color-scheme: dark)');
+  // цвет полосы статуса на айфоне: совпадает с фоном приложения
+  const THEME_COLOR = { dark: '#191918', light: '#f3f2ee' };
   const MQ_PHONE = window.matchMedia('(max-width: 699px)');
   const MQ_TABLET = window.matchMedia('(min-width: 700px) and (max-width: 1023px)');
 
@@ -3171,6 +3175,40 @@ window.CrmSupabaseStore = (() => {
   /* ===================================================================
      Утилиты
      =================================================================== */
+  /* ---------- Оформление: тёмное, светлое или как в системе ---------- */
+  function readTheme() {
+    try {
+      const v = localStorage.getItem(THEME_KEY);
+      return v === 'dark' || v === 'light' ? v : 'auto';
+    } catch { return 'auto'; }
+  }
+  // Переключение мгновенное: меняется только атрибут на <html>, страница не перезагружается
+  function applyTheme(mode) {
+    const want = mode === 'dark' || mode === 'light' ? mode : 'auto';
+    const real = want === 'auto' ? (MQ_DARK.matches ? 'dark' : 'light') : want;
+    const root = document.documentElement;
+    if (want === 'auto') root.removeAttribute('data-theme');
+    else root.setAttribute('data-theme', want);
+    let meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta && document.head) {
+      meta = document.createElement('meta');
+      meta.setAttribute('name', 'theme-color');
+      document.head.appendChild(meta);
+    }
+    if (meta) meta.setAttribute('content', THEME_COLOR[real]);
+    return real;
+  }
+  function setTheme(mode) {
+    try {
+      if (mode === 'auto') localStorage.removeItem(THEME_KEY);
+      else localStorage.setItem(THEME_KEY, mode);
+    } catch {}
+    applyTheme(mode);
+    document.querySelectorAll('#theme-seg button').forEach((b) => b.classList.toggle('on', b.dataset.theme === mode));
+  }
+  applyTheme(readTheme());
+  MQ_DARK.addEventListener('change', () => { if (readTheme() === 'auto') applyTheme('auto'); });
+
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
   const pad = (n) => String(n).padStart(2, '0');
@@ -5412,6 +5450,14 @@ ${badge}
      =================================================================== */
   function bindSettings() {
     const dlg = $('#dlg-settings');
+    const seg = $('#theme-seg');
+    if (seg) {
+      setTheme(readTheme());
+      seg.addEventListener('click', (e) => {
+        const b = e.target.closest('button[data-theme]');
+        if (b) setTheme(b.dataset.theme);
+      });
+    }
     $('#btn-settings').addEventListener('click', () => {
       $('#set-where').textContent = store.kind === 'claude'
         ? 'Клиенты хранятся в вашем аккаунте Claude и синхронизируются на всех устройствах, где вы вошли. Видите их только вы и те, кому вы дадите право редактирования.'
@@ -5617,7 +5663,7 @@ ${badge}
   }
 
   // для проверок: чистые функции схемы, без данных
-  window.EXDED_CRM_TEST = { normalize, legacyToClients, boardDeals, activeDeal, dealTitle, normalizeDeal, loadCatalog, catalog, catalogFind, catalogBlocked, keepFocusVisible, fitSheets, docPayload, docSubject, docItemsOf, normalizeDocRec };
+  window.EXDED_CRM_TEST = { normalize, legacyToClients, boardDeals, activeDeal, dealTitle, normalizeDeal, loadCatalog, catalog, catalogFind, catalogBlocked, keepFocusVisible, fitSheets, readTheme, applyTheme, setTheme, docPayload, docSubject, docItemsOf, normalizeDocRec };
 
   function init() { registerSW(); boot(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
