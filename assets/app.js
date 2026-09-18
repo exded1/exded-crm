@@ -3006,6 +3006,7 @@ window.CrmSupabaseStore = (() => {
     const map = new Map();
     let channel = null;
     let hooks = null;
+    let mergeOff = false;      // в базе ещё нет crm_merge — работаем как раньше
 
     const emit = () => hooks && hooks.onData(Array.from(map.values()));
 
@@ -3066,12 +3067,35 @@ window.CrmSupabaseStore = (() => {
       async refresh() { try { await loadAll(); } catch {} },
       // то же самое, но с честной ошибкой: по кнопке «Обновить» надо знать, вышло или нет
       async pull() { await loadAll(); },
-      async save(doc) {
+      // ⚠️ Шлём ТОЛЬКО изменённые поля, склеивает их сама база (crm_merge).
+      // Раньше здесь уходил весь документ, и правка одного затирала правку другого,
+      // сделанную в это же время в другом поле того же клиента.
+      // keys не передали (новый клиент) — пишем целиком.
+      async save(doc, keys) {
         const body = { ...doc };
         delete body.id;
-        const { error } = await sb.from('crm_docs').upsert({ id: doc.id, kind: 'client', data: body, updated_at: new Date().toISOString() });
-        if (error) throw new Error(error.message);
-        map.set(doc.id, { ...body, id: doc.id });
+        const list = Array.isArray(keys) ? keys.filter((k) => k !== 'id') : null;
+
+        if (!list || !list.length || mergeOff) {
+          const { error } = await sb.from('crm_docs').upsert({ id: doc.id, kind: 'client', data: body, updated_at: new Date().toISOString() });
+          if (error) throw new Error(error.message);
+          map.set(doc.id, { ...body, id: doc.id });
+          return;
+        }
+
+        const patch = { updated_at: body.updated_at };
+        for (const k of list) patch[k] = body[k] === undefined ? null : body[k];
+        const { error } = await sb.rpc('crm_merge', { p_id: doc.id, p_patch: patch });
+        if (error) {
+          // функции ещё нет — работаем по-старому, но говорим об этом в консоль
+          if (/crm_merge/.test(error.message || '')) {
+            mergeOff = true;
+            console.warn('[EXDED CRM] Слияние правок выключено: запустите 5_sliyanie-pravok.sql в Supabase');
+            return this.save(doc, keys);
+          }
+          throw new Error(error.message);
+        }
+        map.set(doc.id, { ...(map.get(doc.id) || {}), ...patch, id: doc.id });
       },
       async remove(id) {
         const { error } = await sb.from('crm_docs').delete().eq('id', id);
@@ -3562,6 +3586,10 @@ window.CrmSupabaseStore = (() => {
   };
   let store = null;
   const dirty = new Map();       // id -> Set полей, ещё не отправленных
+  // что мы записали последним: если из базы вернулось другое, значит кто-то правил
+  // то же поле в это же время — скажем об этом и покажем свежее значение
+  const lastSent = new Map();    // id -> { at, values: { поле: json } }
+  const CLASH_WINDOW = 90 * 1000;
   const inflight = new Map();    // id -> updated_at отправляемой версии
   const creating = new Set();
   const deleting = new Set();
@@ -3748,9 +3776,25 @@ window.CrmSupabaseStore = (() => {
     });
   }
 
+  function noteSent(snap, keys) {
+    if (!keys || !keys.length) { lastSent.delete(snap.id); return; }
+    const values = {};
+    for (const k of keys) values[k] = JSON.stringify(snap[k] === undefined ? null : snap[k]);
+    lastSent.set(snap.id, { at: Date.now(), values });
+  }
+
+  function overwritten(id, incoming) {
+    const sent = lastSent.get(id);
+    if (!sent) return false;
+    if (Date.now() - sent.at > CLASH_WINDOW) { lastSent.delete(id); return false; }
+    return Object.keys(sent.values)
+      .some((k) => JSON.stringify(incoming[k] === undefined ? null : incoming[k]) !== sent.values[k]);
+  }
+
   function onData(docs) {
     const incoming = new Map();
     const legacyIds = [];
+    let clash = false;
     for (const d of docs) {
       if (!d || !d.id) continue;
       const c = normalize(d);
@@ -3762,6 +3806,7 @@ window.CrmSupabaseStore = (() => {
       const local = state.clients.get(id);
       if (local && dirty.has(id)) continue;
       if (!local || (d.updated_at || '') >= (local.updated_at || '')) {
+        if (overwritten(id, d)) { clash = true; lastSent.delete(id); }
         state.clients.set(id, d);
         logSeen(d);        // правки с другого устройства он записал сам — здесь их не дублируем
       }
@@ -3770,6 +3815,10 @@ window.CrmSupabaseStore = (() => {
       if (!incoming.has(id) && !dirty.has(id) && !inflight.has(id) && !creating.has(id)) { state.clients.delete(id); logForget(id); }
     }
     scheduleRender();
+    if (clash) {
+      toast('Данные обновил кто-то ещё');
+      if (state.openId && $('#dlg-card').open) renderCard();   // в полях — свежее, а не набранное
+    }
     syncOpenCard();
     for (const id of legacyIds) migrateDoc(id);
   }
@@ -3837,10 +3886,15 @@ window.CrmSupabaseStore = (() => {
     const isNew = creating.has(id);
     const logPrev = isNew ? null : logBase.get(id);
     try {
-      await store.save(snap, isNew ? null : Array.from(keys));
+      const sentKeys = isNew ? null : Array.from(keys);
+      // ⚠️ запоминаем ДО отправки: живая синхронизация успевает вернуть наш же
+      // документ обратно раньше, чем придёт ответ, и мы приняли бы его за чужую правку
+      noteSent(snap, sentKeys);
+      await store.save(snap, sentKeys);
       creating.delete(id);
       logSaved(snap, logPrev);   // в историю уходит после сохранения и не ждётся
     } catch (err) {
+      lastSent.delete(id);          // не сохранилось — что в базе, мы не знаем
       const again = dirty.get(id) || new Set();
       keys.forEach((k) => again.add(k));
       dirty.set(id, again);
@@ -3876,6 +3930,7 @@ window.CrmSupabaseStore = (() => {
       await store.remove(id);
       pushLog(c, ['клиент удалён'], 'delete');
       logForget(id);
+      lastSent.delete(id);
       toast(`«${c.company || 'Клиент'}» удалён`);
     } catch (err) {
       state.clients.set(id, c);
