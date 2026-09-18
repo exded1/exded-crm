@@ -190,6 +190,7 @@
         </div>
       </div>
       <div class="stack">
+        <button type="button" class="btn" id="btn-log">История изменений</button>
         <button type="button" class="btn" id="btn-export">Скачать резервную копию</button>
         <button type="button" class="btn" id="btn-import">Загрузить из копии</button>
         <input type="file" id="import-file" accept=".json,application/json" hidden>
@@ -197,6 +198,23 @@
       <p class="hint">Раз в неделю скачивайте копию и храните у себя. Загрузка из копии только добавляет недостающих клиентов и ничего не стирает.</p>
       <footer class="modal-foot">
         <button type="button" class="btn ghost danger" id="btn-logout" hidden>Выйти</button>
+        <span class="grow"></span>
+        <button type="button" class="btn primary" data-close>Готово</button>
+      </footer>
+    </div>
+  </dialog>
+
+  <!-- История изменений -->
+  <dialog id="dlg-log" class="modal" aria-labelledby="log-title">
+    <div class="modal-box">
+      <h2 id="log-title">История изменений</h2>
+      <div class="log-filters">
+        <select id="log-who" aria-label="Кто менял"><option value="">Все люди</option></select>
+        <select id="log-client" aria-label="Клиент"><option value="">Все клиенты</option></select>
+      </div>
+      <div class="log-rows" id="log-rows"><p class="hint">Загружаю…</p></div>
+      <p class="hint">Новое сверху. Записи хранятся 90 дней, потом удаляются сами. Изменить или удалить запись нельзя никому.</p>
+      <footer class="modal-foot">
         <span class="grow"></span>
         <button type="button" class="btn primary" data-close>Готово</button>
       </footer>

@@ -3077,6 +3077,23 @@ window.CrmSupabaseStore = (() => {
         map.delete(id);
       },
       async lock() { return true; },
+      // История изменений: отдельная таблица crm_log. Пишем не дожидаясь ответа,
+      // читаем последние записи. Править и удалять записи нельзя — это запрещено в базе.
+      async logWrite(rows) {
+        if (!rows || !rows.length) return;
+        const { error } = await sb.from('crm_log').insert(rows);
+        if (error) throw new Error(error.message);
+      },
+      async logRead({ limit = 300 } = {}) {
+        const { data, error } = await sb.from('crm_log')
+          .select('id,at,actor,client_id,client_name,kind,text')
+          .order('at', { ascending: false })
+          .limit(limit);
+        if (error) throw new Error(error.message.includes('crm_log')
+          ? 'В базе нет таблицы истории. Запустите файл 3_istoriya-izmeneniy.sql.'
+          : error.message);
+        return data || [];
+      },
       // Номер документа выдаёт база: с двух устройств одинаковый номер выйти не может
       async nextDocNo(kind) {
         const { data, error } = await sb.rpc('next_doc_no', { p_kind: kind });
@@ -3198,11 +3215,17 @@ window.CrmSupabaseStore = (() => {
     if (meta) meta.setAttribute('content', THEME_COLOR[real]);
     return real;
   }
+  let themeTimer = null;
   function setTheme(mode) {
     try {
       if (mode === 'auto') localStorage.removeItem(THEME_KEY);
       else localStorage.setItem(THEME_KEY, mode);
     } catch {}
+    // мягкий переход цветов: включаем на четверть секунды и сразу снимаем
+    const root = document.documentElement;
+    if (!MQ_CALM.matches) root.classList.add('is-theming');
+    clearTimeout(themeTimer);
+    themeTimer = setTimeout(() => root.classList.remove('is-theming'), 260);
     applyTheme(mode);
     document.querySelectorAll('#theme-seg button').forEach((b) => b.classList.toggle('on', b.dataset.theme === mode));
   }
@@ -3717,10 +3740,13 @@ window.CrmSupabaseStore = (() => {
       if (deleting.has(id)) continue;
       const local = state.clients.get(id);
       if (local && dirty.has(id)) continue;
-      if (!local || (d.updated_at || '') >= (local.updated_at || '')) state.clients.set(id, d);
+      if (!local || (d.updated_at || '') >= (local.updated_at || '')) {
+        state.clients.set(id, d);
+        logSeen(d);        // правки с другого устройства он записал сам — здесь их не дублируем
+      }
     }
     for (const id of Array.from(state.clients.keys())) {
-      if (!incoming.has(id) && !dirty.has(id) && !inflight.has(id) && !creating.has(id)) state.clients.delete(id);
+      if (!incoming.has(id) && !dirty.has(id) && !inflight.has(id) && !creating.has(id)) { state.clients.delete(id); logForget(id); }
     }
     scheduleRender();
     syncOpenCard();
@@ -3788,9 +3814,11 @@ window.CrmSupabaseStore = (() => {
     const snap = clone(c);
     inflight.set(id, snap.updated_at);
     const isNew = creating.has(id);
+    const logPrev = isNew ? null : logBase.get(id);
     try {
       await store.save(snap, isNew ? null : Array.from(keys));
       creating.delete(id);
+      logSaved(snap, logPrev);   // в историю уходит после сохранения и не ждётся
     } catch (err) {
       const again = dirty.get(id) || new Set();
       keys.forEach((k) => again.add(k));
@@ -3825,6 +3853,8 @@ window.CrmSupabaseStore = (() => {
     scheduleRender();
     try {
       await store.remove(id);
+      pushLog(c, ['клиент удалён'], 'delete');
+      logForget(id);
       toast(`«${c.company || 'Клиент'}» удалён`);
     } catch (err) {
       state.clients.set(id, c);
@@ -4039,6 +4069,66 @@ window.CrmSupabaseStore = (() => {
 </article>`;
   }
 
+  /* Доска обновляется без мигания: карточки не пересоздаются, а переиспользуются.
+     Новая появляется мягко, исчезающая уходит и только потом убирается из разметки.
+     Пересборка innerHTML целиком заодно рвала бы перетаскивание и сбивала прокрутку. */
+  const cardKey = (x) => `${x.c.id}:${x.d.id}`;
+  const partsBox = document.createElement('div');
+  // системная настройка «уменьшить движение»: тогда анимаций нет вовсе,
+  // и событие animationend не придёт — везде есть запасной таймер
+  const MQ_CALM = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+  function leaveCard(el) {
+    if (el.dataset.leaving === '1') return;
+    el.dataset.leaving = '1';
+    el.classList.add('is-leave');
+    el.removeAttribute('data-key');
+    const done = () => el.remove();
+    el.addEventListener('animationend', done, { once: true });
+    setTimeout(done, 400);
+  }
+
+  function patchList(list, rows, render) {
+    const have = new Map();
+    for (const el of Array.from(list.children)) {
+      if (el.dataset.leaving === '1') { el.remove(); continue; }
+      have.set(el.dataset.key, el);
+    }
+    let prev = null;
+    for (const row of rows) {
+      const key = cardKey(row);
+      const html = render(row);
+      let el = have.get(key);
+      if (el) {
+        have.delete(key);
+        if (el.dataset.html !== html) {
+          partsBox.innerHTML = html;
+          const fresh = partsBox.firstElementChild;
+          for (const a of Array.from(el.attributes)) {
+            if (a.name !== 'data-html' && a.name !== 'data-key' && !fresh.hasAttribute(a.name)) el.removeAttribute(a.name);
+          }
+          for (const a of Array.from(fresh.attributes)) {
+            if (el.getAttribute(a.name) !== a.value) el.setAttribute(a.name, a.value);
+          }
+          el.innerHTML = fresh.innerHTML;
+        }
+      } else {
+        partsBox.innerHTML = html;
+        el = partsBox.firstElementChild;
+        el.classList.add('is-enter');
+        const off = () => el.classList.remove('is-enter');
+        el.addEventListener('animationend', off, { once: true });
+        setTimeout(off, 400);
+      }
+      el.dataset.key = key;
+      el.dataset.html = html;
+      const at = prev ? prev.nextSibling : list.firstChild;
+      if (at !== el) list.insertBefore(el, at);
+      prev = el;
+    }
+    for (const el of have.values()) leaveCard(el);
+  }
+
   function renderBoard() {
     closeAsk();
     const q = state.search.trim();
@@ -4052,7 +4142,7 @@ window.CrmSupabaseStore = (() => {
     for (const s of STATUS_KEYS) {
       groups[s].sort(sortFor(s));
       const list = $(`.col-list[data-status="${s}"]`);
-      list.innerHTML = groups[s].map(s === 'lost' ? lostRowHTML : cardHTML).join('');
+      patchList(list, groups[s], s === 'lost' ? lostRowHTML : cardHTML);
       list.dataset.empty = q ? 'Ничего не найдено' : list.dataset.emptyDefault;
       $$(`[data-count="${s}"]`).forEach((el) => { el.textContent = groups[s].length; });
       const sumEl = $(`[data-sum="${s}"]`);
@@ -4091,12 +4181,25 @@ window.CrmSupabaseStore = (() => {
     el.innerHTML = html;
   }
 
+  function swapColumns() {
+    if (MQ_CALM.matches) return;
+    $$('.board .col').forEach((col) => {
+      if (!col.offsetParent && col.offsetWidth === 0) return;     // скрытая колонка не мигает зря
+      col.classList.remove('is-swap');
+      void col.offsetWidth;
+      col.classList.add('is-swap');
+      col.addEventListener('animationend', () => col.classList.remove('is-swap'), { once: true });
+    });
+  }
+
   function setTab(tab, remember = true) {
+    const same = state.tab === tab;
     state.tab = tab;
     $('#board').dataset.tab = tab;
     const pair = MQ_TABLET.matches ? (tab === 'work' || tab === 'wait' ? ['work', 'wait'] : ['client', 'lost']) : [tab];
     $$('#tabs button').forEach((b) => b.classList.toggle('on', pair.includes(b.dataset.tab)));
     if (remember) { try { localStorage.setItem(TAB_KEY, tab); } catch {} }
+    if (!same && (MQ_PHONE.matches || MQ_TABLET.matches)) swapColumns();
   }
 
   let justDragged = 0;
@@ -4235,7 +4338,8 @@ window.CrmSupabaseStore = (() => {
       draggable: '.card, .lost-row',
       filter: 'a, button',
       preventOnFilter: false,
-      animation: 150,
+      animation: MQ_CALM.matches ? 0 : 160,    // соседи расступаются плавно; при «уменьшить движение» — мгновенно
+      easing: 'cubic-bezier(.2, .8, .2, 1)',
       delay: 180,
       delayOnTouchOnly: true,
       touchStartThreshold: 5,
@@ -5401,6 +5505,161 @@ ${badge}
   }
 
   /* ===================================================================
+     История изменений: кто что менял. Записи уходят в отдельную таблицу
+     (crm_log), а не в карточку клиента — иначе они терялись бы при слиянии
+     правок с другого устройства. Пишем только изменения данных: открытие
+     карточек, прокрутка и поиск в историю не попадают.
+     Запись уходит ПОСЛЕ сохранения и не ждётся — карточка закрывается сразу.
+     =================================================================== */
+  const LOG_LIMIT = 300;
+  const logBase = new Map();     // id -> состояние, уже учтённое в истории
+  const logSeen = (c) => { if (c && c.id) logBase.set(c.id, JSON.stringify(c)); };
+  const logForget = (id) => logBase.delete(id);
+
+  const logActor = () => {
+    const u = store && store.user;
+    return str((u && (u.email || u.name)) || '').trim() || 'без входа';
+  };
+  const BILL_LABEL = Object.fromEntries(BILLING.map((b) => [b.key, b.label]));
+  const LINK_LABEL = Object.fromEntries(LINKS.map((l) => [l.key, l.label]));
+  const logVal = (v) => { const s = str(v).trim(); return s ? `«${s}»` : 'пусто'; };
+  const logMoney = (n) => (Number.isFinite(n) ? fmtMoney(n) : 'пусто');
+  const logShort = (s, n = 60) => { const t = str(s).replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n - 1)}…` : t; };
+  const logName = (it) => (str(it.name).trim() ? str(it.name).trim() : 'без названия');
+
+  function logItemLines(before, after, pre, add) {
+    const was = new Map((before.items || []).map((x) => [x.id, x]));
+    const now = new Map((after.items || []).map((x) => [x.id, x]));
+    for (const [id, it] of now) {
+      const old = was.get(id);
+      if (!old) {
+        const p = itemPrice(it);
+        add(`${pre}позиция ${logName(it)} добавлена${Number.isFinite(p) ? `, ${logMoney(p)}` : ''}`);
+        continue;
+      }
+      if (str(old.name).trim() !== str(it.name).trim()) {
+        add(str(old.name).trim()
+          ? `${pre}позиция ${logVal(old.name)} → ${logVal(it.name)}`
+          : `${pre}позиция названа ${logVal(it.name)}`);
+      }
+      const op = itemPrice(old);
+      const np = itemPrice(it);
+      if (op !== np) add(`${pre}цена ${logName(it)}: ${logMoney(op)} → ${logMoney(np)}`);
+      if (old.qty !== it.qty) add(`${pre}количество ${logName(it)}: ${old.qty} → ${it.qty}`);
+      if (old.gross !== it.gross) add(`${pre}${logName(it)}: цена теперь ${it.gross ? 'брутто, с НДС' : 'нетто, без НДС'}`);
+    }
+    for (const [id, it] of was) if (!now.has(id)) add(`${pre}позиция ${logName(it)} убрана`);
+  }
+
+  function logDealLines(before, after, pre, add) {
+    if (before.status !== after.status) add(`${pre}статус ${TITLE[before.status]} → ${TITLE[after.status]}`);
+    if (str(before.title) !== str(after.title)) add(`${pre}название сделки ${logVal(before.title)} → ${logVal(after.title)}`);
+    if (str(before.product) !== str(after.product)) add(`${pre}что хочет купить: ${logVal(logShort(before.product))} → ${logVal(logShort(after.product))}`);
+    if (str(before.invoice_no) !== str(after.invoice_no)) add(`${pre}счёт № ${logVal(before.invoice_no)} → ${logVal(after.invoice_no)}`);
+    if (before.amount !== after.amount) add(`${pre}сумма ${logMoney(before.amount)} → ${logMoney(after.amount)}`);
+    if (str(before.agreed) !== str(after.agreed)) add(`${pre}договорённость: ${logVal(logShort(after.agreed))}`);
+    if (str(before.lost_reason) !== str(after.lost_reason) && str(after.lost_reason).trim()) add(`${pre}причина минуса: ${logVal(logShort(after.lost_reason))}`);
+    const bn = before.next ? before.next.at : '';
+    const an = after.next ? after.next.at : '';
+    if (bn !== an) add(an ? `${pre}перезвонить ${fmtDateTime(an)}` : `${pre}напоминание снято`);
+    logItemLines(before, after, pre, add);
+    const wasDocs = new Set((before.docs || []).map((d) => d.no));
+    for (const d of after.docs || []) {
+      if (wasDocs.has(d.no)) continue;
+      add(`${pre}выпущен ${DOC_KIND[d.kind].label} ${d.no} на ${logMoney(d.total)}`);
+    }
+  }
+
+  // Человеческий список изменений: было → стало
+  function changeLines(before, after) {
+    const out = [];
+    const add = (t) => { if (t) out.push(t); };
+    if (!before) {
+      add('клиент создан');
+      for (const d of after.deals) {
+        const items = (d.items || []).filter((x) => Number.isFinite(itemPrice(x)));
+        if (items.length) add(`позиций сразу: ${items.length}`);
+      }
+      if (after.log.length) add(`запись в историю: ${logVal(logShort(after.log[0].text))}`);
+      return out;
+    }
+    if (str(before.company) !== str(after.company)) add(`название ${logVal(before.company)} → ${logVal(after.company)}`);
+    if (Boolean(before.vip) !== Boolean(after.vip)) add(after.vip ? 'отмечен VIP' : 'снята отметка VIP');
+    if (str(before.about) !== str(after.about)) add(`заметка о клиенте: ${logVal(logShort(after.about))}`);
+
+    for (const b of BILLING) {
+      const x = str(before.billing[b.key]);
+      const y = str(after.billing[b.key]);
+      if (x !== y) add(`реквизиты, ${BILL_LABEL[b.key]}: ${logVal(x)} → ${logVal(y)}`);
+    }
+    for (const l of LINKS) {
+      const x = str(before.links[l.key]);
+      const y = str(after.links[l.key]);
+      if (x !== y) add(`ссылка ${LINK_LABEL[l.key]}: ${logVal(x)} → ${logVal(y)}`);
+    }
+
+    const cWas = new Map(before.contacts.map((x) => [x.id, x]));
+    const cNow = new Map(after.contacts.map((x) => [x.id, x]));
+    for (const [id, ct] of cNow) {
+      const old = cWas.get(id);
+      const who = str(ct.name).trim() || str(ct.phone).trim() || 'контакт';
+      if (!old) { add(`контакт ${logVal(who)} добавлен`); continue; }
+      for (const [k, label] of [['name', 'имя'], ['role', 'должность'], ['phone', 'телефон'], ['email', 'почта']]) {
+        if (str(old[k]) !== str(ct[k])) add(`контакт ${who}, ${label}: ${logVal(old[k])} → ${logVal(ct[k])}`);
+      }
+      if (old.channels.join(',') !== ct.channels.join(',')) {
+        const names = ct.channels.map((k) => (CHANNELS.find((x) => x.key === k) || {}).label || k).join(', ');
+        add(`контакт ${who}: каналы ${names || 'сняты'}`);
+      }
+      if (Boolean(old.dm) !== Boolean(ct.dm)) add(`контакт ${who}: ${ct.dm ? 'отмечен ЛПР' : 'снята отметка ЛПР'}`);
+      if (Boolean(old.main) !== Boolean(ct.main) && ct.main) add(`контакт ${who}: теперь главный`);
+    }
+    for (const [id, ct] of cWas) if (!cNow.has(id)) add(`контакт ${logVal(str(ct.name).trim() || str(ct.phone).trim() || 'контакт')} удалён`);
+
+    const seenLog = new Set(before.log.map((e) => e.id));
+    for (const e of after.log) if (!seenLog.has(e.id)) add(`запись в историю: ${logVal(logShort(e.text))}`);
+
+    const seenOrders = new Set(before.orders.map((o) => o.id));
+    for (const o of after.orders) if (!seenOrders.has(o.id)) add(`заказ с сайта № ${o.number} на ${logMoney(o.total)}`);
+
+    const dWas = new Map(before.deals.map((d) => [d.id, d]));
+    const dNow = new Map(after.deals.map((d) => [d.id, d]));
+    const multi = after.deals.length > 1;
+    for (const [id, d] of dNow) {
+      const old = dWas.get(id);
+      const pre = multi ? `${dealTitle(d)}: ` : '';
+      if (!old) { add(`новая сделка ${logVal(dealTitle(d))}`); continue; }
+      logDealLines(old, d, pre, add);
+    }
+    for (const [id, d] of dWas) if (!dNow.has(id)) add(`сделка ${logVal(dealTitle(d))} удалена`);
+    return out;
+  }
+
+  // Отправка в историю: без ожидания, чтобы не задерживать сохранение
+  function pushLog(client, lines, kind = 'change') {
+    if (!lines || !lines.length) return;
+    if (!store || typeof store.logWrite !== 'function') return;
+    const at = nowIso();
+    const actor = logActor();
+    const rows = lines.map((text) => ({
+      at, actor, kind,
+      client_id: client ? client.id : null,
+      client_name: client ? clientName(client) : '',
+      text,
+    }));
+    Promise.resolve().then(() => store.logWrite(rows)).catch((e) => console.warn('история', e));
+  }
+
+  // ⚠️ prev берётся ДО сохранения: хранилище успевает прислать документ обратно
+  // (живая синхронизация) и затереть точку отсчёта, пока идёт запись.
+  function logSaved(snap, prev) {
+    logSeen(snap);
+    let lines = [];
+    try { lines = changeLines(prev ? JSON.parse(prev) : null, snap); } catch (e) { console.warn('история', e); return; }
+    pushLog(snap, lines);
+  }
+
+  /* ===================================================================
      Минус
      =================================================================== */
   let lostCtx = null;
@@ -5445,11 +5704,77 @@ ${badge}
     });
   }
 
+  /* Экран истории: список сверху вниз, новое первым, отбор по человеку и по клиенту */
+  const logView = { rows: [], who: '', client: '' };
+
+  function logRowHTML(r) {
+    const cls = r.kind === 'delete' ? ' is-delete' : (r.text === 'клиент создан' ? ' is-new' : '');
+    const who = str(r.actor).split('@')[0] || str(r.actor);
+    return `<div class="log-row${cls}">
+  <time class="log-when">${esc(fmtDateTime(r.at))}</time>
+  <span class="log-who">${esc(who)}</span>
+  <p class="log-text">${r.client_name ? `<span class="log-client">${esc(r.client_name)}</span> · ` : ''}${esc(r.text)}</p>
+</div>`;
+  }
+
+  function renderLogView() {
+    const box = $('#log-rows');
+    if (!box) return;
+    const rows = logView.rows.filter((r) => (!logView.who || r.actor === logView.who) && (!logView.client || String(r.client_id || '') === logView.client));
+    if (!rows.length) {
+      box.innerHTML = `<p class="hint">${logView.rows.length ? 'По этому отбору записей нет.' : 'Пока ничего не менялось.'}</p>`;
+      return;
+    }
+    box.innerHTML = rows.map(logRowHTML).join('');
+  }
+
+  function fillLogFilters() {
+    const who = $('#log-who');
+    const cl = $('#log-client');
+    const people = Array.from(new Set(logView.rows.map((r) => str(r.actor)).filter(Boolean))).sort();
+    const clients = new Map();
+    for (const r of logView.rows) if (r.client_id) clients.set(String(r.client_id), r.client_name || 'без названия');
+    who.innerHTML = `<option value="">Все люди</option>${people.map((p) => `<option value="${esc(p)}"${p === logView.who ? ' selected' : ''}>${esc(p)}</option>`).join('')}`;
+    cl.innerHTML = `<option value="">Все клиенты</option>${Array.from(clients).sort((a, b) => a[1].localeCompare(b[1], 'ru')).map(([id, name]) => `<option value="${esc(id)}"${id === logView.client ? ' selected' : ''}>${esc(name)}</option>`).join('')}`;
+  }
+
+  async function openLogView() {
+    const dlg = $('#dlg-log');
+    logView.who = '';
+    logView.client = '';
+    logView.rows = [];
+    $('#log-rows').innerHTML = '<p class="hint">Загружаю…</p>';
+    dlg.showModal();
+    fitSheets();
+    if (!store || typeof store.logRead !== 'function') {
+      $('#log-rows').innerHTML = '<p class="hint">История ведётся в базе Supabase — в этой версии её нет.</p>';
+      return;
+    }
+    try {
+      logView.rows = await store.logRead({ limit: LOG_LIMIT });
+    } catch (e) {
+      $('#log-rows').innerHTML = `<p class="hint cat-off">${esc((e && e.message) || 'История не загрузилась')}</p>`;
+      return;
+    }
+    fillLogFilters();
+    renderLogView();
+  }
+
+  function bindLogView() {
+    const dlg = $('#dlg-log');
+    if (!dlg) return;
+    dlg.addEventListener('click', (e) => { if (e.target === dlg || e.target.closest('[data-close]')) dlg.close(); });
+    $('#log-who').addEventListener('change', (e) => { logView.who = e.target.value; renderLogView(); });
+    $('#log-client').addEventListener('change', (e) => { logView.client = e.target.value; renderLogView(); });
+  }
+
   /* ===================================================================
      Настройки, копия
      =================================================================== */
   function bindSettings() {
     const dlg = $('#dlg-settings');
+    const logBtn = $('#btn-log');
+    if (logBtn) logBtn.addEventListener('click', () => { dlg.close(); openLogView(); });
     const seg = $('#theme-seg');
     if (seg) {
       setTheme(readTheme());
@@ -5574,6 +5899,7 @@ ${badge}
       bindCard();
       bindLost();
       bindPlan();
+      bindLogView();
       bindSettings();
       bindShortcuts();
       bindViewport();
@@ -5663,7 +5989,7 @@ ${badge}
   }
 
   // для проверок: чистые функции схемы, без данных
-  window.EXDED_CRM_TEST = { normalize, legacyToClients, boardDeals, activeDeal, dealTitle, normalizeDeal, loadCatalog, catalog, catalogFind, catalogBlocked, keepFocusVisible, fitSheets, readTheme, applyTheme, setTheme, docPayload, docSubject, docItemsOf, normalizeDocRec };
+  window.EXDED_CRM_TEST = { normalize, legacyToClients, boardDeals, activeDeal, dealTitle, normalizeDeal, loadCatalog, catalog, catalogFind, catalogBlocked, keepFocusVisible, fitSheets, renderBoardNow: renderBoard, changeLines, logSeen, readTheme, applyTheme, setTheme, docPayload, docSubject, docItemsOf, normalizeDocRec };
 
   function init() { registerSW(); boot(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
