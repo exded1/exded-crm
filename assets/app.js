@@ -4700,13 +4700,29 @@ ${badge}
 <button type="button" class="item-tag" data-act="item-vat" aria-pressed="${it.gross}" title="Нажмите, чтобы переключить. Пометка относится к обеим ценам, НДС считается от той, что пошла в расчёт.">${it.gross ? 'брутто · с НДС 19 %' : 'нетто · без НДС'}</button>`;
   }
 
+  // Крестик показываем только у открытой сделки и только если она не единственная:
+  // клиент без сделок теряет смысл, а промахнуться по соседней таблетке нельзя.
+  const dealDocNos = (d) => (d.docs || []).map((x) => x.no).filter(Boolean);
+
+  function dealDelHTML(c, d, on) {
+    if (!on || c.deals.length < 2) return '';
+    const docs = dealDocNos(d);
+    const why = docs.length
+      ? `Нельзя удалить: выпущены документы ${docs.join(', ')}`
+      : `Удалить сделку «${dealTitle(d)}»`;
+    return `<button type="button" class="deal-del${docs.length ? ' is-off' : ''}" data-act="deal-del" data-deal="${esc(d.id)}"${docs.length ? ' aria-disabled="true"' : ''} aria-label="${esc(why)}" title="${esc(why)}">${ICON.close}</button>`;
+  }
+
   function dealsHTML(c, cur) {
     const tabs = c.deals.map((d) => {
       const on = cur && d.id === cur.id;
       const sum = Number.isFinite(d.amount) ? fmtMoney(d.amount) : '';
-      return `<button type="button" class="deal-tab s-${d.status}${on ? ' on' : ''}" data-act="deal-pick" data-deal="${esc(d.id)}" aria-pressed="${on}">
-  <i class="deal-dot" aria-hidden="true"></i><span class="deal-name">${esc(dealTitle(d))}</span><span class="deal-meta">${esc(TITLE[d.status])}${sum ? ' · ' + esc(sum) : ''}</span>
-</button>`;
+      const del = dealDelHTML(c, d, on);
+      return `<span class="deal-box${del ? ' has-del' : ''}">
+  <button type="button" class="deal-tab s-${d.status}${on ? ' on' : ''}" data-act="deal-pick" data-deal="${esc(d.id)}" aria-pressed="${on}">
+    <i class="deal-dot" aria-hidden="true"></i><span class="deal-name">${esc(dealTitle(d))}</span><span class="deal-meta">${esc(TITLE[d.status])}${sum ? ' · ' + esc(sum) : ''}</span>
+  </button>${del}
+</span>`;
     }).join('');
     if (!cur) return `<div class="cs-sec-head"><h3>Сделки</h3></div><div class="deal-tabs">${tabs}</div>`;
     const total = itemsTotal(cur);
@@ -5362,6 +5378,14 @@ ${badge}
         renderCard();
         return;
       }
+      if (act === 'deal-del') {
+        const d2 = c.deals.find((x) => x.id === btn.dataset.deal);
+        if (!d2 || c.deals.length < 2) return;
+        const docs = dealDocNos(d2);
+        if (docs.length) { toast(`Нельзя удалить: выпущены документы ${docs.join(', ')}`, 'err'); return; }
+        openDealDel(c.id, d2.id);
+        return;
+      }
       if (act === 'deal-add') {
         const added = addDeal(c.id, {});
         if (added) { state.openDeal = added.id; renderCard(); toast('Новая сделка'); const t = $('[data-dbind="title"]', body); if (t) t.focus(); }
@@ -5659,6 +5683,48 @@ ${badge}
     pushLog(snap, lines);
   }
 
+  /* Удаление сделки: только по подтверждению, одним нажатием не удаляется */
+  let dealDelCtx = null;
+  function openDealDel(clientId, dealId) {
+    const c = state.clients.get(clientId);
+    const d = dealOf(c, dealId);
+    if (!c || !d || c.deals.length < 2 || dealDocNos(d).length) return;
+    dealDelCtx = { clientId, dealId, title: dealTitle(d) };
+    $('#deal-del-text').textContent = `Удалить сделку «${dealDelCtx.title}»? Вместе с позициями и суммами. Отменить нельзя.`;
+    $('#dlg-deal-del').showModal();
+    fitSheets();
+  }
+
+  function removeDeal(clientId, dealId) {
+    const c = state.clients.get(clientId);
+    const d = dealOf(c, dealId);
+    if (!c || !d || c.deals.length < 2 || dealDocNos(d).length) return;
+    const title = dealTitle(d);
+    const idx = c.deals.findIndex((x) => x.id === dealId);
+    const deals = clone(c.deals).filter((x) => x.id !== dealId);
+    // остаёмся на соседней сделке: следующей, а если удалили последнюю — предыдущей
+    const next = deals[Math.min(idx, deals.length - 1)];
+    state.openDeal = next ? next.id : null;
+    patch(clientId, { deals }, { now: true });     // строка «сделка … удалена» уйдёт в историю сама
+    if (state.openId === clientId) renderCard();
+    scheduleRender();
+    toast(`Сделка «${title}» удалена`);
+  }
+
+  function bindDealDel() {
+    const dlg = $('#dlg-deal-del');
+    if (!dlg) return;
+    dlg.addEventListener('click', (e) => { if (e.target === dlg || e.target.closest('[data-close]')) dlg.close(); });
+    dlg.addEventListener('close', () => { dealDelCtx = null; });
+    $('#deal-del-go').addEventListener('click', () => {
+      if (!dealDelCtx) return;
+      const { clientId, dealId } = dealDelCtx;
+      dealDelCtx = null;
+      dlg.close();
+      removeDeal(clientId, dealId);
+    });
+  }
+
   /* ===================================================================
      Минус
      =================================================================== */
@@ -5898,6 +5964,7 @@ ${badge}
       bindNew();
       bindCard();
       bindLost();
+      bindDealDel();
       bindPlan();
       bindLogView();
       bindSettings();
