@@ -2,6 +2,2974 @@ window.EXDED_CRM_SW = true;
 /*! Sortable 1.15.7 - MIT | git://github.com/SortableJS/Sortable.git */
 !function(t,e){"object"==typeof exports&&"undefined"!=typeof module?module.exports=e():"function"==typeof define&&define.amd?define(e):(t=t||self).Sortable=e()}(this,function(){"use strict";function o(t,e){(null==e||e>t.length)&&(e=t.length);for(var n=0,o=Array(e);n<e;n++)o[n]=t[n];return o}function i(t,e,n){return(e=function(t){t=function(t,e){if("object"!=typeof t||!t)return t;var n=t[Symbol.toPrimitive];if(void 0===n)return("string"===e?String:Number)(t);e=n.call(t,e||"default");if("object"!=typeof e)return e;throw new TypeError("@@toPrimitive must return a primitive value.")}(t,"string");return"symbol"==typeof t?t:t+""}(e))in t?Object.defineProperty(t,e,{value:n,enumerable:!0,configurable:!0,writable:!0}):t[e]=n,t}function a(){return(a=Object.assign?Object.assign.bind():function(t){for(var e=1;e<arguments.length;e++){var n,o=arguments[e];for(n in o)!{}.hasOwnProperty.call(o,n)||(t[n]=o[n])}return t}).apply(null,arguments)}function r(e,t){var n,o=Object.keys(e);return Object.getOwnPropertySymbols&&(n=Object.getOwnPropertySymbols(e),t&&(n=n.filter(function(t){return Object.getOwnPropertyDescriptor(e,t).enumerable})),o.push.apply(o,n)),o}function I(e){for(var t=1;t<arguments.length;t++){var n=null!=arguments[t]?arguments[t]:{};t%2?r(Object(n),!0).forEach(function(t){i(e,t,n[t])}):Object.getOwnPropertyDescriptors?Object.defineProperties(e,Object.getOwnPropertyDescriptors(n)):r(Object(n)).forEach(function(t){Object.defineProperty(e,t,Object.getOwnPropertyDescriptor(n,t))})}return e}function l(t,e){if(null==t)return{};var n,o=function(t,e){if(null==t)return{};var n,o={};for(n in t)if({}.hasOwnProperty.call(t,n)){if(-1!==e.indexOf(n))continue;o[n]=t[n]}return o}(t,e);if(Object.getOwnPropertySymbols)for(var i=Object.getOwnPropertySymbols(t),r=0;r<i.length;r++)n=i[r],-1===e.indexOf(n)&&{}.propertyIsEnumerable.call(t,n)&&(o[n]=t[n]);return o}function e(t){return function(t){if(Array.isArray(t))return o(t)}(t)||function(t){if("undefined"!=typeof Symbol&&null!=t[Symbol.iterator]||null!=t["@@iterator"])return Array.from(t)}(t)||function(t,e){if(t){if("string"==typeof t)return o(t,e);var n={}.toString.call(t).slice(8,-1);return"Map"===(n="Object"===n&&t.constructor?t.constructor.name:n)||"Set"===n?Array.from(t):"Arguments"===n||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(n)?o(t,e):void 0}}(t)||function(){throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}()}function s(t){return(s="function"==typeof Symbol&&"symbol"==typeof Symbol.iterator?function(t){return typeof t}:function(t){return t&&"function"==typeof Symbol&&t.constructor===Symbol&&t!==Symbol.prototype?"symbol":typeof t})(t)}function t(t){if("undefined"!=typeof window&&window.navigator)return!!navigator.userAgent.match(t)}var y=t(/(?:Trident.*rv[ :]?11\.|msie|iemobile|Windows Phone)/i),w=t(/Edge/i),c=t(/firefox/i),u=t(/safari/i)&&!t(/chrome/i)&&!t(/android/i),d=t(/iP(ad|od|hone)/i),n=t(/chrome/i)&&t(/android/i),h={capture:!1,passive:!1};function f(t,e,n){t.addEventListener(e,n,!y&&h)}function p(t,e,n){t.removeEventListener(e,n,!y&&h)}function g(t,e){if(e&&(">"===e[0]&&(e=e.substring(1)),t))try{if(t.matches)return t.matches(e);if(t.msMatchesSelector)return t.msMatchesSelector(e);if(t.webkitMatchesSelector)return t.webkitMatchesSelector(e)}catch(t){return}}function m(t){return t.host&&t!==document&&t.host.nodeType&&t.host!==t?t.host:t.parentNode}function P(t,e,n,o){if(t){n=n||document;do{if(null!=e&&(">"!==e[0]||t.parentNode===n)&&g(t,e)||o&&t===n)return t}while(t!==n&&(t=m(t)))}return null}var v,b=/\s+/g;function k(t,e,n){var o;t&&e&&(t.classList?t.classList[n?"add":"remove"](e):(o=(" "+t.className+" ").replace(b," ").replace(" "+e+" "," "),t.className=(o+(n?" "+e:"")).replace(b," ")))}function R(t,e,n){var o=t&&t.style;if(o){if(void 0===n)return document.defaultView&&document.defaultView.getComputedStyle?n=document.defaultView.getComputedStyle(t,""):t.currentStyle&&(n=t.currentStyle),void 0===e?n:n[e];o[e=!(e in o||-1!==e.indexOf("webkit"))?"-webkit-"+e:e]=n+("string"==typeof n?"":"px")}}function D(t,e){var n="";if("string"==typeof t)n=t;else do{var o=R(t,"transform")}while(o&&"none"!==o&&(n=o+" "+n),!e&&(t=t.parentNode));var i=window.DOMMatrix||window.WebKitCSSMatrix||window.CSSMatrix||window.MSCSSMatrix;return i&&new i(n)}function E(t,e,n){if(t){var o=t.getElementsByTagName(e),i=0,r=o.length;if(n)for(;i<r;i++)n(o[i],i);return o}return[]}function O(){var t=document.scrollingElement;return t||document.documentElement}function X(t,e,n,o,i){if(t.getBoundingClientRect||t===window){var r,a,l,s,c,u,d=t!==window&&t.parentNode&&t!==O()?(a=(r=t.getBoundingClientRect()).top,l=r.left,s=r.bottom,c=r.right,u=r.height,r.width):(l=a=0,s=window.innerHeight,c=window.innerWidth,u=window.innerHeight,window.innerWidth);if((e||n)&&t!==window&&(i=i||t.parentNode,!y))do{if(i&&i.getBoundingClientRect&&("none"!==R(i,"transform")||n&&"static"!==R(i,"position"))){var h=i.getBoundingClientRect();a-=h.top+parseInt(R(i,"border-top-width")),l-=h.left+parseInt(R(i,"border-left-width")),s=a+r.height,c=l+r.width;break}}while(i=i.parentNode);return o&&t!==window&&(o=(e=D(i||t))&&e.a,t=e&&e.d,e&&(s=(a/=t)+(u/=t),c=(l/=o)+(d/=o))),{top:a,left:l,bottom:s,right:c,width:d,height:u}}}function Y(t,e,n){for(var o=M(t,!0),i=X(t)[e];o;){var r=X(o)[n];if(!("top"===n||"left"===n?r<=i:i<=r))return o;if(o===O())break;o=M(o,!1)}return!1}function B(t,e,n,o){for(var i=0,r=0,a=t.children;r<a.length;){if("none"!==a[r].style.display&&a[r]!==Ht.ghost&&(o||a[r]!==Ht.dragged)&&P(a[r],n.draggable,t,!1)){if(i===e)return a[r];i++}r++}return null}function F(t,e){for(var n=t.lastElementChild;n&&(n===Ht.ghost||"none"===R(n,"display")||e&&!g(n,e));)n=n.previousElementSibling;return n||null}function j(t,e){var n=0;if(!t||!t.parentNode)return-1;for(;t=t.previousElementSibling;)"TEMPLATE"===t.nodeName.toUpperCase()||t===Ht.clone||e&&!g(t,e)||n++;return n}function S(t){var e=0,n=0,o=O();if(t)do{var i=D(t),r=i.a,i=i.d}while(e+=t.scrollLeft*r,n+=t.scrollTop*i,t!==o&&(t=t.parentNode));return[e,n]}function M(t,e){if(!t||!t.getBoundingClientRect)return O();var n=t,o=!1;do{if(n.clientWidth<n.scrollWidth||n.clientHeight<n.scrollHeight){var i=R(n);if(n.clientWidth<n.scrollWidth&&("auto"==i.overflowX||"scroll"==i.overflowX)||n.clientHeight<n.scrollHeight&&("auto"==i.overflowY||"scroll"==i.overflowY)){if(!n.getBoundingClientRect||n===document.body)return O();if(o||e)return n;o=!0}}}while(n=n.parentNode);return O()}function _(t,e){return Math.round(t.top)===Math.round(e.top)&&Math.round(t.left)===Math.round(e.left)&&Math.round(t.height)===Math.round(e.height)&&Math.round(t.width)===Math.round(e.width)}function C(e,n){return function(){var t;v||(1===(t=arguments).length?e.call(this,t[0]):e.apply(this,t),v=setTimeout(function(){v=void 0},n))}}function H(t,e,n){t.scrollLeft+=e,t.scrollTop+=n}function T(t){var e=window.Polymer,n=window.jQuery||window.Zepto;return e&&e.dom?e.dom(t).cloneNode(!0):n?n(t).clone(!0)[0]:t.cloneNode(!0)}function x(t,e){R(t,"position","absolute"),R(t,"top",e.top),R(t,"left",e.left),R(t,"width",e.width),R(t,"height",e.height)}function A(t){R(t,"position",""),R(t,"top",""),R(t,"left",""),R(t,"width",""),R(t,"height","")}function L(n,o,i){var r={};return Array.from(n.children).forEach(function(t){var e;P(t,o.draggable,n,!1)&&!t.animated&&t!==i&&(e=X(t),r.left=Math.min(null!==(t=r.left)&&void 0!==t?t:1/0,e.left),r.top=Math.min(null!==(t=r.top)&&void 0!==t?t:1/0,e.top),r.right=Math.max(null!==(t=r.right)&&void 0!==t?t:-1/0,e.right),r.bottom=Math.max(null!==(t=r.bottom)&&void 0!==t?t:-1/0,e.bottom))}),r.width=r.right-r.left,r.height=r.bottom-r.top,r.x=r.left,r.y=r.top,r}var K="Sortable"+(new Date).getTime();function N(){var e,o=[];return{captureAnimationState:function(){o=[],this.options.animation&&[].slice.call(this.el.children).forEach(function(t){var e,n;"none"!==R(t,"display")&&t!==Ht.ghost&&(o.push({target:t,rect:X(t)}),e=I({},o[o.length-1].rect),!t.thisAnimationDuration||(n=D(t,!0))&&(e.top-=n.f,e.left-=n.e),t.fromRect=e)})},addAnimationState:function(t){o.push(t)},removeAnimationState:function(t){o.splice(function(t,e){for(var n in t)if(t.hasOwnProperty(n))for(var o in e)if(e.hasOwnProperty(o)&&e[o]===t[n][o])return Number(n);return-1}(o,{target:t}),1)},animateAll:function(t){var c=this;if(!this.options.animation)return clearTimeout(e),void("function"==typeof t&&t());var u=!1,d=0;o.forEach(function(t){var e=0,n=t.target,o=n.fromRect,i=X(n),r=n.prevFromRect,a=n.prevToRect,l=t.rect,s=D(n,!0);s&&(i.top-=s.f,i.left-=s.e),n.toRect=i,n.thisAnimationDuration&&_(r,i)&&!_(o,i)&&(l.top-i.top)/(l.left-i.left)==(o.top-i.top)/(o.left-i.left)&&(t=l,s=r,r=a,a=c.options,e=Math.sqrt(Math.pow(s.top-t.top,2)+Math.pow(s.left-t.left,2))/Math.sqrt(Math.pow(s.top-r.top,2)+Math.pow(s.left-r.left,2))*a.animation),_(i,o)||(n.prevFromRect=o,n.prevToRect=i,e=e||c.options.animation,c.animate(n,l,i,e)),e&&(u=!0,d=Math.max(d,e),clearTimeout(n.animationResetTimer),n.animationResetTimer=setTimeout(function(){n.animationTime=0,n.prevFromRect=null,n.fromRect=null,n.prevToRect=null,n.thisAnimationDuration=null},e),n.thisAnimationDuration=e)}),clearTimeout(e),u?e=setTimeout(function(){"function"==typeof t&&t()},d):"function"==typeof t&&t(),o=[]},animate:function(t,e,n,o){var i,r;o&&(R(t,"transition",""),R(t,"transform",""),i=(r=D(this.el))&&r.a,r=r&&r.d,i=(e.left-n.left)/(i||1),r=(e.top-n.top)/(r||1),t.animatingX=!!i,t.animatingY=!!r,R(t,"transform","translate3d("+i+"px,"+r+"px,0)"),this.forRepaintDummy=t.offsetWidth,R(t,"transition","transform "+o+"ms"+(this.options.easing?" "+this.options.easing:"")),R(t,"transform","translate3d(0,0,0)"),"number"==typeof t.animated&&clearTimeout(t.animated),t.animated=setTimeout(function(){R(t,"transition",""),R(t,"transform",""),t.animated=!1,t.animatingX=!1,t.animatingY=!1},o))}}}var W=[],z={initializeByDefault:!0},G={mount:function(e){for(var t in z)!z.hasOwnProperty(t)||t in e||(e[t]=z[t]);W.forEach(function(t){if(t.pluginName===e.pluginName)throw"Sortable: Cannot mount plugin ".concat(e.pluginName," more than once")}),W.push(e)},pluginEvent:function(e,n,o){var t=this;this.eventCanceled=!1,o.cancel=function(){t.eventCanceled=!0};var i=e+"Global";W.forEach(function(t){n[t.pluginName]&&(n[t.pluginName][i]&&n[t.pluginName][i](I({sortable:n},o)),n.options[t.pluginName]&&n[t.pluginName][e]&&n[t.pluginName][e](I({sortable:n},o)))})},initializePlugins:function(n,o,i,t){for(var e in W.forEach(function(t){var e=t.pluginName;(n.options[e]||t.initializeByDefault)&&((t=new t(n,o,n.options)).sortable=n,t.options=n.options,n[e]=t,a(i,t.defaults))}),n.options){var r;n.options.hasOwnProperty(e)&&(void 0!==(r=this.modifyOption(n,e,n.options[e]))&&(n.options[e]=r))}},getEventProperties:function(e,n){var o={};return W.forEach(function(t){"function"==typeof t.eventProperties&&a(o,t.eventProperties.call(n[t.pluginName],e))}),o},modifyOption:function(e,n,o){var i;return W.forEach(function(t){e[t.pluginName]&&t.optionListeners&&"function"==typeof t.optionListeners[n]&&(i=t.optionListeners[n].call(e[t.pluginName],o))}),i}};function U(t){var e=t.sortable,n=t.rootEl,o=t.name,i=t.targetEl,r=t.cloneEl,a=t.toEl,l=t.fromEl,s=t.oldIndex,c=t.newIndex,u=t.oldDraggableIndex,d=t.newDraggableIndex,h=t.originalEvent,f=t.putSortable,p=t.extraEventProperties;if(e=e||n&&n[K]){var g,m=e.options,t="on"+o.charAt(0).toUpperCase()+o.substr(1);!window.CustomEvent||y||w?(g=document.createEvent("Event")).initEvent(o,!0,!0):g=new CustomEvent(o,{bubbles:!0,cancelable:!0}),g.to=a||n,g.from=l||n,g.item=i||n,g.clone=r,g.oldIndex=s,g.newIndex=c,g.oldDraggableIndex=u,g.newDraggableIndex=d,g.originalEvent=h,g.pullMode=f?f.lastPutMode:void 0;var v,b=I(I({},p),G.getEventProperties(o,e));for(v in b)g[v]=b[v];n&&n.dispatchEvent(g),m[t]&&m[t].call(e,g)}}function q(t,e){var n=(o=2<arguments.length&&void 0!==arguments[2]?arguments[2]:{}).evt,o=l(o,V);G.pluginEvent.bind(Ht)(t,e,I({dragEl:$,parentEl:Q,ghostEl:J,rootEl:tt,nextEl:et,lastDownEl:nt,cloneEl:ot,cloneHidden:it,dragStarted:vt,putSortable:ut,activeSortable:Ht.active,originalEvent:n,oldIndex:rt,oldDraggableIndex:lt,newIndex:at,newDraggableIndex:st,hideGhostForTarget:Yt,unhideGhostForTarget:Bt,cloneNowHidden:function(){it=!0},cloneNowShown:function(){it=!1},dispatchSortableEvent:function(t){Z({sortable:e,name:t,originalEvent:n})}},o))}var V=["evt"];function Z(t){U(I({putSortable:ut,cloneEl:ot,targetEl:$,rootEl:tt,oldIndex:rt,oldDraggableIndex:lt,newIndex:at,newDraggableIndex:st},t))}var $,Q,J,tt,et,nt,ot,it,rt,at,lt,st,ct,ut,dt,ht,ft,pt,gt,mt,vt,bt,yt,wt,Dt,Et=!1,St=!1,_t=[],Ct=!1,Tt=!1,xt=[],Ot=!1,Mt=[],At="undefined"!=typeof document,Nt=d,It=w||y?"cssFloat":"float",Pt=At&&!n&&!d&&"draggable"in document.createElement("div"),kt=function(){if(At){if(y)return!1;var t=document.createElement("x");return t.style.cssText="pointer-events:auto","auto"===t.style.pointerEvents}}(),Rt=function(t,e){var n=R(t),o=parseInt(n.width)-parseInt(n.paddingLeft)-parseInt(n.paddingRight)-parseInt(n.borderLeftWidth)-parseInt(n.borderRightWidth),i=B(t,0,e),r=B(t,1,e),a=i&&R(i),l=r&&R(r),s=a&&parseInt(a.marginLeft)+parseInt(a.marginRight)+X(i).width,t=l&&parseInt(l.marginLeft)+parseInt(l.marginRight)+X(r).width;if("flex"===n.display)return"column"===n.flexDirection||"column-reverse"===n.flexDirection?"vertical":"horizontal";if("grid"===n.display)return n.gridTemplateColumns.split(" ").length<=1?"vertical":"horizontal";if(i&&a.float&&"none"!==a.float){e="left"===a.float?"left":"right";return!r||"both"!==l.clear&&l.clear!==e?"horizontal":"vertical"}return i&&("block"===a.display||"flex"===a.display||"table"===a.display||"grid"===a.display||o<=s&&"none"===n[It]||r&&"none"===n[It]&&o<s+t)?"vertical":"horizontal"},Xt=function(t){function l(r,a){return function(t,e,n,o){var i=t.options.group.name&&e.options.group.name&&t.options.group.name===e.options.group.name;if(null==r&&(a||i))return!0;if(null==r||!1===r)return!1;if(a&&"clone"===r)return r;if("function"==typeof r)return l(r(t,e,n,o),a)(t,e,n,o);e=(a?t:e).options.group.name;return!0===r||"string"==typeof r&&r===e||r.join&&-1<r.indexOf(e)}}var e={},n=t.group;n&&"object"==s(n)||(n={name:n}),e.name=n.name,e.checkPull=l(n.pull,!0),e.checkPut=l(n.put),e.revertClone=n.revertClone,t.group=e},Yt=function(){!kt&&J&&R(J,"display","none")},Bt=function(){!kt&&J&&R(J,"display","")};At&&!n&&document.addEventListener("click",function(t){if(St)return t.preventDefault(),t.stopPropagation&&t.stopPropagation(),t.stopImmediatePropagation&&t.stopImmediatePropagation(),St=!1},!0);function Ft(t){if($){t=t.touches?t.touches[0]:t;var e=(i=t.clientX,r=t.clientY,_t.some(function(t){var e=t[K].options.emptyInsertThreshold;if(e&&!F(t)){var n=X(t),o=i>=n.left-e&&i<=n.right+e,e=r>=n.top-e&&r<=n.bottom+e;return o&&e?a=t:void 0}}),a);if(e){var n,o={};for(n in t)t.hasOwnProperty(n)&&(o[n]=t[n]);o.target=o.rootEl=e,o.preventDefault=void 0,o.stopPropagation=void 0,e[K]._onDragOver(o)}}var i,r,a}function jt(t){$&&$.parentNode[K]._isOutsideThisEl(t.target)}function Ht(t,e){if(!t||!t.nodeType||1!==t.nodeType)throw"Sortable: `el` must be an HTMLElement, not ".concat({}.toString.call(t));this.el=t,this.options=e=a({},e),t[K]=this;var n,o,i={group:null,sort:!0,disabled:!1,store:null,handle:null,draggable:/^[uo]l$/i.test(t.nodeName)?">li":">*",swapThreshold:1,invertSwap:!1,invertedSwapThreshold:null,removeCloneOnHide:!0,direction:function(){return Rt(t,this.options)},ghostClass:"sortable-ghost",chosenClass:"sortable-chosen",dragClass:"sortable-drag",ignore:"a, img",filter:null,preventOnFilter:!0,animation:0,easing:null,setData:function(t,e){t.setData("Text",e.textContent)},dropBubble:!1,dragoverBubble:!1,dataIdAttr:"data-id",delay:0,delayOnTouchOnly:!1,touchStartThreshold:(Number.parseInt?Number:window).parseInt(window.devicePixelRatio,10)||1,forceFallback:!1,fallbackClass:"sortable-fallback",fallbackOnBody:!1,fallbackTolerance:0,fallbackOffset:{x:0,y:0},supportPointer:!1!==Ht.supportPointer&&"PointerEvent"in window&&(!u||d),emptyInsertThreshold:5};for(n in G.initializePlugins(this,t,i),i)n in e||(e[n]=i[n]);for(o in Xt(e),this)"_"===o.charAt(0)&&"function"==typeof this[o]&&(this[o]=this[o].bind(this));this.nativeDraggable=!e.forceFallback&&Pt,this.nativeDraggable&&(this.options.touchStartThreshold=1),e.supportPointer?f(t,"pointerdown",this._onTapStart):(f(t,"mousedown",this._onTapStart),f(t,"touchstart",this._onTapStart)),this.nativeDraggable&&(f(t,"dragover",this),f(t,"dragenter",this)),_t.push(this.el),e.store&&e.store.get&&this.sort(e.store.get(this)||[]),a(this,N())}function Lt(t,e,n,o,i,r,a,l){var s,c,u=t[K],d=u.options.onMove;return!window.CustomEvent||y||w?(s=document.createEvent("Event")).initEvent("move",!0,!0):s=new CustomEvent("move",{bubbles:!0,cancelable:!0}),s.to=e,s.from=t,s.dragged=n,s.draggedRect=o,s.related=i||e,s.relatedRect=r||X(e),s.willInsertAfter=l,s.originalEvent=a,t.dispatchEvent(s),c=d?d.call(u,s,a):c}function Kt(t){t.draggable=!1}function Wt(){Ot=!1}function zt(t){return setTimeout(t,0)}function Gt(t){return clearTimeout(t)}Ht.prototype={constructor:Ht,_isOutsideThisEl:function(t){this.el.contains(t)||t===this.el||(bt=null)},_getDirection:function(t,e){return"function"==typeof this.options.direction?this.options.direction.call(this,t,e,$):this.options.direction},_onTapStart:function(e){if(e.cancelable){var n=this,o=this.el,t=this.options,i=t.preventOnFilter,r=e.type,a=e.touches&&e.touches[0]||e.pointerType&&"touch"===e.pointerType&&e,l=(a||e).target,s=e.target.shadowRoot&&(e.path&&e.path[0]||e.composedPath&&e.composedPath()[0])||l,c=t.filter;if(!function(t){Mt.length=0;var e=t.getElementsByTagName("input"),n=e.length;for(;n--;){var o=e[n];o.checked&&Mt.push(o)}}(o),!$&&!(/mousedown|pointerdown/.test(r)&&0!==e.button||t.disabled)&&!s.isContentEditable&&(this.nativeDraggable||!u||!l||"SELECT"!==l.tagName.toUpperCase())&&!((l=P(l,t.draggable,o,!1))&&l.animated||nt===l)){if(rt=j(l),lt=j(l,t.draggable),"function"==typeof c){if(c.call(this,e,l,this))return Z({sortable:n,rootEl:s,name:"filter",targetEl:l,toEl:o,fromEl:o}),q("filter",n,{evt:e}),void(i&&e.preventDefault())}else if(c=c&&c.split(",").some(function(t){if(t=P(s,t.trim(),o,!1))return Z({sortable:n,rootEl:t,name:"filter",targetEl:l,fromEl:o,toEl:o}),q("filter",n,{evt:e}),!0}))return void(i&&e.preventDefault());t.handle&&!P(s,t.handle,o,!1)||this._prepareDragStart(e,a,l)}}},_prepareDragStart:function(t,e,n){var o,i=this,r=i.el,a=i.options,l=r.ownerDocument;n&&!$&&n.parentNode===r&&(o=X(n),tt=r,Q=($=n).parentNode,et=$.nextSibling,nt=n,ct=a.group,dt={target:Ht.dragged=$,clientX:(e||t).clientX,clientY:(e||t).clientY},gt=dt.clientX-o.left,mt=dt.clientY-o.top,this._lastX=(e||t).clientX,this._lastY=(e||t).clientY,$.style["will-change"]="all",o=function(){q("delayEnded",i,{evt:t}),Ht.eventCanceled?i._onDrop():(i._disableDelayedDragEvents(),!c&&i.nativeDraggable&&($.draggable=!0),i._triggerDragStart(t,e),Z({sortable:i,name:"choose",originalEvent:t}),k($,a.chosenClass,!0))},a.ignore.split(",").forEach(function(t){E($,t.trim(),Kt)}),f(l,"dragover",Ft),f(l,"mousemove",Ft),f(l,"touchmove",Ft),a.supportPointer?(f(l,"pointerup",i._onDrop),this.nativeDraggable||f(l,"pointercancel",i._onDrop)):(f(l,"mouseup",i._onDrop),f(l,"touchend",i._onDrop),f(l,"touchcancel",i._onDrop)),c&&this.nativeDraggable&&(this.options.touchStartThreshold=4,$.draggable=!0),q("delayStart",this,{evt:t}),!a.delay||a.delayOnTouchOnly&&!e||this.nativeDraggable&&(w||y)?o():Ht.eventCanceled?this._onDrop():(a.supportPointer?(f(l,"pointerup",i._disableDelayedDrag),f(l,"pointercancel",i._disableDelayedDrag)):(f(l,"mouseup",i._disableDelayedDrag),f(l,"touchend",i._disableDelayedDrag),f(l,"touchcancel",i._disableDelayedDrag)),f(l,"mousemove",i._delayedDragTouchMoveHandler),f(l,"touchmove",i._delayedDragTouchMoveHandler),a.supportPointer&&f(l,"pointermove",i._delayedDragTouchMoveHandler),i._dragStartTimer=setTimeout(o,a.delay)))},_delayedDragTouchMoveHandler:function(t){t=t.touches?t.touches[0]:t;Math.max(Math.abs(t.clientX-this._lastX),Math.abs(t.clientY-this._lastY))>=Math.floor(this.options.touchStartThreshold/(this.nativeDraggable&&window.devicePixelRatio||1))&&this._disableDelayedDrag()},_disableDelayedDrag:function(){$&&Kt($),clearTimeout(this._dragStartTimer),this._disableDelayedDragEvents()},_disableDelayedDragEvents:function(){var t=this.el.ownerDocument;p(t,"mouseup",this._disableDelayedDrag),p(t,"touchend",this._disableDelayedDrag),p(t,"touchcancel",this._disableDelayedDrag),p(t,"pointerup",this._disableDelayedDrag),p(t,"pointercancel",this._disableDelayedDrag),p(t,"mousemove",this._delayedDragTouchMoveHandler),p(t,"touchmove",this._delayedDragTouchMoveHandler),p(t,"pointermove",this._delayedDragTouchMoveHandler)},_triggerDragStart:function(t,e){e=e||"touch"==t.pointerType&&t,!this.nativeDraggable||e?this.options.supportPointer?f(document,"pointermove",this._onTouchMove):f(document,e?"touchmove":"mousemove",this._onTouchMove):(f($,"dragend",this),f(tt,"dragstart",this._onDragStart));try{document.selection?zt(function(){document.selection.empty()}):window.getSelection().removeAllRanges()}catch(t){}},_dragStarted:function(t,e){var n;Et=!1,tt&&$?(q("dragStarted",this,{evt:e}),this.nativeDraggable&&f(document,"dragover",jt),n=this.options,t||k($,n.dragClass,!1),k($,n.ghostClass,!0),Ht.active=this,t&&this._appendGhost(),Z({sortable:this,name:"start",originalEvent:e})):this._nulling()},_emulateDragOver:function(){if(ht){this._lastX=ht.clientX,this._lastY=ht.clientY,Yt();for(var t=document.elementFromPoint(ht.clientX,ht.clientY),e=t;t&&t.shadowRoot&&(t=t.shadowRoot.elementFromPoint(ht.clientX,ht.clientY))!==e;)e=t;if($.parentNode[K]._isOutsideThisEl(t),e)do{if(e[K])if(e[K]._onDragOver({clientX:ht.clientX,clientY:ht.clientY,target:t,rootEl:e})&&!this.options.dragoverBubble)break}while(e=m(t=e));Bt()}},_onTouchMove:function(t){if(dt){var e=this.options,n=e.fallbackTolerance,o=e.fallbackOffset,i=t.touches?t.touches[0]:t,r=J&&D(J,!0),a=J&&r&&r.a,l=J&&r&&r.d,e=Nt&&Dt&&S(Dt),a=(i.clientX-dt.clientX+o.x)/(a||1)+(e?e[0]-xt[0]:0)/(a||1),l=(i.clientY-dt.clientY+o.y)/(l||1)+(e?e[1]-xt[1]:0)/(l||1);if(!Ht.active&&!Et){if(n&&Math.max(Math.abs(i.clientX-this._lastX),Math.abs(i.clientY-this._lastY))<n)return;this._onDragStart(t,!0)}J&&(r?(r.e+=a-(ft||0),r.f+=l-(pt||0)):r={a:1,b:0,c:0,d:1,e:a,f:l},r="matrix(".concat(r.a,",").concat(r.b,",").concat(r.c,",").concat(r.d,",").concat(r.e,",").concat(r.f,")"),R(J,"webkitTransform",r),R(J,"mozTransform",r),R(J,"msTransform",r),R(J,"transform",r),ft=a,pt=l,ht=i),t.cancelable&&t.preventDefault()}},_appendGhost:function(){if(!J){var t=this.options.fallbackOnBody?document.body:tt,e=X($,!0,Nt,!0,t),n=this.options;if(Nt){for(Dt=t;"static"===R(Dt,"position")&&"none"===R(Dt,"transform")&&Dt!==document;)Dt=Dt.parentNode;Dt!==document.body&&Dt!==document.documentElement?(Dt===document&&(Dt=O()),e.top+=Dt.scrollTop,e.left+=Dt.scrollLeft):Dt=O(),xt=S(Dt)}k(J=$.cloneNode(!0),n.ghostClass,!1),k(J,n.fallbackClass,!0),k(J,n.dragClass,!0),R(J,"transition",""),R(J,"transform",""),R(J,"box-sizing","border-box"),R(J,"margin",0),R(J,"top",e.top),R(J,"left",e.left),R(J,"width",e.width),R(J,"height",e.height),R(J,"opacity","0.8"),R(J,"position",Nt?"absolute":"fixed"),R(J,"zIndex","100000"),R(J,"pointerEvents","none"),Ht.ghost=J,t.appendChild(J),R(J,"transform-origin",gt/parseInt(J.style.width)*100+"% "+mt/parseInt(J.style.height)*100+"%")}},_onDragStart:function(t,e){var n=this,o=t.dataTransfer,i=n.options;q("dragStart",this,{evt:t}),Ht.eventCanceled?this._onDrop():(q("setupClone",this),Ht.eventCanceled||((ot=T($)).removeAttribute("id"),ot.draggable=!1,ot.style["will-change"]="",this._hideClone(),k(ot,this.options.chosenClass,!1),Ht.clone=ot),n.cloneId=zt(function(){q("clone",n),Ht.eventCanceled||(n.options.removeCloneOnHide||tt.insertBefore(ot,$),n._hideClone(),Z({sortable:n,name:"clone"}))}),e||k($,i.dragClass,!0),e?(St=!0,n._loopId=setInterval(n._emulateDragOver,50)):(p(document,"mouseup",n._onDrop),p(document,"touchend",n._onDrop),p(document,"touchcancel",n._onDrop),o&&(o.effectAllowed="move",i.setData&&i.setData.call(n,o,$)),f(document,"drop",n),R($,"transform","translateZ(0)")),Et=!0,n._dragStartId=zt(n._dragStarted.bind(n,e,t)),f(document,"selectstart",n),vt=!0,window.getSelection().removeAllRanges(),u&&R(document.body,"user-select","none"))},_onDragOver:function(n){var o,i,r,t,e,a=this.el,l=n.target,s=this.options,c=s.group,u=Ht.active,d=ct===c,h=s.sort,f=ut||u,p=this,g=!1;if(!Ot){if(void 0!==n.preventDefault&&n.cancelable&&n.preventDefault(),l=P(l,s.draggable,a,!0),O("dragOver"),Ht.eventCanceled)return g;if($.contains(n.target)||l.animated&&l.animatingX&&l.animatingY||p._ignoreWhileAnimating===l)return A(!1);if(St=!1,u&&!s.disabled&&(d?h||(i=Q!==tt):ut===this||(this.lastPutMode=ct.checkPull(this,u,$,n))&&c.checkPut(this,u,$,n))){if(r="vertical"===this._getDirection(n,l),o=X($),O("dragOverValid"),Ht.eventCanceled)return g;if(i)return Q=tt,M(),this._hideClone(),O("revert"),Ht.eventCanceled||(et?tt.insertBefore($,et):tt.appendChild($)),A(!0);var m=F(a,s.draggable);if(m&&(S=n,c=r,x=X(F((E=this).el,E.options.draggable)),E=L(E.el,E.options,J),!(c?S.clientX>E.right+10||S.clientY>x.bottom&&S.clientX>x.left:S.clientY>E.bottom+10||S.clientX>x.right&&S.clientY>x.top)||m.animated)){if(m&&(t=n,e=r,C=X(B((_=this).el,0,_.options,!0)),_=L(_.el,_.options,J),e?t.clientX<_.left-10||t.clientY<C.top&&t.clientX<C.right:t.clientY<_.top-10||t.clientY<C.bottom&&t.clientX<C.left)){var v=B(a,0,s,!0);if(v===$)return A(!1);if(D=X(l=v),!1!==Lt(tt,a,$,o,l,D,n,!1))return M(),a.insertBefore($,v),Q=a,N(),A(!0)}else if(l.parentNode===a){var b,y,w,D=X(l),E=$.parentNode!==a,S=(S=$.animated&&$.toRect||o,x=l.animated&&l.toRect||D,_=(e=r)?S.left:S.top,t=e?S.right:S.bottom,C=e?S.width:S.height,v=e?x.left:x.top,S=e?x.right:x.bottom,x=e?x.width:x.height,!(_===v||t===S||_+C/2===v+x/2)),_=r?"top":"left",C=Y(l,"top","top")||Y($,"top","top"),v=C?C.scrollTop:void 0;if(bt!==l&&(y=D[_],Ct=!1,Tt=!S&&s.invertSwap||E),0!==(b=function(t,e,n,o,i,r,a,l){var s=o?t.clientY:t.clientX,c=o?n.height:n.width,t=o?n.top:n.left,o=o?n.bottom:n.right,n=!1;if(!a)if(l&&wt<c*i){if(Ct=!Ct&&(1===yt?t+c*r/2<s:s<o-c*r/2)?!0:Ct)n=!0;else if(1===yt?s<t+wt:o-wt<s)return-yt}else if(t+c*(1-i)/2<s&&s<o-c*(1-i)/2)return function(t){return j($)<j(t)?1:-1}(e);if((n=n||a)&&(s<t+c*r/2||o-c*r/2<s))return t+c/2<s?1:-1;return 0}(n,l,D,r,S?1:s.swapThreshold,null==s.invertedSwapThreshold?s.swapThreshold:s.invertedSwapThreshold,Tt,bt===l)))for(var T=j($);(w=Q.children[T-=b])&&("none"===R(w,"display")||w===J););if(0===b||w===l)return A(!1);yt=b;var x=(bt=l).nextElementSibling,E=!1,S=Lt(tt,a,$,o,l,D,n,E=1===b);if(!1!==S)return 1!==S&&-1!==S||(E=1===S),Ot=!0,setTimeout(Wt,30),M(),E&&!x?a.appendChild($):l.parentNode.insertBefore($,E?x:l),C&&H(C,0,v-C.scrollTop),Q=$.parentNode,void 0===y||Tt||(wt=Math.abs(y-X(l)[_])),N(),A(!0)}}else{if(m===$)return A(!1);if((l=m&&a===n.target?m:l)&&(D=X(l)),!1!==Lt(tt,a,$,o,l,D,n,!!l))return M(),m&&m.nextSibling?a.insertBefore($,m.nextSibling):a.appendChild($),Q=a,N(),A(!0)}if(a.contains($))return A(!1)}return!1}function O(t,e){q(t,p,I({evt:n,isOwner:d,axis:r?"vertical":"horizontal",revert:i,dragRect:o,targetRect:D,canSort:h,fromSortable:f,target:l,completed:A,onMove:function(t,e){return Lt(tt,a,$,o,t,X(t),n,e)},changed:N},e))}function M(){O("dragOverAnimationCapture"),p.captureAnimationState(),p!==f&&f.captureAnimationState()}function A(t){return O("dragOverCompleted",{insertion:t}),t&&(d?u._hideClone():u._showClone(p),p!==f&&(k($,(ut||u).options.ghostClass,!1),k($,s.ghostClass,!0)),ut!==p&&p!==Ht.active?ut=p:p===Ht.active&&ut&&(ut=null),f===p&&(p._ignoreWhileAnimating=l),p.animateAll(function(){O("dragOverAnimationComplete"),p._ignoreWhileAnimating=null}),p!==f&&(f.animateAll(),f._ignoreWhileAnimating=null)),(l===$&&!$.animated||l===a&&!l.animated)&&(bt=null),s.dragoverBubble||n.rootEl||l===document||($.parentNode[K]._isOutsideThisEl(n.target),t||Ft(n)),!s.dragoverBubble&&n.stopPropagation&&n.stopPropagation(),g=!0}function N(){at=j($),st=j($,s.draggable),Z({sortable:p,name:"change",toEl:a,newIndex:at,newDraggableIndex:st,originalEvent:n})}},_ignoreWhileAnimating:null,_offMoveEvents:function(){p(document,"mousemove",this._onTouchMove),p(document,"touchmove",this._onTouchMove),p(document,"pointermove",this._onTouchMove),p(document,"dragover",Ft),p(document,"mousemove",Ft),p(document,"touchmove",Ft)},_offUpEvents:function(){var t=this.el.ownerDocument;p(t,"mouseup",this._onDrop),p(t,"touchend",this._onDrop),p(t,"pointerup",this._onDrop),p(t,"pointercancel",this._onDrop),p(t,"touchcancel",this._onDrop),p(document,"selectstart",this)},_onDrop:function(t){var e=this.el,n=this.options;at=j($),st=j($,n.draggable),q("drop",this,{evt:t}),Q=$&&$.parentNode,at=j($),st=j($,n.draggable),Ht.eventCanceled||(Ct=Tt=Et=!1,clearInterval(this._loopId),clearTimeout(this._dragStartTimer),Gt(this.cloneId),Gt(this._dragStartId),this.nativeDraggable&&(p(document,"drop",this),p(e,"dragstart",this._onDragStart)),this._offMoveEvents(),this._offUpEvents(),u&&R(document.body,"user-select",""),R($,"transform",""),t&&(vt&&(t.cancelable&&t.preventDefault(),n.dropBubble||t.stopPropagation()),J&&J.parentNode&&J.parentNode.removeChild(J),(tt===Q||ut&&"clone"!==ut.lastPutMode)&&ot&&ot.parentNode&&ot.parentNode.removeChild(ot),$&&(this.nativeDraggable&&p($,"dragend",this),Kt($),$.style["will-change"]="",vt&&!Et&&k($,(ut||this).options.ghostClass,!1),k($,this.options.chosenClass,!1),Z({sortable:this,name:"unchoose",toEl:Q,newIndex:null,newDraggableIndex:null,originalEvent:t}),tt!==Q?(0<=at&&(Z({rootEl:Q,name:"add",toEl:Q,fromEl:tt,originalEvent:t}),Z({sortable:this,name:"remove",toEl:Q,originalEvent:t}),Z({rootEl:Q,name:"sort",toEl:Q,fromEl:tt,originalEvent:t}),Z({sortable:this,name:"sort",toEl:Q,originalEvent:t})),ut&&ut.save()):at!==rt&&0<=at&&(Z({sortable:this,name:"update",toEl:Q,originalEvent:t}),Z({sortable:this,name:"sort",toEl:Q,originalEvent:t})),Ht.active&&(null!=at&&-1!==at||(at=rt,st=lt),Z({sortable:this,name:"end",toEl:Q,originalEvent:t}),this.save())))),this._nulling()},_nulling:function(){q("nulling",this),tt=$=Q=J=et=ot=nt=it=dt=ht=vt=at=st=rt=lt=bt=yt=ut=ct=Ht.dragged=Ht.ghost=Ht.clone=Ht.active=null;var e=this.el;Mt.forEach(function(t){e.contains(t)&&(t.checked=!0)}),Mt.length=ft=pt=0},handleEvent:function(t){switch(t.type){case"drop":case"dragend":this._onDrop(t);break;case"dragenter":case"dragover":$&&(this._onDragOver(t),function(t){t.dataTransfer&&(t.dataTransfer.dropEffect="move");t.cancelable&&t.preventDefault()}(t));break;case"selectstart":t.preventDefault()}},toArray:function(){for(var t,e=[],n=this.el.children,o=0,i=n.length,r=this.options;o<i;o++)P(t=n[o],r.draggable,this.el,!1)&&e.push(t.getAttribute(r.dataIdAttr)||function(t){var e=t.tagName+t.className+t.src+t.href+t.textContent,n=e.length,o=0;for(;n--;)o+=e.charCodeAt(n);return o.toString(36)}(t));return e},sort:function(t,e){var n={},o=this.el;this.toArray().forEach(function(t,e){e=o.children[e];P(e,this.options.draggable,o,!1)&&(n[t]=e)},this),e&&this.captureAnimationState(),t.forEach(function(t){n[t]&&(o.removeChild(n[t]),o.appendChild(n[t]))}),e&&this.animateAll()},save:function(){var t=this.options.store;t&&t.set&&t.set(this)},closest:function(t,e){return P(t,e||this.options.draggable,this.el,!1)},option:function(t,e){var n=this.options;if(void 0===e)return n[t];var o=G.modifyOption(this,t,e);n[t]=void 0!==o?o:e,"group"===t&&Xt(n)},destroy:function(){q("destroy",this);var t=this.el;t[K]=null,p(t,"mousedown",this._onTapStart),p(t,"touchstart",this._onTapStart),p(t,"pointerdown",this._onTapStart),this.nativeDraggable&&(p(t,"dragover",this),p(t,"dragenter",this)),Array.prototype.forEach.call(t.querySelectorAll("[draggable]"),function(t){t.removeAttribute("draggable")}),this._onDrop(),this._disableDelayedDragEvents(),_t.splice(_t.indexOf(this.el),1),this.el=t=null},_hideClone:function(){it||(q("hideClone",this),Ht.eventCanceled||(R(ot,"display","none"),this.options.removeCloneOnHide&&ot.parentNode&&ot.parentNode.removeChild(ot),it=!0))},_showClone:function(t){"clone"===t.lastPutMode?it&&(q("showClone",this),Ht.eventCanceled||($.parentNode!=tt||this.options.group.revertClone?et?tt.insertBefore(ot,et):tt.appendChild(ot):tt.insertBefore(ot,$),this.options.group.revertClone&&this.animate($,ot),R(ot,"display",""),it=!1)):this._hideClone()}},At&&f(document,"touchmove",function(t){(Ht.active||Et)&&t.cancelable&&t.preventDefault()}),Ht.utils={on:f,off:p,css:R,find:E,is:function(t,e){return!!P(t,e,t,!1)},extend:function(t,e){if(t&&e)for(var n in e)e.hasOwnProperty(n)&&(t[n]=e[n]);return t},throttle:C,closest:P,toggleClass:k,clone:T,index:j,nextTick:zt,cancelNextTick:Gt,detectDirection:Rt,getChild:B,expando:K},Ht.get=function(t){return t[K]},Ht.mount=function(){for(var t=arguments.length,e=new Array(t),n=0;n<t;n++)e[n]=arguments[n];(e=e[0].constructor===Array?e[0]:e).forEach(function(t){if(!t.prototype||!t.prototype.constructor)throw"Sortable: Mounted plugin must be a constructor function, not ".concat({}.toString.call(t));t.utils&&(Ht.utils=I(I({},Ht.utils),t.utils)),G.mount(t)})},Ht.create=function(t,e){return new Ht(t,e)};var Ut,qt,Vt,Zt,$t,Qt,Jt=[],te=!(Ht.version="1.15.7");function ee(){Jt.forEach(function(t){clearInterval(t.pid)}),Jt=[]}function ne(){clearInterval(Qt)}var oe,ie=C(function(n,t,e,o){if(t.scroll){var i,r=(n.touches?n.touches[0]:n).clientX,a=(n.touches?n.touches[0]:n).clientY,l=t.scrollSensitivity,s=t.scrollSpeed,c=O(),u=!1;qt!==e&&(qt=e,ee(),Ut=t.scroll,i=t.scrollFn,!0===Ut&&(Ut=M(e,!0)));var d=0,h=Ut;do{var f=h,p=X(f),g=p.top,m=p.bottom,v=p.left,b=p.right,y=p.width,w=p.height,D=void 0,E=void 0,S=f.scrollWidth,_=f.scrollHeight,C=R(f),T=f.scrollLeft,p=f.scrollTop,E=f===c?(D=y<S&&("auto"===C.overflowX||"scroll"===C.overflowX||"visible"===C.overflowX),w<_&&("auto"===C.overflowY||"scroll"===C.overflowY||"visible"===C.overflowY)):(D=y<S&&("auto"===C.overflowX||"scroll"===C.overflowX),w<_&&("auto"===C.overflowY||"scroll"===C.overflowY)),T=D&&(Math.abs(b-r)<=l&&T+y<S)-(Math.abs(v-r)<=l&&!!T),p=E&&(Math.abs(m-a)<=l&&p+w<_)-(Math.abs(g-a)<=l&&!!p);if(!Jt[d])for(var x=0;x<=d;x++)Jt[x]||(Jt[x]={});Jt[d].vx==T&&Jt[d].vy==p&&Jt[d].el===f||(Jt[d].el=f,Jt[d].vx=T,Jt[d].vy=p,clearInterval(Jt[d].pid),0==T&&0==p||(u=!0,Jt[d].pid=setInterval(function(){o&&0===this.layer&&Ht.active._onTouchMove($t);var t=Jt[this.layer].vy?Jt[this.layer].vy*s:0,e=Jt[this.layer].vx?Jt[this.layer].vx*s:0;"function"==typeof i&&"continue"!==i.call(Ht.dragged.parentNode[K],e,t,n,$t,Jt[this.layer].el)||H(Jt[this.layer].el,e,t)}.bind({layer:d}),24))),d++}while(t.bubbleScroll&&h!==c&&(h=M(h,!1)));te=u}},30),n=function(t){var e=t.originalEvent,n=t.putSortable,o=t.dragEl,i=t.activeSortable,r=t.dispatchSortableEvent,a=t.hideGhostForTarget,t=t.unhideGhostForTarget;e&&(i=n||i,a(),e=e.changedTouches&&e.changedTouches.length?e.changedTouches[0]:e,e=document.elementFromPoint(e.clientX,e.clientY),t(),i&&!i.el.contains(e)&&(r("spill"),this.onSpill({dragEl:o,putSortable:n})))};function re(){}function ae(){}re.prototype={startIndex:null,dragStart:function(t){t=t.oldDraggableIndex;this.startIndex=t},onSpill:function(t){var e=t.dragEl,n=t.putSortable;this.sortable.captureAnimationState(),n&&n.captureAnimationState();t=B(this.sortable.el,this.startIndex,this.options);t?this.sortable.el.insertBefore(e,t):this.sortable.el.appendChild(e),this.sortable.animateAll(),n&&n.animateAll()},drop:n},a(re,{pluginName:"revertOnSpill"}),ae.prototype={onSpill:function(t){var e=t.dragEl,t=t.putSortable||this.sortable;t.captureAnimationState(),e.parentNode&&e.parentNode.removeChild(e),t.animateAll()},drop:n},a(ae,{pluginName:"removeOnSpill"});var le,se,ce,ue,de,he=[],fe=[],pe=!1,ge=!1,me=!1;function ve(n,o){fe.forEach(function(t,e){e=o.children[t.sortableIndex+(n?Number(e):0)];e?o.insertBefore(t,e):o.appendChild(t)})}function be(){he.forEach(function(t){t!==ce&&t.parentNode&&t.parentNode.removeChild(t)})}return Ht.mount(new function(){function t(){for(var t in this.defaults={scroll:!0,forceAutoScrollFallback:!1,scrollSensitivity:30,scrollSpeed:10,bubbleScroll:!0},this)"_"===t.charAt(0)&&"function"==typeof this[t]&&(this[t]=this[t].bind(this))}return t.prototype={dragStarted:function(t){t=t.originalEvent;this.sortable.nativeDraggable?f(document,"dragover",this._handleAutoScroll):this.options.supportPointer?f(document,"pointermove",this._handleFallbackAutoScroll):t.touches?f(document,"touchmove",this._handleFallbackAutoScroll):f(document,"mousemove",this._handleFallbackAutoScroll)},dragOverCompleted:function(t){t=t.originalEvent;this.options.dragOverBubble||t.rootEl||this._handleAutoScroll(t)},drop:function(){this.sortable.nativeDraggable?p(document,"dragover",this._handleAutoScroll):(p(document,"pointermove",this._handleFallbackAutoScroll),p(document,"touchmove",this._handleFallbackAutoScroll),p(document,"mousemove",this._handleFallbackAutoScroll)),ne(),ee(),clearTimeout(v),v=void 0},nulling:function(){$t=qt=Ut=te=Qt=Vt=Zt=null,Jt.length=0},_handleFallbackAutoScroll:function(t){this._handleAutoScroll(t,!0)},_handleAutoScroll:function(e,n){var o,i=this,r=(e.touches?e.touches[0]:e).clientX,a=(e.touches?e.touches[0]:e).clientY,t=document.elementFromPoint(r,a);$t=e,n||this.options.forceAutoScrollFallback||w||y||u?(ie(e,this.options,t,n),o=M(t,!0),!te||Qt&&r===Vt&&a===Zt||(Qt&&ne(),Qt=setInterval(function(){var t=M(document.elementFromPoint(r,a),!0);t!==o&&(o=t,ee()),ie(e,i.options,t,n)},10),Vt=r,Zt=a)):this.options.bubbleScroll&&M(t,!0)!==O()?ie(e,this.options,M(t,!1),!1):ee()}},a(t,{pluginName:"scroll",initializeByDefault:!0})}),Ht.mount(ae,re),Ht.mount(new function(){function t(){this.defaults={swapClass:"sortable-swap-highlight"}}return t.prototype={dragStart:function(t){t=t.dragEl;oe=t},dragOverValid:function(t){var e=t.completed,n=t.target,o=t.onMove,i=t.activeSortable,r=t.changed,a=t.cancel;i.options.swap&&(t=this.sortable.el,i=this.options,n&&n!==t&&(t=oe,oe=!1!==o(n)?(k(n,i.swapClass,!0),n):null,t&&t!==oe&&k(t,i.swapClass,!1)),r(),e(!0),a())},drop:function(t){var e,n,o=t.activeSortable,i=t.putSortable,r=t.dragEl,a=i||this.sortable,l=this.options;oe&&k(oe,l.swapClass,!1),oe&&(l.swap||i&&i.options.swap)&&r!==oe&&(a.captureAnimationState(),a!==o&&o.captureAnimationState(),n=oe,t=(e=r).parentNode,l=n.parentNode,t&&l&&!t.isEqualNode(n)&&!l.isEqualNode(e)&&(i=j(e),r=j(n),t.isEqualNode(l)&&i<r&&r++,t.insertBefore(n,t.children[i]),l.insertBefore(e,l.children[r])),a.animateAll(),a!==o&&o.animateAll())},nulling:function(){oe=null}},a(t,{pluginName:"swap",eventProperties:function(){return{swapItem:oe}}})}),Ht.mount(new function(){function t(o){for(var t in this)"_"===t.charAt(0)&&"function"==typeof this[t]&&(this[t]=this[t].bind(this));o.options.avoidImplicitDeselect||(o.options.supportPointer?f(document,"pointerup",this._deselectMultiDrag):(f(document,"mouseup",this._deselectMultiDrag),f(document,"touchend",this._deselectMultiDrag))),f(document,"keydown",this._checkKeyDown),f(document,"keyup",this._checkKeyUp),this.defaults={selectedClass:"sortable-selected",multiDragKey:null,avoidImplicitDeselect:!1,setData:function(t,e){var n="";he.length&&se===o?he.forEach(function(t,e){n+=(e?", ":"")+t.textContent}):n=e.textContent,t.setData("Text",n)}}}return t.prototype={multiDragKeyDown:!1,isMultiDrag:!1,delayStartGlobal:function(t){t=t.dragEl;ce=t},delayEnded:function(){this.isMultiDrag=~he.indexOf(ce)},setupClone:function(t){var e=t.sortable,t=t.cancel;if(this.isMultiDrag){for(var n=0;n<he.length;n++)fe.push(T(he[n])),fe[n].sortableIndex=he[n].sortableIndex,fe[n].draggable=!1,fe[n].style["will-change"]="",k(fe[n],this.options.selectedClass,!1),he[n]===ce&&k(fe[n],this.options.chosenClass,!1);e._hideClone(),t()}},clone:function(t){var e=t.sortable,n=t.rootEl,o=t.dispatchSortableEvent,t=t.cancel;this.isMultiDrag&&(this.options.removeCloneOnHide||he.length&&se===e&&(ve(!0,n),o("clone"),t()))},showClone:function(t){var e=t.cloneNowShown,n=t.rootEl,t=t.cancel;this.isMultiDrag&&(ve(!1,n),fe.forEach(function(t){R(t,"display","")}),e(),de=!1,t())},hideClone:function(t){var e=this,n=(t.sortable,t.cloneNowHidden),t=t.cancel;this.isMultiDrag&&(fe.forEach(function(t){R(t,"display","none"),e.options.removeCloneOnHide&&t.parentNode&&t.parentNode.removeChild(t)}),n(),de=!0,t())},dragStartGlobal:function(t){t.sortable;!this.isMultiDrag&&se&&se.multiDrag._deselectMultiDrag(),he.forEach(function(t){t.sortableIndex=j(t)}),he=he.sort(function(t,e){return t.sortableIndex-e.sortableIndex}),me=!0},dragStarted:function(t){var e,n=this,t=t.sortable;this.isMultiDrag&&(this.options.sort&&(t.captureAnimationState(),this.options.animation&&(he.forEach(function(t){t!==ce&&R(t,"position","absolute")}),e=X(ce,!1,!0,!0),he.forEach(function(t){t!==ce&&x(t,e)}),pe=ge=!0)),t.animateAll(function(){pe=ge=!1,n.options.animation&&he.forEach(function(t){A(t)}),n.options.sort&&be()}))},dragOver:function(t){var e=t.target,n=t.completed,t=t.cancel;ge&&~he.indexOf(e)&&(n(!1),t())},revert:function(t){var n,o,e=t.fromSortable,i=t.rootEl,r=t.sortable,a=t.dragRect;1<he.length&&(he.forEach(function(t){r.addAnimationState({target:t,rect:ge?X(t):a}),A(t),t.fromRect=a,e.removeAnimationState(t)}),ge=!1,n=!this.options.removeCloneOnHide,o=i,he.forEach(function(t,e){e=o.children[t.sortableIndex+(n?Number(e):0)];e?o.insertBefore(t,e):o.appendChild(t)}))},dragOverCompleted:function(t){var e,n=t.sortable,o=t.isOwner,i=t.insertion,r=t.activeSortable,a=t.parentEl,l=t.putSortable,t=this.options;i&&(o&&r._hideClone(),pe=!1,t.animation&&1<he.length&&(ge||!o&&!r.options.sort&&!l)&&(e=X(ce,!1,!0,!0),he.forEach(function(t){t!==ce&&(x(t,e),a.appendChild(t))}),ge=!0),o||(ge||be(),1<he.length?(o=de,r._showClone(n),r.options.animation&&!de&&o&&fe.forEach(function(t){r.addAnimationState({target:t,rect:ue}),t.fromRect=ue,t.thisAnimationDuration=null})):r._showClone(n)))},dragOverAnimationCapture:function(t){var e=t.dragRect,n=t.isOwner,t=t.activeSortable;he.forEach(function(t){t.thisAnimationDuration=null}),t.options.animation&&!n&&t.multiDrag.isMultiDrag&&(ue=a({},e),e=D(ce,!0),ue.top-=e.f,ue.left-=e.e)},dragOverAnimationComplete:function(){ge&&(ge=!1,be())},drop:function(t){var o,i,r,a,n,e,l,s=t.originalEvent,c=t.rootEl,u=t.parentEl,d=t.sortable,h=t.dispatchSortableEvent,f=t.oldIndex,t=t.putSortable,p=t||this.sortable;s&&(o=this.options,i=u.children,me||(o.multiDragKey&&!this.multiDragKeyDown&&this._deselectMultiDrag(),k(ce,o.selectedClass,!~he.indexOf(ce)),~he.indexOf(ce)?(he.splice(he.indexOf(ce),1),le=null,U({sortable:d,rootEl:c,name:"deselect",targetEl:ce,originalEvent:s})):(he.push(ce),U({sortable:d,rootEl:c,name:"select",targetEl:ce,originalEvent:s}),s.shiftKey&&le&&d.el.contains(le)?(r=j(le),a=j(ce),~r&&~a&&r!==a&&function(){for(var e,t=r<a?(e=r,a):(e=a,r+1),n=o.filter;e<t;e++)~he.indexOf(i[e])||P(i[e],o.draggable,u,!1)&&(n&&("function"==typeof n?n.call(d,s,i[e],d):n.split(",").some(function(t){return P(i[e],t.trim(),u,!1)}))||(k(i[e],o.selectedClass,!0),he.push(i[e]),U({sortable:d,rootEl:c,name:"select",targetEl:i[e],originalEvent:s})))}()):le=ce,se=p)),me&&this.isMultiDrag&&(ge=!1,(u[K].options.sort||u!==c)&&1<he.length&&(n=X(ce),e=j(ce,":not(."+this.options.selectedClass+")"),!pe&&o.animation&&(ce.thisAnimationDuration=null),p.captureAnimationState(),pe||(o.animation&&(ce.fromRect=n,he.forEach(function(t){var e;t.thisAnimationDuration=null,t!==ce&&(e=ge?X(t):n,t.fromRect=e,p.addAnimationState({target:t,rect:e}))})),be(),he.forEach(function(t){i[e]?u.insertBefore(t,i[e]):u.appendChild(t),e++}),f===j(ce)&&(l=!1,he.forEach(function(t){t.sortableIndex!==j(t)&&(l=!0)}),l&&(h("update"),h("sort")))),he.forEach(function(t){A(t)}),p.animateAll()),se=p),(c===u||t&&"clone"!==t.lastPutMode)&&fe.forEach(function(t){t.parentNode&&t.parentNode.removeChild(t)}))},nullingGlobal:function(){this.isMultiDrag=me=!1,fe.length=0},destroyGlobal:function(){this._deselectMultiDrag(),p(document,"pointerup",this._deselectMultiDrag),p(document,"mouseup",this._deselectMultiDrag),p(document,"touchend",this._deselectMultiDrag),p(document,"keydown",this._checkKeyDown),p(document,"keyup",this._checkKeyUp)},_deselectMultiDrag:function(t){if(!(void 0!==me&&me||se!==this.sortable||t&&P(t.target,this.options.draggable,this.sortable.el,!1)||t&&0!==t.button))for(;he.length;){var e=he[0];k(e,this.options.selectedClass,!1),he.shift(),U({sortable:this.sortable,rootEl:this.sortable.el,name:"deselect",targetEl:e,originalEvent:t})}},_checkKeyDown:function(t){t.key===this.options.multiDragKey&&(this.multiDragKeyDown=!0)},_checkKeyUp:function(t){t.key===this.options.multiDragKey&&(this.multiDragKeyDown=!1)}},a(t,{pluginName:"multiDrag",utils:{select:function(t){var e=t.parentNode[K];e&&e.options.multiDrag&&!~he.indexOf(t)&&(se&&se!==e&&(se.multiDrag._deselectMultiDrag(),se=e),k(t,e.options.selectedClass,!0),he.push(t))},deselect:function(t){var e=t.parentNode[K],n=he.indexOf(t);e&&e.options.multiDrag&&~n&&(k(t,e.options.selectedClass,!1),he.splice(n,1))}},eventProperties:function(){var n=this,o=[],i=[];return he.forEach(function(t){var e;o.push({multiDragElement:t,index:t.sortableIndex}),e=ge&&t!==ce?-1:ge?j(t,":not(."+n.options.selectedClass+")"):j(t),i.push({multiDragElement:t,index:e})}),{items:e(he),clones:[].concat(fe),oldIndicies:o,newIndicies:i}},optionListeners:{multiDragKey:function(t){return"ctrl"===(t=t.toLowerCase())?t="Control":1<t.length&&(t=t.charAt(0).toUpperCase()+t.substr(1)),t}}})}),Ht});
 ;
+//---------------------------------------------------------------------
+//
+// QR Code Generator for JavaScript
+//
+// Copyright (c) 2009 Kazuhiko Arase
+//
+// URL: http://www.d-project.com/
+//
+// Licensed under the MIT license:
+//  http://www.opensource.org/licenses/mit-license.php
+//
+// The word 'QR Code' is registered trademark of
+// DENSO WAVE INCORPORATED
+//  http://www.denso-wave.com/qrcode/faqpatent-e.html
+//
+//---------------------------------------------------------------------
+
+var qrcode = function() {
+
+  //---------------------------------------------------------------------
+  // qrcode
+  //---------------------------------------------------------------------
+
+  /**
+   * qrcode
+   * @param typeNumber 1 to 40
+   * @param errorCorrectionLevel 'L','M','Q','H'
+   */
+  var qrcode = function(typeNumber, errorCorrectionLevel) {
+
+    var PAD0 = 0xEC;
+    var PAD1 = 0x11;
+
+    var _typeNumber = typeNumber;
+    var _errorCorrectionLevel = QRErrorCorrectionLevel[errorCorrectionLevel];
+    var _modules = null;
+    var _moduleCount = 0;
+    var _dataCache = null;
+    var _dataList = [];
+
+    var _this = {};
+
+    var makeImpl = function(test, maskPattern) {
+
+      _moduleCount = _typeNumber * 4 + 17;
+      _modules = function(moduleCount) {
+        var modules = new Array(moduleCount);
+        for (var row = 0; row < moduleCount; row += 1) {
+          modules[row] = new Array(moduleCount);
+          for (var col = 0; col < moduleCount; col += 1) {
+            modules[row][col] = null;
+          }
+        }
+        return modules;
+      }(_moduleCount);
+
+      setupPositionProbePattern(0, 0);
+      setupPositionProbePattern(_moduleCount - 7, 0);
+      setupPositionProbePattern(0, _moduleCount - 7);
+      setupPositionAdjustPattern();
+      setupTimingPattern();
+      setupTypeInfo(test, maskPattern);
+
+      if (_typeNumber >= 7) {
+        setupTypeNumber(test);
+      }
+
+      if (_dataCache == null) {
+        _dataCache = createData(_typeNumber, _errorCorrectionLevel, _dataList);
+      }
+
+      mapData(_dataCache, maskPattern);
+    };
+
+    var setupPositionProbePattern = function(row, col) {
+
+      for (var r = -1; r <= 7; r += 1) {
+
+        if (row + r <= -1 || _moduleCount <= row + r) continue;
+
+        for (var c = -1; c <= 7; c += 1) {
+
+          if (col + c <= -1 || _moduleCount <= col + c) continue;
+
+          if ( (0 <= r && r <= 6 && (c == 0 || c == 6) )
+              || (0 <= c && c <= 6 && (r == 0 || r == 6) )
+              || (2 <= r && r <= 4 && 2 <= c && c <= 4) ) {
+            _modules[row + r][col + c] = true;
+          } else {
+            _modules[row + r][col + c] = false;
+          }
+        }
+      }
+    };
+
+    var getBestMaskPattern = function() {
+
+      var minLostPoint = 0;
+      var pattern = 0;
+
+      for (var i = 0; i < 8; i += 1) {
+
+        makeImpl(true, i);
+
+        var lostPoint = QRUtil.getLostPoint(_this);
+
+        if (i == 0 || minLostPoint > lostPoint) {
+          minLostPoint = lostPoint;
+          pattern = i;
+        }
+      }
+
+      return pattern;
+    };
+
+    var setupTimingPattern = function() {
+
+      for (var r = 8; r < _moduleCount - 8; r += 1) {
+        if (_modules[r][6] != null) {
+          continue;
+        }
+        _modules[r][6] = (r % 2 == 0);
+      }
+
+      for (var c = 8; c < _moduleCount - 8; c += 1) {
+        if (_modules[6][c] != null) {
+          continue;
+        }
+        _modules[6][c] = (c % 2 == 0);
+      }
+    };
+
+    var setupPositionAdjustPattern = function() {
+
+      var pos = QRUtil.getPatternPosition(_typeNumber);
+
+      for (var i = 0; i < pos.length; i += 1) {
+
+        for (var j = 0; j < pos.length; j += 1) {
+
+          var row = pos[i];
+          var col = pos[j];
+
+          if (_modules[row][col] != null) {
+            continue;
+          }
+
+          for (var r = -2; r <= 2; r += 1) {
+
+            for (var c = -2; c <= 2; c += 1) {
+
+              if (r == -2 || r == 2 || c == -2 || c == 2
+                  || (r == 0 && c == 0) ) {
+                _modules[row + r][col + c] = true;
+              } else {
+                _modules[row + r][col + c] = false;
+              }
+            }
+          }
+        }
+      }
+    };
+
+    var setupTypeNumber = function(test) {
+
+      var bits = QRUtil.getBCHTypeNumber(_typeNumber);
+
+      for (var i = 0; i < 18; i += 1) {
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+        _modules[Math.floor(i / 3)][i % 3 + _moduleCount - 8 - 3] = mod;
+      }
+
+      for (var i = 0; i < 18; i += 1) {
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+        _modules[i % 3 + _moduleCount - 8 - 3][Math.floor(i / 3)] = mod;
+      }
+    };
+
+    var setupTypeInfo = function(test, maskPattern) {
+
+      var data = (_errorCorrectionLevel << 3) | maskPattern;
+      var bits = QRUtil.getBCHTypeInfo(data);
+
+      // vertical
+      for (var i = 0; i < 15; i += 1) {
+
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+
+        if (i < 6) {
+          _modules[i][8] = mod;
+        } else if (i < 8) {
+          _modules[i + 1][8] = mod;
+        } else {
+          _modules[_moduleCount - 15 + i][8] = mod;
+        }
+      }
+
+      // horizontal
+      for (var i = 0; i < 15; i += 1) {
+
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+
+        if (i < 8) {
+          _modules[8][_moduleCount - i - 1] = mod;
+        } else if (i < 9) {
+          _modules[8][15 - i - 1 + 1] = mod;
+        } else {
+          _modules[8][15 - i - 1] = mod;
+        }
+      }
+
+      // fixed module
+      _modules[_moduleCount - 8][8] = (!test);
+    };
+
+    var mapData = function(data, maskPattern) {
+
+      var inc = -1;
+      var row = _moduleCount - 1;
+      var bitIndex = 7;
+      var byteIndex = 0;
+      var maskFunc = QRUtil.getMaskFunction(maskPattern);
+
+      for (var col = _moduleCount - 1; col > 0; col -= 2) {
+
+        if (col == 6) col -= 1;
+
+        while (true) {
+
+          for (var c = 0; c < 2; c += 1) {
+
+            if (_modules[row][col - c] == null) {
+
+              var dark = false;
+
+              if (byteIndex < data.length) {
+                dark = ( ( (data[byteIndex] >>> bitIndex) & 1) == 1);
+              }
+
+              var mask = maskFunc(row, col - c);
+
+              if (mask) {
+                dark = !dark;
+              }
+
+              _modules[row][col - c] = dark;
+              bitIndex -= 1;
+
+              if (bitIndex == -1) {
+                byteIndex += 1;
+                bitIndex = 7;
+              }
+            }
+          }
+
+          row += inc;
+
+          if (row < 0 || _moduleCount <= row) {
+            row -= inc;
+            inc = -inc;
+            break;
+          }
+        }
+      }
+    };
+
+    var createBytes = function(buffer, rsBlocks) {
+
+      var offset = 0;
+
+      var maxDcCount = 0;
+      var maxEcCount = 0;
+
+      var dcdata = new Array(rsBlocks.length);
+      var ecdata = new Array(rsBlocks.length);
+
+      for (var r = 0; r < rsBlocks.length; r += 1) {
+
+        var dcCount = rsBlocks[r].dataCount;
+        var ecCount = rsBlocks[r].totalCount - dcCount;
+
+        maxDcCount = Math.max(maxDcCount, dcCount);
+        maxEcCount = Math.max(maxEcCount, ecCount);
+
+        dcdata[r] = new Array(dcCount);
+
+        for (var i = 0; i < dcdata[r].length; i += 1) {
+          dcdata[r][i] = 0xff & buffer.getBuffer()[i + offset];
+        }
+        offset += dcCount;
+
+        var rsPoly = QRUtil.getErrorCorrectPolynomial(ecCount);
+        var rawPoly = qrPolynomial(dcdata[r], rsPoly.getLength() - 1);
+
+        var modPoly = rawPoly.mod(rsPoly);
+        ecdata[r] = new Array(rsPoly.getLength() - 1);
+        for (var i = 0; i < ecdata[r].length; i += 1) {
+          var modIndex = i + modPoly.getLength() - ecdata[r].length;
+          ecdata[r][i] = (modIndex >= 0)? modPoly.getAt(modIndex) : 0;
+        }
+      }
+
+      var totalCodeCount = 0;
+      for (var i = 0; i < rsBlocks.length; i += 1) {
+        totalCodeCount += rsBlocks[i].totalCount;
+      }
+
+      var data = new Array(totalCodeCount);
+      var index = 0;
+
+      for (var i = 0; i < maxDcCount; i += 1) {
+        for (var r = 0; r < rsBlocks.length; r += 1) {
+          if (i < dcdata[r].length) {
+            data[index] = dcdata[r][i];
+            index += 1;
+          }
+        }
+      }
+
+      for (var i = 0; i < maxEcCount; i += 1) {
+        for (var r = 0; r < rsBlocks.length; r += 1) {
+          if (i < ecdata[r].length) {
+            data[index] = ecdata[r][i];
+            index += 1;
+          }
+        }
+      }
+
+      return data;
+    };
+
+    var createData = function(typeNumber, errorCorrectionLevel, dataList) {
+
+      var rsBlocks = QRRSBlock.getRSBlocks(typeNumber, errorCorrectionLevel);
+
+      var buffer = qrBitBuffer();
+
+      for (var i = 0; i < dataList.length; i += 1) {
+        var data = dataList[i];
+        buffer.put(data.getMode(), 4);
+        buffer.put(data.getLength(), QRUtil.getLengthInBits(data.getMode(), typeNumber) );
+        data.write(buffer);
+      }
+
+      // calc num max data.
+      var totalDataCount = 0;
+      for (var i = 0; i < rsBlocks.length; i += 1) {
+        totalDataCount += rsBlocks[i].dataCount;
+      }
+
+      if (buffer.getLengthInBits() > totalDataCount * 8) {
+        throw 'code length overflow. ('
+          + buffer.getLengthInBits()
+          + '>'
+          + totalDataCount * 8
+          + ')';
+      }
+
+      // end code
+      if (buffer.getLengthInBits() + 4 <= totalDataCount * 8) {
+        buffer.put(0, 4);
+      }
+
+      // padding
+      while (buffer.getLengthInBits() % 8 != 0) {
+        buffer.putBit(false);
+      }
+
+      // padding
+      while (true) {
+
+        if (buffer.getLengthInBits() >= totalDataCount * 8) {
+          break;
+        }
+        buffer.put(PAD0, 8);
+
+        if (buffer.getLengthInBits() >= totalDataCount * 8) {
+          break;
+        }
+        buffer.put(PAD1, 8);
+      }
+
+      return createBytes(buffer, rsBlocks);
+    };
+
+    _this.addData = function(data, mode) {
+
+      mode = mode || 'Byte';
+
+      var newData = null;
+
+      switch(mode) {
+      case 'Numeric' :
+        newData = qrNumber(data);
+        break;
+      case 'Alphanumeric' :
+        newData = qrAlphaNum(data);
+        break;
+      case 'Byte' :
+        newData = qr8BitByte(data);
+        break;
+      case 'Kanji' :
+        newData = qrKanji(data);
+        break;
+      default :
+        throw 'mode:' + mode;
+      }
+
+      _dataList.push(newData);
+      _dataCache = null;
+    };
+
+    _this.isDark = function(row, col) {
+      if (row < 0 || _moduleCount <= row || col < 0 || _moduleCount <= col) {
+        throw row + ',' + col;
+      }
+      return _modules[row][col];
+    };
+
+    _this.getModuleCount = function() {
+      return _moduleCount;
+    };
+
+    _this.make = function() {
+      if (_typeNumber < 1) {
+        var typeNumber = 1;
+
+        for (; typeNumber < 40; typeNumber++) {
+          var rsBlocks = QRRSBlock.getRSBlocks(typeNumber, _errorCorrectionLevel);
+          var buffer = qrBitBuffer();
+
+          for (var i = 0; i < _dataList.length; i++) {
+            var data = _dataList[i];
+            buffer.put(data.getMode(), 4);
+            buffer.put(data.getLength(), QRUtil.getLengthInBits(data.getMode(), typeNumber) );
+            data.write(buffer);
+          }
+
+          var totalDataCount = 0;
+          for (var i = 0; i < rsBlocks.length; i++) {
+            totalDataCount += rsBlocks[i].dataCount;
+          }
+
+          if (buffer.getLengthInBits() <= totalDataCount * 8) {
+            break;
+          }
+        }
+
+        _typeNumber = typeNumber;
+      }
+
+      makeImpl(false, getBestMaskPattern() );
+    };
+
+    _this.createTableTag = function(cellSize, margin) {
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      var qrHtml = '';
+
+      qrHtml += '<table style="';
+      qrHtml += ' border-width: 0px; border-style: none;';
+      qrHtml += ' border-collapse: collapse;';
+      qrHtml += ' padding: 0px; margin: ' + margin + 'px;';
+      qrHtml += '">';
+      qrHtml += '<tbody>';
+
+      for (var r = 0; r < _this.getModuleCount(); r += 1) {
+
+        qrHtml += '<tr>';
+
+        for (var c = 0; c < _this.getModuleCount(); c += 1) {
+          qrHtml += '<td style="';
+          qrHtml += ' border-width: 0px; border-style: none;';
+          qrHtml += ' border-collapse: collapse;';
+          qrHtml += ' padding: 0px; margin: 0px;';
+          qrHtml += ' width: ' + cellSize + 'px;';
+          qrHtml += ' height: ' + cellSize + 'px;';
+          qrHtml += ' background-color: ';
+          qrHtml += _this.isDark(r, c)? '#000000' : '#ffffff';
+          qrHtml += ';';
+          qrHtml += '"/>';
+        }
+
+        qrHtml += '</tr>';
+      }
+
+      qrHtml += '</tbody>';
+      qrHtml += '</table>';
+
+      return qrHtml;
+    };
+
+    _this.createSvgTag = function(cellSize, margin, alt, title) {
+
+      var opts = {};
+      if (typeof arguments[0] == 'object') {
+        // Called by options.
+        opts = arguments[0];
+        // overwrite cellSize and margin.
+        cellSize = opts.cellSize;
+        margin = opts.margin;
+        alt = opts.alt;
+        title = opts.title;
+      }
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      // Compose alt property surrogate
+      alt = (typeof alt === 'string') ? {text: alt} : alt || {};
+      alt.text = alt.text || null;
+      alt.id = (alt.text) ? alt.id || 'qrcode-description' : null;
+
+      // Compose title property surrogate
+      title = (typeof title === 'string') ? {text: title} : title || {};
+      title.text = title.text || null;
+      title.id = (title.text) ? title.id || 'qrcode-title' : null;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var c, mc, r, mr, qrSvg='', rect;
+
+      rect = 'l' + cellSize + ',0 0,' + cellSize +
+        ' -' + cellSize + ',0 0,-' + cellSize + 'z ';
+
+      qrSvg += '<svg version="1.1" xmlns="http://www.w3.org/2000/svg"';
+      qrSvg += !opts.scalable ? ' width="' + size + 'px" height="' + size + 'px"' : '';
+      qrSvg += ' viewBox="0 0 ' + size + ' ' + size + '" ';
+      qrSvg += ' preserveAspectRatio="xMinYMin meet"';
+      qrSvg += (title.text || alt.text) ? ' role="img" aria-labelledby="' +
+          escapeXml([title.id, alt.id].join(' ').trim() ) + '"' : '';
+      qrSvg += '>';
+      qrSvg += (title.text) ? '<title id="' + escapeXml(title.id) + '">' +
+          escapeXml(title.text) + '</title>' : '';
+      qrSvg += (alt.text) ? '<description id="' + escapeXml(alt.id) + '">' +
+          escapeXml(alt.text) + '</description>' : '';
+      qrSvg += '<rect width="100%" height="100%" fill="white" cx="0" cy="0"/>';
+      qrSvg += '<path d="';
+
+      for (r = 0; r < _this.getModuleCount(); r += 1) {
+        mr = r * cellSize + margin;
+        for (c = 0; c < _this.getModuleCount(); c += 1) {
+          if (_this.isDark(r, c) ) {
+            mc = c*cellSize+margin;
+            qrSvg += 'M' + mc + ',' + mr + rect;
+          }
+        }
+      }
+
+      qrSvg += '" stroke="transparent" fill="black"/>';
+      qrSvg += '</svg>';
+
+      return qrSvg;
+    };
+
+    _this.createDataURL = function(cellSize, margin) {
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var min = margin;
+      var max = size - margin;
+
+      return createDataURL(size, size, function(x, y) {
+        if (min <= x && x < max && min <= y && y < max) {
+          var c = Math.floor( (x - min) / cellSize);
+          var r = Math.floor( (y - min) / cellSize);
+          return _this.isDark(r, c)? 0 : 1;
+        } else {
+          return 1;
+        }
+      } );
+    };
+
+    _this.createImgTag = function(cellSize, margin, alt) {
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+
+      var img = '';
+      img += '<img';
+      img += '\u0020src="';
+      img += _this.createDataURL(cellSize, margin);
+      img += '"';
+      img += '\u0020width="';
+      img += size;
+      img += '"';
+      img += '\u0020height="';
+      img += size;
+      img += '"';
+      if (alt) {
+        img += '\u0020alt="';
+        img += escapeXml(alt);
+        img += '"';
+      }
+      img += '/>';
+
+      return img;
+    };
+
+    var escapeXml = function(s) {
+      var escaped = '';
+      for (var i = 0; i < s.length; i += 1) {
+        var c = s.charAt(i);
+        switch(c) {
+        case '<': escaped += '&lt;'; break;
+        case '>': escaped += '&gt;'; break;
+        case '&': escaped += '&amp;'; break;
+        case '"': escaped += '&quot;'; break;
+        default : escaped += c; break;
+        }
+      }
+      return escaped;
+    };
+
+    var _createHalfASCII = function(margin) {
+      var cellSize = 1;
+      margin = (typeof margin == 'undefined')? cellSize * 2 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var min = margin;
+      var max = size - margin;
+
+      var y, x, r1, r2, p;
+
+      var blocks = {
+        '██': '█',
+        '█ ': '▀',
+        ' █': '▄',
+        '  ': ' '
+      };
+
+      var blocksLastLineNoMargin = {
+        '██': '▀',
+        '█ ': '▀',
+        ' █': ' ',
+        '  ': ' '
+      };
+
+      var ascii = '';
+      for (y = 0; y < size; y += 2) {
+        r1 = Math.floor((y - min) / cellSize);
+        r2 = Math.floor((y + 1 - min) / cellSize);
+        for (x = 0; x < size; x += 1) {
+          p = '█';
+
+          if (min <= x && x < max && min <= y && y < max && _this.isDark(r1, Math.floor((x - min) / cellSize))) {
+            p = ' ';
+          }
+
+          if (min <= x && x < max && min <= y+1 && y+1 < max && _this.isDark(r2, Math.floor((x - min) / cellSize))) {
+            p += ' ';
+          }
+          else {
+            p += '█';
+          }
+
+          // Output 2 characters per pixel, to create full square. 1 character per pixels gives only half width of square.
+          ascii += (margin < 1 && y+1 >= max) ? blocksLastLineNoMargin[p] : blocks[p];
+        }
+
+        ascii += '\n';
+      }
+
+      if (size % 2 && margin > 0) {
+        return ascii.substring(0, ascii.length - size - 1) + Array(size+1).join('▀');
+      }
+
+      return ascii.substring(0, ascii.length-1);
+    };
+
+    _this.createASCII = function(cellSize, margin) {
+      cellSize = cellSize || 1;
+
+      if (cellSize < 2) {
+        return _createHalfASCII(margin);
+      }
+
+      cellSize -= 1;
+      margin = (typeof margin == 'undefined')? cellSize * 2 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var min = margin;
+      var max = size - margin;
+
+      var y, x, r, p;
+
+      var white = Array(cellSize+1).join('██');
+      var black = Array(cellSize+1).join('  ');
+
+      var ascii = '';
+      var line = '';
+      for (y = 0; y < size; y += 1) {
+        r = Math.floor( (y - min) / cellSize);
+        line = '';
+        for (x = 0; x < size; x += 1) {
+          p = 1;
+
+          if (min <= x && x < max && min <= y && y < max && _this.isDark(r, Math.floor((x - min) / cellSize))) {
+            p = 0;
+          }
+
+          // Output 2 characters per pixel, to create full square. 1 character per pixels gives only half width of square.
+          line += p ? white : black;
+        }
+
+        for (r = 0; r < cellSize; r += 1) {
+          ascii += line + '\n';
+        }
+      }
+
+      return ascii.substring(0, ascii.length-1);
+    };
+
+    _this.renderTo2dContext = function(context, cellSize) {
+      cellSize = cellSize || 2;
+      var length = _this.getModuleCount();
+      for (var row = 0; row < length; row++) {
+        for (var col = 0; col < length; col++) {
+          context.fillStyle = _this.isDark(row, col) ? 'black' : 'white';
+          context.fillRect(row * cellSize, col * cellSize, cellSize, cellSize);
+        }
+      }
+    }
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrcode.stringToBytes
+  //---------------------------------------------------------------------
+
+  qrcode.stringToBytesFuncs = {
+    'default' : function(s) {
+      var bytes = [];
+      for (var i = 0; i < s.length; i += 1) {
+        var c = s.charCodeAt(i);
+        bytes.push(c & 0xff);
+      }
+      return bytes;
+    }
+  };
+
+  qrcode.stringToBytes = qrcode.stringToBytesFuncs['default'];
+
+  //---------------------------------------------------------------------
+  // qrcode.createStringToBytes
+  //---------------------------------------------------------------------
+
+  /**
+   * @param unicodeData base64 string of byte array.
+   * [16bit Unicode],[16bit Bytes], ...
+   * @param numChars
+   */
+  qrcode.createStringToBytes = function(unicodeData, numChars) {
+
+    // create conversion map.
+
+    var unicodeMap = function() {
+
+      var bin = base64DecodeInputStream(unicodeData);
+      var read = function() {
+        var b = bin.read();
+        if (b == -1) throw 'eof';
+        return b;
+      };
+
+      var count = 0;
+      var unicodeMap = {};
+      while (true) {
+        var b0 = bin.read();
+        if (b0 == -1) break;
+        var b1 = read();
+        var b2 = read();
+        var b3 = read();
+        var k = String.fromCharCode( (b0 << 8) | b1);
+        var v = (b2 << 8) | b3;
+        unicodeMap[k] = v;
+        count += 1;
+      }
+      if (count != numChars) {
+        throw count + ' != ' + numChars;
+      }
+
+      return unicodeMap;
+    }();
+
+    var unknownChar = '?'.charCodeAt(0);
+
+    return function(s) {
+      var bytes = [];
+      for (var i = 0; i < s.length; i += 1) {
+        var c = s.charCodeAt(i);
+        if (c < 128) {
+          bytes.push(c);
+        } else {
+          var b = unicodeMap[s.charAt(i)];
+          if (typeof b == 'number') {
+            if ( (b & 0xff) == b) {
+              // 1byte
+              bytes.push(b);
+            } else {
+              // 2bytes
+              bytes.push(b >>> 8);
+              bytes.push(b & 0xff);
+            }
+          } else {
+            bytes.push(unknownChar);
+          }
+        }
+      }
+      return bytes;
+    };
+  };
+
+  //---------------------------------------------------------------------
+  // QRMode
+  //---------------------------------------------------------------------
+
+  var QRMode = {
+    MODE_NUMBER :    1 << 0,
+    MODE_ALPHA_NUM : 1 << 1,
+    MODE_8BIT_BYTE : 1 << 2,
+    MODE_KANJI :     1 << 3
+  };
+
+  //---------------------------------------------------------------------
+  // QRErrorCorrectionLevel
+  //---------------------------------------------------------------------
+
+  var QRErrorCorrectionLevel = {
+    L : 1,
+    M : 0,
+    Q : 3,
+    H : 2
+  };
+
+  //---------------------------------------------------------------------
+  // QRMaskPattern
+  //---------------------------------------------------------------------
+
+  var QRMaskPattern = {
+    PATTERN000 : 0,
+    PATTERN001 : 1,
+    PATTERN010 : 2,
+    PATTERN011 : 3,
+    PATTERN100 : 4,
+    PATTERN101 : 5,
+    PATTERN110 : 6,
+    PATTERN111 : 7
+  };
+
+  //---------------------------------------------------------------------
+  // QRUtil
+  //---------------------------------------------------------------------
+
+  var QRUtil = function() {
+
+    var PATTERN_POSITION_TABLE = [
+      [],
+      [6, 18],
+      [6, 22],
+      [6, 26],
+      [6, 30],
+      [6, 34],
+      [6, 22, 38],
+      [6, 24, 42],
+      [6, 26, 46],
+      [6, 28, 50],
+      [6, 30, 54],
+      [6, 32, 58],
+      [6, 34, 62],
+      [6, 26, 46, 66],
+      [6, 26, 48, 70],
+      [6, 26, 50, 74],
+      [6, 30, 54, 78],
+      [6, 30, 56, 82],
+      [6, 30, 58, 86],
+      [6, 34, 62, 90],
+      [6, 28, 50, 72, 94],
+      [6, 26, 50, 74, 98],
+      [6, 30, 54, 78, 102],
+      [6, 28, 54, 80, 106],
+      [6, 32, 58, 84, 110],
+      [6, 30, 58, 86, 114],
+      [6, 34, 62, 90, 118],
+      [6, 26, 50, 74, 98, 122],
+      [6, 30, 54, 78, 102, 126],
+      [6, 26, 52, 78, 104, 130],
+      [6, 30, 56, 82, 108, 134],
+      [6, 34, 60, 86, 112, 138],
+      [6, 30, 58, 86, 114, 142],
+      [6, 34, 62, 90, 118, 146],
+      [6, 30, 54, 78, 102, 126, 150],
+      [6, 24, 50, 76, 102, 128, 154],
+      [6, 28, 54, 80, 106, 132, 158],
+      [6, 32, 58, 84, 110, 136, 162],
+      [6, 26, 54, 82, 110, 138, 166],
+      [6, 30, 58, 86, 114, 142, 170]
+    ];
+    var G15 = (1 << 10) | (1 << 8) | (1 << 5) | (1 << 4) | (1 << 2) | (1 << 1) | (1 << 0);
+    var G18 = (1 << 12) | (1 << 11) | (1 << 10) | (1 << 9) | (1 << 8) | (1 << 5) | (1 << 2) | (1 << 0);
+    var G15_MASK = (1 << 14) | (1 << 12) | (1 << 10) | (1 << 4) | (1 << 1);
+
+    var _this = {};
+
+    var getBCHDigit = function(data) {
+      var digit = 0;
+      while (data != 0) {
+        digit += 1;
+        data >>>= 1;
+      }
+      return digit;
+    };
+
+    _this.getBCHTypeInfo = function(data) {
+      var d = data << 10;
+      while (getBCHDigit(d) - getBCHDigit(G15) >= 0) {
+        d ^= (G15 << (getBCHDigit(d) - getBCHDigit(G15) ) );
+      }
+      return ( (data << 10) | d) ^ G15_MASK;
+    };
+
+    _this.getBCHTypeNumber = function(data) {
+      var d = data << 12;
+      while (getBCHDigit(d) - getBCHDigit(G18) >= 0) {
+        d ^= (G18 << (getBCHDigit(d) - getBCHDigit(G18) ) );
+      }
+      return (data << 12) | d;
+    };
+
+    _this.getPatternPosition = function(typeNumber) {
+      return PATTERN_POSITION_TABLE[typeNumber - 1];
+    };
+
+    _this.getMaskFunction = function(maskPattern) {
+
+      switch (maskPattern) {
+
+      case QRMaskPattern.PATTERN000 :
+        return function(i, j) { return (i + j) % 2 == 0; };
+      case QRMaskPattern.PATTERN001 :
+        return function(i, j) { return i % 2 == 0; };
+      case QRMaskPattern.PATTERN010 :
+        return function(i, j) { return j % 3 == 0; };
+      case QRMaskPattern.PATTERN011 :
+        return function(i, j) { return (i + j) % 3 == 0; };
+      case QRMaskPattern.PATTERN100 :
+        return function(i, j) { return (Math.floor(i / 2) + Math.floor(j / 3) ) % 2 == 0; };
+      case QRMaskPattern.PATTERN101 :
+        return function(i, j) { return (i * j) % 2 + (i * j) % 3 == 0; };
+      case QRMaskPattern.PATTERN110 :
+        return function(i, j) { return ( (i * j) % 2 + (i * j) % 3) % 2 == 0; };
+      case QRMaskPattern.PATTERN111 :
+        return function(i, j) { return ( (i * j) % 3 + (i + j) % 2) % 2 == 0; };
+
+      default :
+        throw 'bad maskPattern:' + maskPattern;
+      }
+    };
+
+    _this.getErrorCorrectPolynomial = function(errorCorrectLength) {
+      var a = qrPolynomial([1], 0);
+      for (var i = 0; i < errorCorrectLength; i += 1) {
+        a = a.multiply(qrPolynomial([1, QRMath.gexp(i)], 0) );
+      }
+      return a;
+    };
+
+    _this.getLengthInBits = function(mode, type) {
+
+      if (1 <= type && type < 10) {
+
+        // 1 - 9
+
+        switch(mode) {
+        case QRMode.MODE_NUMBER    : return 10;
+        case QRMode.MODE_ALPHA_NUM : return 9;
+        case QRMode.MODE_8BIT_BYTE : return 8;
+        case QRMode.MODE_KANJI     : return 8;
+        default :
+          throw 'mode:' + mode;
+        }
+
+      } else if (type < 27) {
+
+        // 10 - 26
+
+        switch(mode) {
+        case QRMode.MODE_NUMBER    : return 12;
+        case QRMode.MODE_ALPHA_NUM : return 11;
+        case QRMode.MODE_8BIT_BYTE : return 16;
+        case QRMode.MODE_KANJI     : return 10;
+        default :
+          throw 'mode:' + mode;
+        }
+
+      } else if (type < 41) {
+
+        // 27 - 40
+
+        switch(mode) {
+        case QRMode.MODE_NUMBER    : return 14;
+        case QRMode.MODE_ALPHA_NUM : return 13;
+        case QRMode.MODE_8BIT_BYTE : return 16;
+        case QRMode.MODE_KANJI     : return 12;
+        default :
+          throw 'mode:' + mode;
+        }
+
+      } else {
+        throw 'type:' + type;
+      }
+    };
+
+    _this.getLostPoint = function(qrcode) {
+
+      var moduleCount = qrcode.getModuleCount();
+
+      var lostPoint = 0;
+
+      // LEVEL1
+
+      for (var row = 0; row < moduleCount; row += 1) {
+        for (var col = 0; col < moduleCount; col += 1) {
+
+          var sameCount = 0;
+          var dark = qrcode.isDark(row, col);
+
+          for (var r = -1; r <= 1; r += 1) {
+
+            if (row + r < 0 || moduleCount <= row + r) {
+              continue;
+            }
+
+            for (var c = -1; c <= 1; c += 1) {
+
+              if (col + c < 0 || moduleCount <= col + c) {
+                continue;
+              }
+
+              if (r == 0 && c == 0) {
+                continue;
+              }
+
+              if (dark == qrcode.isDark(row + r, col + c) ) {
+                sameCount += 1;
+              }
+            }
+          }
+
+          if (sameCount > 5) {
+            lostPoint += (3 + sameCount - 5);
+          }
+        }
+      };
+
+      // LEVEL2
+
+      for (var row = 0; row < moduleCount - 1; row += 1) {
+        for (var col = 0; col < moduleCount - 1; col += 1) {
+          var count = 0;
+          if (qrcode.isDark(row, col) ) count += 1;
+          if (qrcode.isDark(row + 1, col) ) count += 1;
+          if (qrcode.isDark(row, col + 1) ) count += 1;
+          if (qrcode.isDark(row + 1, col + 1) ) count += 1;
+          if (count == 0 || count == 4) {
+            lostPoint += 3;
+          }
+        }
+      }
+
+      // LEVEL3
+
+      for (var row = 0; row < moduleCount; row += 1) {
+        for (var col = 0; col < moduleCount - 6; col += 1) {
+          if (qrcode.isDark(row, col)
+              && !qrcode.isDark(row, col + 1)
+              &&  qrcode.isDark(row, col + 2)
+              &&  qrcode.isDark(row, col + 3)
+              &&  qrcode.isDark(row, col + 4)
+              && !qrcode.isDark(row, col + 5)
+              &&  qrcode.isDark(row, col + 6) ) {
+            lostPoint += 40;
+          }
+        }
+      }
+
+      for (var col = 0; col < moduleCount; col += 1) {
+        for (var row = 0; row < moduleCount - 6; row += 1) {
+          if (qrcode.isDark(row, col)
+              && !qrcode.isDark(row + 1, col)
+              &&  qrcode.isDark(row + 2, col)
+              &&  qrcode.isDark(row + 3, col)
+              &&  qrcode.isDark(row + 4, col)
+              && !qrcode.isDark(row + 5, col)
+              &&  qrcode.isDark(row + 6, col) ) {
+            lostPoint += 40;
+          }
+        }
+      }
+
+      // LEVEL4
+
+      var darkCount = 0;
+
+      for (var col = 0; col < moduleCount; col += 1) {
+        for (var row = 0; row < moduleCount; row += 1) {
+          if (qrcode.isDark(row, col) ) {
+            darkCount += 1;
+          }
+        }
+      }
+
+      var ratio = Math.abs(100 * darkCount / moduleCount / moduleCount - 50) / 5;
+      lostPoint += ratio * 10;
+
+      return lostPoint;
+    };
+
+    return _this;
+  }();
+
+  //---------------------------------------------------------------------
+  // QRMath
+  //---------------------------------------------------------------------
+
+  var QRMath = function() {
+
+    var EXP_TABLE = new Array(256);
+    var LOG_TABLE = new Array(256);
+
+    // initialize tables
+    for (var i = 0; i < 8; i += 1) {
+      EXP_TABLE[i] = 1 << i;
+    }
+    for (var i = 8; i < 256; i += 1) {
+      EXP_TABLE[i] = EXP_TABLE[i - 4]
+        ^ EXP_TABLE[i - 5]
+        ^ EXP_TABLE[i - 6]
+        ^ EXP_TABLE[i - 8];
+    }
+    for (var i = 0; i < 255; i += 1) {
+      LOG_TABLE[EXP_TABLE[i] ] = i;
+    }
+
+    var _this = {};
+
+    _this.glog = function(n) {
+
+      if (n < 1) {
+        throw 'glog(' + n + ')';
+      }
+
+      return LOG_TABLE[n];
+    };
+
+    _this.gexp = function(n) {
+
+      while (n < 0) {
+        n += 255;
+      }
+
+      while (n >= 256) {
+        n -= 255;
+      }
+
+      return EXP_TABLE[n];
+    };
+
+    return _this;
+  }();
+
+  //---------------------------------------------------------------------
+  // qrPolynomial
+  //---------------------------------------------------------------------
+
+  function qrPolynomial(num, shift) {
+
+    if (typeof num.length == 'undefined') {
+      throw num.length + '/' + shift;
+    }
+
+    var _num = function() {
+      var offset = 0;
+      while (offset < num.length && num[offset] == 0) {
+        offset += 1;
+      }
+      var _num = new Array(num.length - offset + shift);
+      for (var i = 0; i < num.length - offset; i += 1) {
+        _num[i] = num[i + offset];
+      }
+      return _num;
+    }();
+
+    var _this = {};
+
+    _this.getAt = function(index) {
+      return _num[index];
+    };
+
+    _this.getLength = function() {
+      return _num.length;
+    };
+
+    _this.multiply = function(e) {
+
+      var num = new Array(_this.getLength() + e.getLength() - 1);
+
+      for (var i = 0; i < _this.getLength(); i += 1) {
+        for (var j = 0; j < e.getLength(); j += 1) {
+          num[i + j] ^= QRMath.gexp(QRMath.glog(_this.getAt(i) ) + QRMath.glog(e.getAt(j) ) );
+        }
+      }
+
+      return qrPolynomial(num, 0);
+    };
+
+    _this.mod = function(e) {
+
+      if (_this.getLength() - e.getLength() < 0) {
+        return _this;
+      }
+
+      var ratio = QRMath.glog(_this.getAt(0) ) - QRMath.glog(e.getAt(0) );
+
+      var num = new Array(_this.getLength() );
+      for (var i = 0; i < _this.getLength(); i += 1) {
+        num[i] = _this.getAt(i);
+      }
+
+      for (var i = 0; i < e.getLength(); i += 1) {
+        num[i] ^= QRMath.gexp(QRMath.glog(e.getAt(i) ) + ratio);
+      }
+
+      // recursive call
+      return qrPolynomial(num, 0).mod(e);
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // QRRSBlock
+  //---------------------------------------------------------------------
+
+  var QRRSBlock = function() {
+
+    var RS_BLOCK_TABLE = [
+
+      // L
+      // M
+      // Q
+      // H
+
+      // 1
+      [1, 26, 19],
+      [1, 26, 16],
+      [1, 26, 13],
+      [1, 26, 9],
+
+      // 2
+      [1, 44, 34],
+      [1, 44, 28],
+      [1, 44, 22],
+      [1, 44, 16],
+
+      // 3
+      [1, 70, 55],
+      [1, 70, 44],
+      [2, 35, 17],
+      [2, 35, 13],
+
+      // 4
+      [1, 100, 80],
+      [2, 50, 32],
+      [2, 50, 24],
+      [4, 25, 9],
+
+      // 5
+      [1, 134, 108],
+      [2, 67, 43],
+      [2, 33, 15, 2, 34, 16],
+      [2, 33, 11, 2, 34, 12],
+
+      // 6
+      [2, 86, 68],
+      [4, 43, 27],
+      [4, 43, 19],
+      [4, 43, 15],
+
+      // 7
+      [2, 98, 78],
+      [4, 49, 31],
+      [2, 32, 14, 4, 33, 15],
+      [4, 39, 13, 1, 40, 14],
+
+      // 8
+      [2, 121, 97],
+      [2, 60, 38, 2, 61, 39],
+      [4, 40, 18, 2, 41, 19],
+      [4, 40, 14, 2, 41, 15],
+
+      // 9
+      [2, 146, 116],
+      [3, 58, 36, 2, 59, 37],
+      [4, 36, 16, 4, 37, 17],
+      [4, 36, 12, 4, 37, 13],
+
+      // 10
+      [2, 86, 68, 2, 87, 69],
+      [4, 69, 43, 1, 70, 44],
+      [6, 43, 19, 2, 44, 20],
+      [6, 43, 15, 2, 44, 16],
+
+      // 11
+      [4, 101, 81],
+      [1, 80, 50, 4, 81, 51],
+      [4, 50, 22, 4, 51, 23],
+      [3, 36, 12, 8, 37, 13],
+
+      // 12
+      [2, 116, 92, 2, 117, 93],
+      [6, 58, 36, 2, 59, 37],
+      [4, 46, 20, 6, 47, 21],
+      [7, 42, 14, 4, 43, 15],
+
+      // 13
+      [4, 133, 107],
+      [8, 59, 37, 1, 60, 38],
+      [8, 44, 20, 4, 45, 21],
+      [12, 33, 11, 4, 34, 12],
+
+      // 14
+      [3, 145, 115, 1, 146, 116],
+      [4, 64, 40, 5, 65, 41],
+      [11, 36, 16, 5, 37, 17],
+      [11, 36, 12, 5, 37, 13],
+
+      // 15
+      [5, 109, 87, 1, 110, 88],
+      [5, 65, 41, 5, 66, 42],
+      [5, 54, 24, 7, 55, 25],
+      [11, 36, 12, 7, 37, 13],
+
+      // 16
+      [5, 122, 98, 1, 123, 99],
+      [7, 73, 45, 3, 74, 46],
+      [15, 43, 19, 2, 44, 20],
+      [3, 45, 15, 13, 46, 16],
+
+      // 17
+      [1, 135, 107, 5, 136, 108],
+      [10, 74, 46, 1, 75, 47],
+      [1, 50, 22, 15, 51, 23],
+      [2, 42, 14, 17, 43, 15],
+
+      // 18
+      [5, 150, 120, 1, 151, 121],
+      [9, 69, 43, 4, 70, 44],
+      [17, 50, 22, 1, 51, 23],
+      [2, 42, 14, 19, 43, 15],
+
+      // 19
+      [3, 141, 113, 4, 142, 114],
+      [3, 70, 44, 11, 71, 45],
+      [17, 47, 21, 4, 48, 22],
+      [9, 39, 13, 16, 40, 14],
+
+      // 20
+      [3, 135, 107, 5, 136, 108],
+      [3, 67, 41, 13, 68, 42],
+      [15, 54, 24, 5, 55, 25],
+      [15, 43, 15, 10, 44, 16],
+
+      // 21
+      [4, 144, 116, 4, 145, 117],
+      [17, 68, 42],
+      [17, 50, 22, 6, 51, 23],
+      [19, 46, 16, 6, 47, 17],
+
+      // 22
+      [2, 139, 111, 7, 140, 112],
+      [17, 74, 46],
+      [7, 54, 24, 16, 55, 25],
+      [34, 37, 13],
+
+      // 23
+      [4, 151, 121, 5, 152, 122],
+      [4, 75, 47, 14, 76, 48],
+      [11, 54, 24, 14, 55, 25],
+      [16, 45, 15, 14, 46, 16],
+
+      // 24
+      [6, 147, 117, 4, 148, 118],
+      [6, 73, 45, 14, 74, 46],
+      [11, 54, 24, 16, 55, 25],
+      [30, 46, 16, 2, 47, 17],
+
+      // 25
+      [8, 132, 106, 4, 133, 107],
+      [8, 75, 47, 13, 76, 48],
+      [7, 54, 24, 22, 55, 25],
+      [22, 45, 15, 13, 46, 16],
+
+      // 26
+      [10, 142, 114, 2, 143, 115],
+      [19, 74, 46, 4, 75, 47],
+      [28, 50, 22, 6, 51, 23],
+      [33, 46, 16, 4, 47, 17],
+
+      // 27
+      [8, 152, 122, 4, 153, 123],
+      [22, 73, 45, 3, 74, 46],
+      [8, 53, 23, 26, 54, 24],
+      [12, 45, 15, 28, 46, 16],
+
+      // 28
+      [3, 147, 117, 10, 148, 118],
+      [3, 73, 45, 23, 74, 46],
+      [4, 54, 24, 31, 55, 25],
+      [11, 45, 15, 31, 46, 16],
+
+      // 29
+      [7, 146, 116, 7, 147, 117],
+      [21, 73, 45, 7, 74, 46],
+      [1, 53, 23, 37, 54, 24],
+      [19, 45, 15, 26, 46, 16],
+
+      // 30
+      [5, 145, 115, 10, 146, 116],
+      [19, 75, 47, 10, 76, 48],
+      [15, 54, 24, 25, 55, 25],
+      [23, 45, 15, 25, 46, 16],
+
+      // 31
+      [13, 145, 115, 3, 146, 116],
+      [2, 74, 46, 29, 75, 47],
+      [42, 54, 24, 1, 55, 25],
+      [23, 45, 15, 28, 46, 16],
+
+      // 32
+      [17, 145, 115],
+      [10, 74, 46, 23, 75, 47],
+      [10, 54, 24, 35, 55, 25],
+      [19, 45, 15, 35, 46, 16],
+
+      // 33
+      [17, 145, 115, 1, 146, 116],
+      [14, 74, 46, 21, 75, 47],
+      [29, 54, 24, 19, 55, 25],
+      [11, 45, 15, 46, 46, 16],
+
+      // 34
+      [13, 145, 115, 6, 146, 116],
+      [14, 74, 46, 23, 75, 47],
+      [44, 54, 24, 7, 55, 25],
+      [59, 46, 16, 1, 47, 17],
+
+      // 35
+      [12, 151, 121, 7, 152, 122],
+      [12, 75, 47, 26, 76, 48],
+      [39, 54, 24, 14, 55, 25],
+      [22, 45, 15, 41, 46, 16],
+
+      // 36
+      [6, 151, 121, 14, 152, 122],
+      [6, 75, 47, 34, 76, 48],
+      [46, 54, 24, 10, 55, 25],
+      [2, 45, 15, 64, 46, 16],
+
+      // 37
+      [17, 152, 122, 4, 153, 123],
+      [29, 74, 46, 14, 75, 47],
+      [49, 54, 24, 10, 55, 25],
+      [24, 45, 15, 46, 46, 16],
+
+      // 38
+      [4, 152, 122, 18, 153, 123],
+      [13, 74, 46, 32, 75, 47],
+      [48, 54, 24, 14, 55, 25],
+      [42, 45, 15, 32, 46, 16],
+
+      // 39
+      [20, 147, 117, 4, 148, 118],
+      [40, 75, 47, 7, 76, 48],
+      [43, 54, 24, 22, 55, 25],
+      [10, 45, 15, 67, 46, 16],
+
+      // 40
+      [19, 148, 118, 6, 149, 119],
+      [18, 75, 47, 31, 76, 48],
+      [34, 54, 24, 34, 55, 25],
+      [20, 45, 15, 61, 46, 16]
+    ];
+
+    var qrRSBlock = function(totalCount, dataCount) {
+      var _this = {};
+      _this.totalCount = totalCount;
+      _this.dataCount = dataCount;
+      return _this;
+    };
+
+    var _this = {};
+
+    var getRsBlockTable = function(typeNumber, errorCorrectionLevel) {
+
+      switch(errorCorrectionLevel) {
+      case QRErrorCorrectionLevel.L :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 0];
+      case QRErrorCorrectionLevel.M :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 1];
+      case QRErrorCorrectionLevel.Q :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 2];
+      case QRErrorCorrectionLevel.H :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 3];
+      default :
+        return undefined;
+      }
+    };
+
+    _this.getRSBlocks = function(typeNumber, errorCorrectionLevel) {
+
+      var rsBlock = getRsBlockTable(typeNumber, errorCorrectionLevel);
+
+      if (typeof rsBlock == 'undefined') {
+        throw 'bad rs block @ typeNumber:' + typeNumber +
+            '/errorCorrectionLevel:' + errorCorrectionLevel;
+      }
+
+      var length = rsBlock.length / 3;
+
+      var list = [];
+
+      for (var i = 0; i < length; i += 1) {
+
+        var count = rsBlock[i * 3 + 0];
+        var totalCount = rsBlock[i * 3 + 1];
+        var dataCount = rsBlock[i * 3 + 2];
+
+        for (var j = 0; j < count; j += 1) {
+          list.push(qrRSBlock(totalCount, dataCount) );
+        }
+      }
+
+      return list;
+    };
+
+    return _this;
+  }();
+
+  //---------------------------------------------------------------------
+  // qrBitBuffer
+  //---------------------------------------------------------------------
+
+  var qrBitBuffer = function() {
+
+    var _buffer = [];
+    var _length = 0;
+
+    var _this = {};
+
+    _this.getBuffer = function() {
+      return _buffer;
+    };
+
+    _this.getAt = function(index) {
+      var bufIndex = Math.floor(index / 8);
+      return ( (_buffer[bufIndex] >>> (7 - index % 8) ) & 1) == 1;
+    };
+
+    _this.put = function(num, length) {
+      for (var i = 0; i < length; i += 1) {
+        _this.putBit( ( (num >>> (length - i - 1) ) & 1) == 1);
+      }
+    };
+
+    _this.getLengthInBits = function() {
+      return _length;
+    };
+
+    _this.putBit = function(bit) {
+
+      var bufIndex = Math.floor(_length / 8);
+      if (_buffer.length <= bufIndex) {
+        _buffer.push(0);
+      }
+
+      if (bit) {
+        _buffer[bufIndex] |= (0x80 >>> (_length % 8) );
+      }
+
+      _length += 1;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrNumber
+  //---------------------------------------------------------------------
+
+  var qrNumber = function(data) {
+
+    var _mode = QRMode.MODE_NUMBER;
+    var _data = data;
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return _data.length;
+    };
+
+    _this.write = function(buffer) {
+
+      var data = _data;
+
+      var i = 0;
+
+      while (i + 2 < data.length) {
+        buffer.put(strToNum(data.substring(i, i + 3) ), 10);
+        i += 3;
+      }
+
+      if (i < data.length) {
+        if (data.length - i == 1) {
+          buffer.put(strToNum(data.substring(i, i + 1) ), 4);
+        } else if (data.length - i == 2) {
+          buffer.put(strToNum(data.substring(i, i + 2) ), 7);
+        }
+      }
+    };
+
+    var strToNum = function(s) {
+      var num = 0;
+      for (var i = 0; i < s.length; i += 1) {
+        num = num * 10 + chatToNum(s.charAt(i) );
+      }
+      return num;
+    };
+
+    var chatToNum = function(c) {
+      if ('0' <= c && c <= '9') {
+        return c.charCodeAt(0) - '0'.charCodeAt(0);
+      }
+      throw 'illegal char :' + c;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrAlphaNum
+  //---------------------------------------------------------------------
+
+  var qrAlphaNum = function(data) {
+
+    var _mode = QRMode.MODE_ALPHA_NUM;
+    var _data = data;
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return _data.length;
+    };
+
+    _this.write = function(buffer) {
+
+      var s = _data;
+
+      var i = 0;
+
+      while (i + 1 < s.length) {
+        buffer.put(
+          getCode(s.charAt(i) ) * 45 +
+          getCode(s.charAt(i + 1) ), 11);
+        i += 2;
+      }
+
+      if (i < s.length) {
+        buffer.put(getCode(s.charAt(i) ), 6);
+      }
+    };
+
+    var getCode = function(c) {
+
+      if ('0' <= c && c <= '9') {
+        return c.charCodeAt(0) - '0'.charCodeAt(0);
+      } else if ('A' <= c && c <= 'Z') {
+        return c.charCodeAt(0) - 'A'.charCodeAt(0) + 10;
+      } else {
+        switch (c) {
+        case ' ' : return 36;
+        case '$' : return 37;
+        case '%' : return 38;
+        case '*' : return 39;
+        case '+' : return 40;
+        case '-' : return 41;
+        case '.' : return 42;
+        case '/' : return 43;
+        case ':' : return 44;
+        default :
+          throw 'illegal char :' + c;
+        }
+      }
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qr8BitByte
+  //---------------------------------------------------------------------
+
+  var qr8BitByte = function(data) {
+
+    var _mode = QRMode.MODE_8BIT_BYTE;
+    var _data = data;
+    var _bytes = qrcode.stringToBytes(data);
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return _bytes.length;
+    };
+
+    _this.write = function(buffer) {
+      for (var i = 0; i < _bytes.length; i += 1) {
+        buffer.put(_bytes[i], 8);
+      }
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrKanji
+  //---------------------------------------------------------------------
+
+  var qrKanji = function(data) {
+
+    var _mode = QRMode.MODE_KANJI;
+    var _data = data;
+
+    var stringToBytes = qrcode.stringToBytesFuncs['SJIS'];
+    if (!stringToBytes) {
+      throw 'sjis not supported.';
+    }
+    !function(c, code) {
+      // self test for sjis support.
+      var test = stringToBytes(c);
+      if (test.length != 2 || ( (test[0] << 8) | test[1]) != code) {
+        throw 'sjis not supported.';
+      }
+    }('\u53cb', 0x9746);
+
+    var _bytes = stringToBytes(data);
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return ~~(_bytes.length / 2);
+    };
+
+    _this.write = function(buffer) {
+
+      var data = _bytes;
+
+      var i = 0;
+
+      while (i + 1 < data.length) {
+
+        var c = ( (0xff & data[i]) << 8) | (0xff & data[i + 1]);
+
+        if (0x8140 <= c && c <= 0x9FFC) {
+          c -= 0x8140;
+        } else if (0xE040 <= c && c <= 0xEBBF) {
+          c -= 0xC140;
+        } else {
+          throw 'illegal char at ' + (i + 1) + '/' + c;
+        }
+
+        c = ( (c >>> 8) & 0xff) * 0xC0 + (c & 0xff);
+
+        buffer.put(c, 13);
+
+        i += 2;
+      }
+
+      if (i < data.length) {
+        throw 'illegal char at ' + (i + 1);
+      }
+    };
+
+    return _this;
+  };
+
+  //=====================================================================
+  // GIF Support etc.
+  //
+
+  //---------------------------------------------------------------------
+  // byteArrayOutputStream
+  //---------------------------------------------------------------------
+
+  var byteArrayOutputStream = function() {
+
+    var _bytes = [];
+
+    var _this = {};
+
+    _this.writeByte = function(b) {
+      _bytes.push(b & 0xff);
+    };
+
+    _this.writeShort = function(i) {
+      _this.writeByte(i);
+      _this.writeByte(i >>> 8);
+    };
+
+    _this.writeBytes = function(b, off, len) {
+      off = off || 0;
+      len = len || b.length;
+      for (var i = 0; i < len; i += 1) {
+        _this.writeByte(b[i + off]);
+      }
+    };
+
+    _this.writeString = function(s) {
+      for (var i = 0; i < s.length; i += 1) {
+        _this.writeByte(s.charCodeAt(i) );
+      }
+    };
+
+    _this.toByteArray = function() {
+      return _bytes;
+    };
+
+    _this.toString = function() {
+      var s = '';
+      s += '[';
+      for (var i = 0; i < _bytes.length; i += 1) {
+        if (i > 0) {
+          s += ',';
+        }
+        s += _bytes[i];
+      }
+      s += ']';
+      return s;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // base64EncodeOutputStream
+  //---------------------------------------------------------------------
+
+  var base64EncodeOutputStream = function() {
+
+    var _buffer = 0;
+    var _buflen = 0;
+    var _length = 0;
+    var _base64 = '';
+
+    var _this = {};
+
+    var writeEncoded = function(b) {
+      _base64 += String.fromCharCode(encode(b & 0x3f) );
+    };
+
+    var encode = function(n) {
+      if (n < 0) {
+        // error.
+      } else if (n < 26) {
+        return 0x41 + n;
+      } else if (n < 52) {
+        return 0x61 + (n - 26);
+      } else if (n < 62) {
+        return 0x30 + (n - 52);
+      } else if (n == 62) {
+        return 0x2b;
+      } else if (n == 63) {
+        return 0x2f;
+      }
+      throw 'n:' + n;
+    };
+
+    _this.writeByte = function(n) {
+
+      _buffer = (_buffer << 8) | (n & 0xff);
+      _buflen += 8;
+      _length += 1;
+
+      while (_buflen >= 6) {
+        writeEncoded(_buffer >>> (_buflen - 6) );
+        _buflen -= 6;
+      }
+    };
+
+    _this.flush = function() {
+
+      if (_buflen > 0) {
+        writeEncoded(_buffer << (6 - _buflen) );
+        _buffer = 0;
+        _buflen = 0;
+      }
+
+      if (_length % 3 != 0) {
+        // padding
+        var padlen = 3 - _length % 3;
+        for (var i = 0; i < padlen; i += 1) {
+          _base64 += '=';
+        }
+      }
+    };
+
+    _this.toString = function() {
+      return _base64;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // base64DecodeInputStream
+  //---------------------------------------------------------------------
+
+  var base64DecodeInputStream = function(str) {
+
+    var _str = str;
+    var _pos = 0;
+    var _buffer = 0;
+    var _buflen = 0;
+
+    var _this = {};
+
+    _this.read = function() {
+
+      while (_buflen < 8) {
+
+        if (_pos >= _str.length) {
+          if (_buflen == 0) {
+            return -1;
+          }
+          throw 'unexpected end of file./' + _buflen;
+        }
+
+        var c = _str.charAt(_pos);
+        _pos += 1;
+
+        if (c == '=') {
+          _buflen = 0;
+          return -1;
+        } else if (c.match(/^\s$/) ) {
+          // ignore if whitespace.
+          continue;
+        }
+
+        _buffer = (_buffer << 6) | decode(c.charCodeAt(0) );
+        _buflen += 6;
+      }
+
+      var n = (_buffer >>> (_buflen - 8) ) & 0xff;
+      _buflen -= 8;
+      return n;
+    };
+
+    var decode = function(c) {
+      if (0x41 <= c && c <= 0x5a) {
+        return c - 0x41;
+      } else if (0x61 <= c && c <= 0x7a) {
+        return c - 0x61 + 26;
+      } else if (0x30 <= c && c <= 0x39) {
+        return c - 0x30 + 52;
+      } else if (c == 0x2b) {
+        return 62;
+      } else if (c == 0x2f) {
+        return 63;
+      } else {
+        throw 'c:' + c;
+      }
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // gifImage (B/W)
+  //---------------------------------------------------------------------
+
+  var gifImage = function(width, height) {
+
+    var _width = width;
+    var _height = height;
+    var _data = new Array(width * height);
+
+    var _this = {};
+
+    _this.setPixel = function(x, y, pixel) {
+      _data[y * _width + x] = pixel;
+    };
+
+    _this.write = function(out) {
+
+      //---------------------------------
+      // GIF Signature
+
+      out.writeString('GIF87a');
+
+      //---------------------------------
+      // Screen Descriptor
+
+      out.writeShort(_width);
+      out.writeShort(_height);
+
+      out.writeByte(0x80); // 2bit
+      out.writeByte(0);
+      out.writeByte(0);
+
+      //---------------------------------
+      // Global Color Map
+
+      // black
+      out.writeByte(0x00);
+      out.writeByte(0x00);
+      out.writeByte(0x00);
+
+      // white
+      out.writeByte(0xff);
+      out.writeByte(0xff);
+      out.writeByte(0xff);
+
+      //---------------------------------
+      // Image Descriptor
+
+      out.writeString(',');
+      out.writeShort(0);
+      out.writeShort(0);
+      out.writeShort(_width);
+      out.writeShort(_height);
+      out.writeByte(0);
+
+      //---------------------------------
+      // Local Color Map
+
+      //---------------------------------
+      // Raster Data
+
+      var lzwMinCodeSize = 2;
+      var raster = getLZWRaster(lzwMinCodeSize);
+
+      out.writeByte(lzwMinCodeSize);
+
+      var offset = 0;
+
+      while (raster.length - offset > 255) {
+        out.writeByte(255);
+        out.writeBytes(raster, offset, 255);
+        offset += 255;
+      }
+
+      out.writeByte(raster.length - offset);
+      out.writeBytes(raster, offset, raster.length - offset);
+      out.writeByte(0x00);
+
+      //---------------------------------
+      // GIF Terminator
+      out.writeString(';');
+    };
+
+    var bitOutputStream = function(out) {
+
+      var _out = out;
+      var _bitLength = 0;
+      var _bitBuffer = 0;
+
+      var _this = {};
+
+      _this.write = function(data, length) {
+
+        if ( (data >>> length) != 0) {
+          throw 'length over';
+        }
+
+        while (_bitLength + length >= 8) {
+          _out.writeByte(0xff & ( (data << _bitLength) | _bitBuffer) );
+          length -= (8 - _bitLength);
+          data >>>= (8 - _bitLength);
+          _bitBuffer = 0;
+          _bitLength = 0;
+        }
+
+        _bitBuffer = (data << _bitLength) | _bitBuffer;
+        _bitLength = _bitLength + length;
+      };
+
+      _this.flush = function() {
+        if (_bitLength > 0) {
+          _out.writeByte(_bitBuffer);
+        }
+      };
+
+      return _this;
+    };
+
+    var getLZWRaster = function(lzwMinCodeSize) {
+
+      var clearCode = 1 << lzwMinCodeSize;
+      var endCode = (1 << lzwMinCodeSize) + 1;
+      var bitLength = lzwMinCodeSize + 1;
+
+      // Setup LZWTable
+      var table = lzwTable();
+
+      for (var i = 0; i < clearCode; i += 1) {
+        table.add(String.fromCharCode(i) );
+      }
+      table.add(String.fromCharCode(clearCode) );
+      table.add(String.fromCharCode(endCode) );
+
+      var byteOut = byteArrayOutputStream();
+      var bitOut = bitOutputStream(byteOut);
+
+      // clear code
+      bitOut.write(clearCode, bitLength);
+
+      var dataIndex = 0;
+
+      var s = String.fromCharCode(_data[dataIndex]);
+      dataIndex += 1;
+
+      while (dataIndex < _data.length) {
+
+        var c = String.fromCharCode(_data[dataIndex]);
+        dataIndex += 1;
+
+        if (table.contains(s + c) ) {
+
+          s = s + c;
+
+        } else {
+
+          bitOut.write(table.indexOf(s), bitLength);
+
+          if (table.size() < 0xfff) {
+
+            if (table.size() == (1 << bitLength) ) {
+              bitLength += 1;
+            }
+
+            table.add(s + c);
+          }
+
+          s = c;
+        }
+      }
+
+      bitOut.write(table.indexOf(s), bitLength);
+
+      // end code
+      bitOut.write(endCode, bitLength);
+
+      bitOut.flush();
+
+      return byteOut.toByteArray();
+    };
+
+    var lzwTable = function() {
+
+      var _map = {};
+      var _size = 0;
+
+      var _this = {};
+
+      _this.add = function(key) {
+        if (_this.contains(key) ) {
+          throw 'dup key:' + key;
+        }
+        _map[key] = _size;
+        _size += 1;
+      };
+
+      _this.size = function() {
+        return _size;
+      };
+
+      _this.indexOf = function(key) {
+        return _map[key];
+      };
+
+      _this.contains = function(key) {
+        return typeof _map[key] != 'undefined';
+      };
+
+      return _this;
+    };
+
+    return _this;
+  };
+
+  var createDataURL = function(width, height, getPixel) {
+    var gif = gifImage(width, height);
+    for (var y = 0; y < height; y += 1) {
+      for (var x = 0; x < width; x += 1) {
+        gif.setPixel(x, y, getPixel(x, y) );
+      }
+    }
+
+    var b = byteArrayOutputStream();
+    gif.write(b);
+
+    var base64 = base64EncodeOutputStream();
+    var bytes = b.toByteArray();
+    for (var i = 0; i < bytes.length; i += 1) {
+      base64.writeByte(bytes[i]);
+    }
+    base64.flush();
+
+    return 'data:image/gif;base64,' + base64;
+  };
+
+  //---------------------------------------------------------------------
+  // returns qrcode function.
+
+  return qrcode;
+}();
+
+// multibyte support
+!function() {
+
+  qrcode.stringToBytesFuncs['UTF-8'] = function(s) {
+    // http://stackoverflow.com/questions/18729405/how-to-convert-utf8-string-to-byte-array
+    function toUTF8Array(str) {
+      var utf8 = [];
+      for (var i=0; i < str.length; i++) {
+        var charcode = str.charCodeAt(i);
+        if (charcode < 0x80) utf8.push(charcode);
+        else if (charcode < 0x800) {
+          utf8.push(0xc0 | (charcode >> 6),
+              0x80 | (charcode & 0x3f));
+        }
+        else if (charcode < 0xd800 || charcode >= 0xe000) {
+          utf8.push(0xe0 | (charcode >> 12),
+              0x80 | ((charcode>>6) & 0x3f),
+              0x80 | (charcode & 0x3f));
+        }
+        // surrogate pair
+        else {
+          i++;
+          // UTF-16 encodes 0x10000-0x10FFFF by
+          // subtracting 0x10000 and splitting the
+          // 20 bits of 0x0-0xFFFFF into two halves
+          charcode = 0x10000 + (((charcode & 0x3ff)<<10)
+            | (str.charCodeAt(i) & 0x3ff));
+          utf8.push(0xf0 | (charcode >>18),
+              0x80 | ((charcode>>12) & 0x3f),
+              0x80 | ((charcode>>6) & 0x3f),
+              0x80 | (charcode & 0x3f));
+        }
+      }
+      return utf8;
+    }
+    return toUTF8Array(s);
+  };
+
+}();
+
+(function (factory) {
+  if (typeof define === 'function' && define.amd) {
+      define([], factory);
+  } else if (typeof exports === 'object') {
+      module.exports = factory();
+  }
+}(function () {
+    return qrcode;
+}));
+
+;
+/* eslint-disable */
+/* Ширины базовых шрифтов PDF (Helvetica), тысячные доли кегля, коды WinAnsi 32..255.
+   Сняты из метрик шрифта; нужны, чтобы считать ширину строки для выравнивания вправо. */
+window.EXDED_PDF_WIDTHS = {
+  reg: [278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584,0,556,278,222,556,333,1000,556,556,333,1000,667,333,1000,278,611,278,278,222,222,333,333,350,556,1000,333,1000,500,333,944,278,500,667,278,333,556,556,556,556,260,556,333,737,370,556,584,333,737,333,400,584,333,333,333,556,537,278,333,333,365,556,834,834,834,611,667,667,667,667,667,667,1000,722,667,667,667,667,278,278,278,278,722,722,778,778,778,778,778,584,778,722,722,722,722,667,667,611,556,556,556,556,556,556,889,500,556,556,556,556,278,278,278,278,556,556,556,556,556,556,556,584,611,556,556,556,556,500,556,500],
+  bold: [278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,333,278,333,584,556,333,556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,389,280,389,584,0,556,278,278,556,500,1000,556,556,333,1000,667,333,1000,278,611,278,278,278,278,500,500,350,556,1000,333,1000,556,333,944,278,500,667,278,333,556,556,556,556,280,556,333,737,370,556,584,333,737,333,400,584,333,333,333,611,556,278,333,333,365,556,834,834,834,611,722,722,722,722,722,722,1000,722,667,667,667,667,278,278,278,278,722,722,778,778,778,778,778,584,778,722,722,722,722,667,667,611,556,556,556,556,556,556,889,556,556,556,556,556,278,278,278,278,611,611,611,611,611,611,611,584,611,611,611,611,611,556,611,556],
+};
+
+;
+'use strict';
+
+/* ===================================================================
+   EXDED — документы: Angebot и Proforma-Rechnung.
+   Собираются прямо в браузере: из позиций сделки получается готовый PDF,
+   который отдаётся системному меню «Поделиться».
+   Разметка снята с образцов AG0007 и PF0007 до координаты.
+   ⛔ Rechnung здесь не делается и делаться не будет: §14 UStG требует
+   строгой нумерации без пропусков и хранения 10 лет — счёт выписывается руками.
+   =================================================================== */
+
+window.ExdedDocs = (() => {
+  /* ---------- Продавец: одно место на все документы ---------- */
+  const SELLER = {
+    brand: 'EXDED',
+    name: 'BOKODER UG (haftungsbeschränkt)',
+    street: 'Rayskistraße 11',
+    zip: '01219',
+    city: 'Dresden',
+    phone: 'Tel. +49 151 50101658',
+    email: 'info@exded.com',
+    site: 'exded.com',
+    ceo: 'Geschäftsführer: Borys Khomenko',
+    register: 'HRB 43057 · Amtsgericht Dresden',
+    ustId: 'USt-IdNr. DE355793465',
+    taxNo: 'Steuernummer 203/106/15146',
+    bankName: 'Ostsächsische Sparkasse Dresden',
+    iban: 'DE28 8505 0300 0221 2480 64',
+    bic: 'OSDDDE81XXX',
+  };
+  const ibanPlain = () => SELLER.iban.replace(/\s+/g, '');
+
+  const VAT = 0.19;
+
+  /* ---------- Цвета образца ---------- */
+  const C = {
+    ink: '#1a1a1a', ink2: '#333333', ink3: '#555555', mute: '#666666',
+    grey: '#888888', light: '#999999', white: '#ffffff',
+    head: '#262626', paper: '#f4f2ef', line: '#d9d7d5', hair: '#e5e3df',
+    rule: '#dddddd', orange: '#ff8234', green: '#8fac58',
+  };
+
+  /* ---------- Числа, деньги, даты ---------- */
+  const r2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+  // Каталог магазина отдаёт цены с НДС. В документах база — нетто.
+  const netFromGross = (gross) => r2(Number(gross) / (1 + VAT));
+  const moneyDE = (n) => {
+    const v = Math.abs(r2(n)).toFixed(2).split('.');
+    return (Number(n) < 0 ? '-' : '') + v[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + v[1] + ' €';
+  };
+  const dateDE = (d) => {
+    const p = new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', year: 'numeric' }).formatToParts(d);
+    const g = (t) => (p.find((x) => x.type === t) || {}).value || '';
+    return `${g('day')}.${g('month')}.${g('year')}`;
+  };
+  const addDays = (d, n) => new Date(d.getTime() + n * 86400000);
+
+  /* ---------- Итоги ---------- */
+  // Каждая позиция округляется до 2 знаков, НДС считается от суммы нетто.
+  function totals(items) {
+    const rows = items.map((it) => {
+      const qty = Number(it.qty) > 0 ? Number(it.qty) : 1;
+      const fin = (v) => typeof v === 'number' && Number.isFinite(v);
+      // договорная цена по сделке, если вписана; иначе каталожная
+      const own = fin(it.price) ? it.price : null;
+      const list = fin(it.list_price) ? it.list_price : null;
+      const raw = own !== null ? own : (list !== null ? list : 0);
+      const toNet = (v) => (it.gross === false ? r2(v) : netFromGross(v));
+      const unit = toNet(raw);
+      // зачёркнутая каталожная — только когда договорная действительно ниже
+      const was = own !== null && list !== null && own < list ? toNet(list) : null;
+      return { name: String(it.name || ''), note: String(it.note || ''), qty, unit, was, sum: r2(unit * qty) };
+    });
+    const net = r2(rows.reduce((a, x) => a + x.sum, 0));
+    const vat = r2(net * VAT);
+    return { rows, net, vat, total: r2(net + vat) };
+  }
+
+  /* ---------- Схемы оплаты ---------- */
+  const PLANS = {
+    '100': { key: '100', label: '100 %', parts: [100] },
+    '70/30': { key: '70/30', label: '70 / 30', parts: [70, 30] },
+    '60/40': { key: '60/40', label: '60 / 40', parts: [60, 40] },
+    '50/50': { key: '50/50', label: '50 / 50', parts: [50, 50] },
+  };
+  function planParts(key, custom) {
+    if (key === 'custom') {
+      const a = Math.min(100, Math.max(1, Math.round(Number(custom) || 50)));
+      return a >= 100 ? [100] : [a, 100 - a];
+    }
+    return (PLANS[key] || PLANS['100']).parts;
+  }
+  // Суммы частей: последняя добирает остаток, чтобы сумма сошлась до цента
+  function planAmounts(total, parts) {
+    const out = [];
+    let left = r2(total);
+    parts.forEach((p, i) => {
+      const amount = i === parts.length - 1 ? left : r2(total * p / 100);
+      out.push({ percent: p, amount });
+      left = r2(left - amount);
+    });
+    return out;
+  }
+
+  /* ---------- Girocode (EPC069-12) ---------- */
+  function giroPayload(amount, purpose) {
+    return [
+      'BCD', '002', '1', 'SCT', SELLER.bic, SELLER.name, ibanPlain(),
+      'EUR' + r2(amount).toFixed(2), '', '', String(purpose || ''),
+    ].join('\n');
+  }
+  function qrMatrix(text) {
+    if (typeof qrcode !== 'function') return null;
+    qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];   // EPC требует UTF-8
+    const q = qrcode(0, 'M');
+    q.addData(String(text), 'Byte');
+    q.make();
+    const n = q.getModuleCount();
+    const rows = [];
+    for (let y = 0; y < n; y += 1) {
+      const row = [];
+      for (let x = 0; x < n; x += 1) row.push(q.isDark(y, x) ? 1 : 0);
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  /* ===================================================================
+     Маленький писатель PDF. Базовый шрифт Helvetica: он есть в каждом
+     просмотрщике, встраивать ничего не нужно, немецкие буквы и € берутся
+     из кодировки WinAnsi. Ширины букв — в pdf-widths.js, по ним считается
+     выравнивание вправо и перенос строк.
+     =================================================================== */
+  const PAGE = { w: 595.28, h: 841.89 };
+  const WIDTHS = () => (window.EXDED_PDF_WIDTHS || { reg: [], bold: [] });
+
+  // Юникод -> код WinAnsi. Латиница и Latin-1 совпадают, остальное по таблице.
+  const WIN = {
+    0x20ac: 0x80, 0x201a: 0x82, 0x0192: 0x83, 0x201e: 0x84, 0x2026: 0x85, 0x2020: 0x86,
+    0x2021: 0x87, 0x02c6: 0x88, 0x2030: 0x89, 0x0160: 0x8a, 0x2039: 0x8b, 0x0152: 0x8c,
+    0x017d: 0x8e, 0x2018: 0x91, 0x2019: 0x92, 0x201c: 0x93, 0x201d: 0x94, 0x2022: 0x95,
+    0x2013: 0x96, 0x2014: 0x97, 0x02dc: 0x98, 0x2122: 0x99, 0x0161: 0x9a, 0x203a: 0x9b,
+    0x0153: 0x9c, 0x017e: 0x9e, 0x0178: 0x9f, 0x00a0: 0x20,
+  };
+  function winCode(ch) {
+    const c = ch.codePointAt(0);
+    if (c >= 0x20 && c <= 0x7e) return c;
+    if (WIN[c] !== undefined) return WIN[c];
+    if (c >= 0xa0 && c <= 0xff) return c;
+    return 0x3f;   // '?'
+  }
+  function textWidth(text, size, bold) {
+    const w = bold ? WIDTHS().bold : WIDTHS().reg;
+    let sum = 0;
+    for (const ch of String(text)) {
+      const code = winCode(ch);
+      sum += w[code - 32] || 500;
+    }
+    return sum * size / 1000;
+  }
+  // Перенос по словам под заданную ширину
+  function wrap(text, size, bold, maxWidth) {
+    const words = String(text).split(/\s+/).filter(Boolean);
+    const lines = [];
+    let cur = '';
+    for (const word of words) {
+      const probe = cur ? cur + ' ' + word : word;
+      if (cur && textWidth(probe, size, bold) > maxWidth) { lines.push(cur); cur = word; } else cur = probe;
+    }
+    if (cur) lines.push(cur);
+    return lines.length ? lines : [''];
+  }
+
+  /* Перенос текста, часть которого жирная: на выходе строки из кусочков */
+  function wrapRuns(runs, size, maxWidth) {
+    const lines = [[]];
+    let width = 0;
+    for (const run of runs) {
+      const words = String(run.text).split(' ');
+      words.forEach((word, i) => {
+        const piece = (i === 0 ? '' : ' ') + word;
+        if (!piece) return;
+        const w = textWidth(piece, size, run.bold);
+        if (width + w > maxWidth && width > 0) {
+          lines.push([]);
+          width = 0;
+          const bare = word;
+          if (bare) { lines[lines.length - 1].push({ text: bare, bold: run.bold }); width = textWidth(bare, size, run.bold); }
+          return;
+        }
+        const line = lines[lines.length - 1];
+        const last = line[line.length - 1];
+        if (last && last.bold === run.bold) last.text += piece;
+        else line.push({ text: piece, bold: run.bold });
+        width += w;
+      });
+    }
+    return lines.filter((l) => l.length);
+  }
+  function runLineOps(line, x, y, size, color) {
+    const ops = [];
+    let cx = x;
+    for (const part of line) {
+      ops.push({ t: 'text', x: cx, y, size, bold: part.bold, color, text: part.text });
+      cx += textWidth(part.text, size, part.bold);
+    }
+    return ops;
+  }
+
+  const hex2rgb = (h) => {
+    const n = parseInt(String(h).replace('#', ''), 16);
+    return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+  };
+  const f3 = (n) => (Math.round(n * 1000) / 1000).toString();
+
+  function escapePdf(text) {
+    let out = '';
+    for (const ch of String(text)) {
+      const code = winCode(ch);
+      if (code === 0x28 || code === 0x29 || code === 0x5c) out += '\\' + String.fromCharCode(code);
+      else if (code < 32 || code > 126) out += '\\' + code.toString(8).padStart(3, '0');
+      else out += String.fromCharCode(code);
+    }
+    return out;
+  }
+
+  /* Операции страницы: rect, line, text, qr. y везде считается сверху,
+     как на бумаге; в координаты PDF переводим один раз, при сборке. */
+  function render(ops) {
+    const out = [];
+    let fill = null;
+    const setFill = (hex) => { if (fill !== hex) { const c = hex2rgb(hex); out.push(`${f3(c[0])} ${f3(c[1])} ${f3(c[2])} rg`); fill = hex; } };
+    for (const op of ops) {
+      if (!op) continue;
+      if (op.t === 'rect') {
+        setFill(op.fill);
+        out.push(`${f3(op.x)} ${f3(PAGE.h - op.y - op.h)} ${f3(op.w)} ${f3(op.h)} re f`);
+      } else if (op.t === 'line') {
+        const c = hex2rgb(op.color);
+        out.push(`${f3(c[0])} ${f3(c[1])} ${f3(c[2])} RG ${f3(op.w || 0.5)} w`);
+        out.push(`${f3(op.x)} ${f3(PAGE.h - op.y)} m ${f3(op.x + op.len)} ${f3(PAGE.h - op.y)} l S`);
+      } else if (op.t === 'qr') {
+        setFill(op.color || '#000000');
+        const n = op.rows.length;
+        const step = op.size / n;
+        for (let y = 0; y < n; y += 1) {
+          let x = 0;
+          while (x < n) {
+            if (!op.rows[y][x]) { x += 1; continue; }
+            let run = 1;
+            while (x + run < n && op.rows[y][x + run]) run += 1;
+            out.push(`${f3(op.x + x * step)} ${f3(PAGE.h - op.y - (y + 1) * step)} ${f3(run * step + 0.02)} ${f3(step + 0.02)} re f`);
+            x += run;
+          }
+        }
+      } else if (op.t === 'text') {
+        const text = String(op.text === undefined ? '' : op.text);
+        if (!text) continue;
+        setFill(op.color || C.ink);
+        let x = op.x;
+        if (op.align === 'right') x = op.x - textWidth(text, op.size, op.bold);
+        else if (op.align === 'center') x = op.x - textWidth(text, op.size, op.bold) / 2;
+        out.push('BT');
+        out.push(`/${op.bold ? 'F2' : 'F1'} ${f3(op.size)} Tf`);
+        if (op.spacing) out.push(`${f3(op.spacing)} Tc`);
+        out.push(`1 0 0 1 ${f3(x)} ${f3(PAGE.h - op.y)} Tm`);
+        out.push(`(${escapePdf(text)}) Tj`);
+        if (op.spacing) out.push('0 Tc');
+        out.push('ET');
+      }
+    }
+    return out.join('\n');
+  }
+
+  function toPdf(ops, title) {
+    const content = render(ops);
+    const objs = [];
+    objs[1] = '<< /Type /Catalog /Pages 2 0 R >>';
+    objs[2] = '<< /Type /Pages /Kids [3 0 R] /Count 1 >>';
+    objs[3] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${f3(PAGE.w)} ${f3(PAGE.h)}] `
+      + '/Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >>';
+    objs[4] = null;   // поток собирается ниже
+    objs[5] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
+    objs[6] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
+    objs[7] = `<< /Title (${escapePdf(title || 'EXDED')}) /Producer (EXDED CRM) >>`;
+
+    const enc = new TextEncoder();
+    const parts = [];
+    let pos = 0;
+    const push = (s) => { const b = typeof s === 'string' ? enc.encode(s) : s; parts.push(b); pos += b.length; return b.length; };
+    const offsets = [];
+
+    push('%PDF-1.4\n%âãÏÓ\n');
+    for (let i = 1; i <= 7; i += 1) {
+      offsets[i] = pos;
+      if (i === 4) {
+        const body = enc.encode(content);
+        push(`4 0 obj\n<< /Length ${body.length} >>\nstream\n`);
+        push(body);
+        push('\nendstream\nendobj\n');
+      } else {
+        push(`${i} 0 obj\n${objs[i]}\nendobj\n`);
+      }
+    }
+    const xref = pos;
+    let table = `xref\n0 8\n0000000000 65535 f \n`;
+    for (let i = 1; i <= 7; i += 1) table += String(offsets[i]).padStart(10, '0') + ' 00000 n \n';
+    push(table);
+    push(`trailer\n<< /Size 8 /Root 1 0 R /Info 7 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+
+    let total = 0;
+    for (const p of parts) total += p.length;
+    const bytes = new Uint8Array(total);
+    let at = 0;
+    for (const p of parts) { bytes.set(p, at); at += p.length; }
+    return bytes;
+  }
+
+  /* ===================================================================
+     Разметка. Все числа сняты с образцов AG0007 и PF0007.
+     y — базовая линия строки, отсчёт сверху листа.
+     =================================================================== */
+  const M = { left: 51, right: 544.3 };
+  const COL = {
+    pos: 59.3, name: 85.9, qty: 391, nameW: 270,
+    unit: 480.1, sum: 535.9,          // правый край цифр в колонках
+    unitHead: 477.1, sumHead: 534.4,  // правый край подписей шапки
+  };
+
+  function headerOps(client) {
+    const ops = [];
+    ops.push({ t: 'text', x: M.left, y: 56.3, size: 24, bold: true, color: C.ink, text: SELLER.brand, spacing: 1.05 });
+    const right = [
+      { y: 40.0, text: SELLER.name, bold: true, color: C.ink },
+      { y: 52.0, text: `${SELLER.street} · ${SELLER.zip} ${SELLER.city}`, color: C.ink3 },
+      { y: 64.0, text: SELLER.phone, color: C.ink3 },
+      { y: 76.0, text: `${SELLER.email} · ${SELLER.site}`, color: C.ink3 },
+    ];
+    for (const r of right) ops.push({ t: 'text', x: M.right, y: r.y, size: 8, bold: r.bold, color: r.color, text: r.text, align: 'right' });
+    ops.push({ t: 'line', x: M.left, y: 92, len: M.right - M.left, color: C.line, w: 1 });
+    ops.push({ t: 'text', x: M.left, y: 107.1, size: 7.5, color: C.light, text: `${SELLER.name} · ${SELLER.street} · ${SELLER.zip} ${SELLER.city}` });
+
+    ops.push({ t: 'text', x: M.left, y: 133.4, size: 8, color: C.light, text: 'KUNDE' });
+    const lines = clientLines(client);
+    ops.push({ t: 'text', x: M.left, y: 152.9, size: 11, bold: true, color: C.ink, text: lines[0] });
+    lines.slice(1).forEach((line, i) => {
+      ops.push({ t: 'text', x: M.left, y: 166.4 + i * 13.3, size: 9.5, color: C.ink2, text: line });
+    });
+    return { ops, extraLines: Math.max(0, lines.length - 3) };
+  }
+
+  function clientLines(c) {
+    const out = [String(c.company || '').trim() || 'Kunde'];
+    if (c.street) out.push(String(c.street));
+    const cityLine = [c.zip, c.city].filter(Boolean).join(' ').trim();
+    if (cityLine) out.push(cityLine);
+    if (c.ustId) out.push('USt-IdNr. ' + String(c.ustId).replace(/^USt-IdNr\.\s*/i, ''));
+    while (out.length < 3) out.push('');
+    return out;
+  }
+
+  function metaOps(rows) {
+    const ops = [];
+    rows.forEach((r, i) => {
+      const y = 135.2 + i * 16.3;
+      ops.push({ t: 'text', x: 428, y, size: 9.5, color: C.light, text: r[0] });
+      ops.push({ t: 'text', x: M.right, y, size: 9.5, bold: true, color: C.ink, text: r[1], align: 'right' });
+    });
+    return ops;
+  }
+
+  function tableOps(rows, top) {
+    const ops = [];
+    ops.push({ t: 'rect', x: M.left, y: top, w: M.right - M.left, h: 20.8, fill: C.head });
+    const hy = top + 14.1;
+    ops.push({ t: 'text', x: COL.pos, y: hy, size: 7, bold: true, color: C.light, text: 'POS.' });
+    ops.push({ t: 'text', x: COL.name, y: hy, size: 7, bold: true, color: C.white, text: 'BEZEICHNUNG' });
+    ops.push({ t: 'text', x: COL.qty, y: hy, size: 7, bold: true, color: C.white, text: 'MENGE', align: 'center' });
+    ops.push({ t: 'text', x: COL.unitHead, y: hy, size: 7, bold: true, color: C.white, text: 'EINZELPREIS', align: 'right' });
+    ops.push({ t: 'text', x: COL.sumHead, y: hy, size: 7, bold: true, color: C.white, text: 'GESAMT', align: 'right' });
+
+    let y = top + 20.8;
+    rows.forEach((row, i) => {
+      const notes = row.note ? wrap(row.note, 8, false, COL.nameW) : [];
+      const names = wrap(row.name, 10, true, COL.nameW);
+      ops.push({ t: 'text', x: COL.pos, y: y + 15.2, size: 9, color: C.ink, text: String(i + 1) });
+      names.forEach((line, k) => ops.push({ t: 'text', x: COL.name, y: y + 15.2 + k * 12.6, size: 10, bold: true, color: C.ink, text: line }));
+      const afterName = y + 15.2 + (names.length - 1) * 12.6;
+      notes.forEach((line, k) => ops.push({ t: 'text', x: COL.name, y: afterName + 12.6 + k * 11, size: 8, color: C.mute, text: line }));
+      ops.push({ t: 'text', x: COL.qty, y: y + 15.2, size: 9, color: C.ink, text: String(row.qty), align: 'center' });
+      // цена: обычно одна строка. Если по сделке договорились дешевле — каталожная
+      // сверху мелким и зачёркнутая, договорная под ней
+      let priceBottom = y + 15.2;
+      if (row.was) {
+        const was = moneyDE(row.was);
+        const w = textWidth(was, 7.5, false);
+        ops.push({ t: 'text', x: COL.unit, y: y + 15.2, size: 7.5, color: C.light, text: was, align: 'right' });
+        ops.push({ t: 'line', x: COL.unit - w, y: y + 15.2 - 2.4, len: w, color: C.light, w: 0.5 });
+        priceBottom = y + 15.2 + 11.4;
+        ops.push({ t: 'text', x: COL.unit, y: priceBottom, size: 9, color: C.ink, text: moneyDE(row.unit), align: 'right' });
+      } else {
+        ops.push({ t: 'text', x: COL.unit, y: y + 15.2, size: 9, color: C.ink, text: moneyDE(row.unit), align: 'right' });
+      }
+      // сумма стоит на одной строке с ценой, по которой она посчитана
+      ops.push({ t: 'text', x: COL.sum, y: priceBottom, size: 9, color: C.ink, text: moneyDE(row.sum), align: 'right' });
+      const bottom = Math.max((notes.length ? afterName + 12.6 + (notes.length - 1) * 11 : afterName), priceBottom) + 10;
+      y = Math.max(bottom, y + 24.2);
+      ops.push({ t: 'line', x: M.left, y, len: M.right - M.left, color: C.hair, w: 0.38 });
+    });
+    return { ops, y };
+  }
+
+  function totalsOps(t, top) {
+    const ops = [];
+    ops.push({ t: 'text', x: 299.1, y: top + 21.1, size: 9.5, color: C.ink3, text: 'Nettobetrag' });
+    ops.push({ t: 'text', x: M.right, y: top + 21.1, size: 9.5, bold: true, color: C.ink, text: moneyDE(t.net), align: 'right' });
+    ops.push({ t: 'text', x: 299.1, y: top + 41.9, size: 9.5, color: C.ink3, text: 'zzgl. 19 % USt.' });
+    ops.push({ t: 'text', x: M.right, y: top + 41.9, size: 9.5, bold: true, color: C.ink, text: moneyDE(t.vat), align: 'right' });
+    ops.push({ t: 'text', x: 299.1, y: top + 66.5, size: 13.5, bold: true, color: C.green, text: 'Gesamtbetrag' });
+    ops.push({ t: 'text', x: M.right, y: top + 66.5, size: 13.5, bold: true, color: C.ink, text: moneyDE(t.total), align: 'right' });
+    return { ops, y: top + 66.5 };
+  }
+
+  // Блок на бумажном фоне: заголовок и абзац
+  function paperBlock(top, title, paragraphs) {
+    const ops = [];
+    const inner = M.right - M.left - 24;
+    const lines = [];
+    for (const p of paragraphs) for (const l of wrap(p, 8.5, false, inner)) lines.push(l);
+    const h = 17.7 + (title ? 17.9 : 0) + (lines.length - 1) * 12.3 + 12.1;
+    ops.push({ t: 'rect', x: M.left, y: top, w: M.right - M.left, h, fill: C.paper });
+    let y = top + 17.7;
+    if (title) { ops.push({ t: 'text', x: M.left + 12, y, size: 9.5, bold: true, color: C.ink, text: title }); y += 17.9; }
+    lines.forEach((line, i) => ops.push({ t: 'text', x: M.left + 12, y: y + i * 12.3, size: 8.5, color: C.ink3, text: line }));
+    return { ops, y: top + h };
+  }
+
+  // Тот же бумажный блок, но абзац с жирными кусками
+  function paperRunsBlock(top, title, runs) {
+    const ops = [];
+    const inner = M.right - M.left - 24;
+    const lines = wrapRuns(runs, 8.5, inner);
+    const h = 17.7 + 17.9 + (lines.length - 1) * 12.3 + 12.1;
+    ops.push({ t: 'rect', x: M.left, y: top, w: M.right - M.left, h, fill: C.paper });
+    ops.push({ t: 'text', x: M.left + 12, y: top + 17.7, size: 9.5, bold: true, color: C.ink, text: title });
+    lines.forEach((line, i) => ops.push(...runLineOps(line, M.left + 12, top + 35.6 + i * 12.3, 8.5, C.ink3)));
+    return { ops, y: top + h };
+  }
+
+  // Блок с оранжевой полосой слева
+  function orangeBlock(top, strong, lines) {
+    const ops = [];
+    const h = 11.6 + lines.length * 14.1 + 4.9;
+    ops.push({ t: 'rect', x: M.left, y: top, w: 3, h, fill: C.orange });
+    ops.push({ t: 'text', x: M.left + 15.1, y: top + 11.6, size: 9.5, bold: true, color: C.ink, text: strong });
+    lines.forEach((line, i) => ops.push({ t: 'text', x: M.left + 15.1, y: top + 25.7 + i * 14.1, size: 9.5, color: C.mute, text: line }));
+    return { ops, y: top + h };
+  }
+
+  function closingOps(top, paragraphs, size) {
+    const ops = [];
+    const sz = size || 9;
+    let y = top;
+    for (const p of paragraphs) {
+      for (const line of wrap(p, sz, false, M.right - M.left)) {
+        ops.push({ t: 'text', x: M.left, y, size: sz, color: C.ink2, text: line });
+        y += 12.9;
+      }
+    }
+    return { ops, y: y - 12.9 };
+  }
+
+  function footerOps(top) {
+    const ops = [];
+    const cols = [
+      { x: 51, w: 190.2, head: 'ANSCHRIFT', lines: [[SELLER.name, 1], [SELLER.street], [`${SELLER.zip} ${SELLER.city}`], [SELLER.phone], [SELLER.email]] },
+      { x: 241.2, w: 183.4, head: 'BANKVERBINDUNG', lines: [[SELLER.bankName, 1], ['IBAN ' + SELLER.iban], ['BIC ' + SELLER.bic]] },
+      { x: 424.6, w: 119.7, head: 'RECHTLICHES', lines: [[SELLER.ceo], [SELLER.register], [SELLER.ustId], [SELLER.taxNo]] },
+    ];
+    for (const c of cols) {
+      ops.push({ t: 'line', x: c.x, y: top, len: c.w, color: C.rule, w: 0.5 });
+      ops.push({ t: 'text', x: c.x, y: top + 6.7, size: 6.8, bold: true, color: C.light, text: c.head });
+      c.lines.forEach((l, i) => ops.push({ t: 'text', x: c.x, y: top + 20.4 + i * 11.7, size: 7.8, bold: Boolean(l[1]), color: l[1] ? C.ink : C.ink3, text: l[0] }));
+    }
+    return ops;
+  }
+
+  /* ---------- Angebot ---------- */
+  function angebot(data) {
+    const date = data.date ? new Date(data.date) : new Date();
+    const until = data.validUntil ? new Date(data.validUntil) : addDays(date, 30);
+    const t = totals(data.items || []);
+    const head = headerOps(data.client || {});
+    const ops = head.ops.concat(metaOps([
+      ['Angebotsnr.', data.no],
+      ['Kundennr.', String((data.client && data.client.customerNo) || '')],
+      ['Datum', dateDE(date)],
+      ['Gültig bis', dateDE(until)],
+    ]));
+
+    const titleY = 221.4 + head.extraLines * 5;
+    ops.push({ t: 'text', x: M.left, y: titleY, size: 17, bold: true, color: C.ink, text: 'Angebot' });
+    if (data.subject) ops.push({ t: 'text', x: M.left, y: titleY + 20.3, size: 10.5, color: C.ink3, text: data.subject });
+
+    const table = tableOps(t.rows, titleY + 34.6);
+    ops.push(...table.ops);
+    const tot = totalsOps(t, table.y);
+    ops.push(...tot.ops);
+
+    let y = tot.y + 11.9;
+    if (data.note) {
+      const b = paperBlock(y, data.noteTitle || 'Wichtiger technischer Hinweis', [data.note]);
+      ops.push(...b.ops);
+      y = b.y + 3.1;
+    }
+    const ob = orangeBlock(y, 'Zahlbar sofort rein netto', [
+      'Lieferung nach Zahlungseingang · Versand innerhalb Deutschlands',
+      `Dieses Preisangebot ist gültig bis ${dateDE(until)}.`,
+    ]);
+    ops.push(...ob.ops);
+
+    const cl = closingOps(ob.y + 17.6, [
+      `${data.salutation || 'Sehr geehrte Damen und Herren'}, vielen Dank für Ihre Anfrage. Gerne unterbreiten wir Ihnen das oben aufgeführte Angebot. Alle Preise verstehen sich in Euro. Für Rückfragen stehen wir Ihnen gerne zur Verfügung.`,
+    ]);
+    ops.push(...cl.ops);
+    ops.push(...footerOps(cl.y + 21.4));
+    return { ops, totals: t, name: `EXDED-Angebot-${data.no}.pdf`, title: `Angebot ${data.no}` };
+  }
+
+  /* ---------- Proforma-Rechnung ---------- */
+  function proforma(data) {
+    const date = data.date ? new Date(data.date) : new Date();
+    const due = data.dueDate ? new Date(data.dueDate) : addDays(date, 7);
+    const t = totals(data.items || []);
+    const parts = planParts(data.plan, data.planCustom);
+    const amounts = planAmounts(t.total, parts);
+    const head = headerOps(data.client || {});
+    const ops = head.ops.concat(metaOps([
+      ['Proforma-Nr.', data.no],
+      ['Kundennr.', String((data.client && data.client.customerNo) || '')],
+      ['Datum', dateDE(date)],
+      ['Zahlbar bis', dateDE(due)],
+    ]));
+
+    const titleY = 221.4 + head.extraLines * 5;
+    ops.push({ t: 'text', x: M.left, y: titleY, size: 17, bold: true, color: C.ink, text: 'Proforma-Rechnung' });
+    if (data.subject) ops.push({ t: 'text', x: M.left, y: titleY + 20.3, size: 10.5, color: C.ink3, text: data.subject });
+
+    const table = tableOps(t.rows, titleY + 34.6);
+    ops.push(...table.ops);
+    const tot = totalsOps(t, table.y);
+    ops.push(...tot.ops);
+
+    /* Zahlungsplan — словами, под выбранную схему */
+    const planRuns = [];
+    if (amounts.length === 1) {
+      planRuns.push({ text: `Zahlbar 100 % · ${moneyDE(amounts[0].amount)}`, bold: true });
+      planRuns.push({ text: ' – sofort. Lieferung nach Zahlungseingang.', bold: false });
+    } else {
+      amounts.forEach((a, i) => {
+        if (i) planRuns.push({ text: '  ·  ', bold: false });
+        planRuns.push({ text: `${i + 1}. ${i === 0 ? 'Anzahlung' : 'Restzahlung'} ${a.percent} % · ${moneyDE(a.amount)}`, bold: true });
+        planRuns.push({ text: i === 0
+          ? ' – sofort. Mit Zahlungseingang gilt der Auftrag als erteilt.'
+          : ' – vor Versand. Wir melden die Ware versandbereit; der Versand erfolgt nach Eingang der Restzahlung.', bold: false });
+      });
+    }
+    const plan = paperRunsBlock(tot.y + 11.9, 'Zahlungsplan', planRuns);
+    ops.push(...plan.ops);
+
+    /* Girocode на первый платёж */
+    const first = amounts[0];
+    const purpose = `${data.no} ${amounts.length === 1 ? 'Zahlung' : 'Anzahlung'}`;
+    const rows = qrMatrix(giroPayload(first.amount, purpose));
+    const boxTop = plan.y + 7;
+    const boxH = amounts.length === 1 ? 136 : 154;
+    ops.push({ t: 'line', x: M.left, y: boxTop, len: M.right - M.left, color: C.line, w: 0.8 });
+    ops.push({ t: 'line', x: M.left, y: boxTop + boxH, len: M.right - M.left, color: C.line, w: 0.8 });
+    ops.push({ t: 'rect', x: M.left, y: boxTop, w: 0.8, h: boxH, fill: C.line });
+    ops.push({ t: 'rect', x: M.right - 0.8, y: boxTop, w: 0.8, h: boxH, fill: C.line });
+    if (rows) ops.push({ t: 'qr', x: 66.5, y: boxTop + 8.5, size: 82, rows });
+    ops.push({ t: 'text', x: 107.5, y: boxTop + 101.8, size: 6.6, color: C.light, text: 'Girocode', align: 'center' });
+    ops.push({ t: 'text', x: 107.5, y: boxTop + 110.1, size: 6.6, color: C.light, text: 'Banking-App scannen', align: 'center' });
+
+    const lx = 165.5; const vx = 253.5;
+    const headText = amounts.length === 1
+      ? 'Zahlung · 100 %'
+      : `Zahlung 1 von ${amounts.length} · Anzahlung ${first.percent} %`;
+    ops.push({ t: 'text', x: lx, y: boxTop + 15.4, size: 9.5, bold: true, color: C.ink2, text: headText });
+    ops.push({ t: 'text', x: lx, y: boxTop + 33, size: 8.6, color: C.grey, text: 'Betrag' });
+    ops.push({ t: 'text', x: vx, y: boxTop + 34.4, size: 12, bold: true, color: C.ink, text: moneyDE(first.amount) });
+    const fields = [
+      ['Empfänger', SELLER.name, 1],
+      ['Bank', SELLER.bankName, 0],
+      ['IBAN', SELLER.iban, 1],
+      ['BIC', SELLER.bic, 0],
+      ['Verwendungszweck', purpose, 1],
+    ];
+    fields.forEach((f, i) => {
+      const y = boxTop + 52.5 + i * 14.4;
+      ops.push({ t: 'text', x: lx, y, size: 8.6, color: C.grey, text: f[0] });
+      ops.push({ t: 'text', x: vx, y, size: 8.6, bold: Boolean(f[2]), color: f[2] ? C.ink : C.ink2, text: f[1] });
+    });
+    if (amounts.length > 1) {
+      const rest = amounts.slice(1).map((a) => `${moneyDE(a.amount)}`).join(' + ');
+      const tailRuns = [
+        { text: `Restzahlung ${rest} nach Versandbereitschaft, Verwendungszweck `, bold: false },
+        { text: `${data.no} Restzahlung`, bold: true },
+        { text: ' (gleiche Bankverbindung).', bold: false },
+      ];
+      wrapRuns(tailRuns, 8.2, M.right - lx - 12).forEach((line, i) => {
+        ops.push(...runLineOps(line, lx, boxTop + 129.5 + i * 12.3, 8.2, C.mute));
+      });
+    }
+
+    /* Оранжевый блок и подпись */
+    const strong = amounts.length === 1
+      ? 'Zahlung vollständig im Voraus: 100 %'
+      : `Zahlung in ${amounts.length === 2 ? 'zwei' : 'mehreren'} Raten: ${first.percent} % Anzahlung, ${amounts.slice(1).map((a) => a.percent + ' %').join(' + ')} vor Versand`;
+    const ob = orangeBlock(boxTop + boxH + 10.8, strong, [
+      'Versand innerhalb Deutschlands · Neuware mit Herstellergarantie',
+      'Diese Proforma-Rechnung ist keine Rechnung im Sinne des §14 UStG. Die Rechnung erhalten Sie mit der Lieferung.',
+    ]);
+    ops.push(...ob.ops);
+
+    const cl = closingOps(ob.y + 17.6, [
+      `${data.salutation || 'Sehr geehrte Damen und Herren'}, vielen Dank für Ihren Auftrag. Zur Abwicklung erhalten Sie diese Proforma-Rechnung. Alle Preise verstehen sich in Euro. Für Rückfragen stehen wir Ihnen gerne zur Verfügung.`,
+    ], 8.6);
+    ops.push(...cl.ops);
+    ops.push(...footerOps(cl.y + 20.9));
+    return { ops, totals: t, plan: amounts, name: `EXDED-Proforma-${data.no}.pdf`, title: `Proforma ${data.no}` };
+  }
+
+  // Лист один. Если содержимое переросло страницу, приложение об этом скажет,
+  // а не выдаст молча обрезанный документ.
+  const PAGE_H = 841.89;
+  function lowestY(ops) {
+    let low = 0;
+    for (const o of ops) {
+      const y = o.t === 'rect' ? o.y + (o.h || 0) : o.t === 'qr' ? o.y + (o.size || 0) : o.y;
+      if (y > low) low = y;
+    }
+    return Math.round(low * 10) / 10;
+  }
+
+  function build(kind, data) {
+    const doc = kind === 'proforma' ? proforma(data) : angebot(data);
+    doc.bytes = toPdf(doc.ops, doc.title);
+    doc.lowestY = lowestY(doc.ops);
+    doc.overflow = doc.lowestY > PAGE_H - 24;
+    return doc;
+  }
+
+  return {
+    SELLER, VAT, PLANS, PAGE_H, build, angebot, proforma, toPdf, lowestY,
+    totals, netFromGross, moneyDE, dateDE, planParts, planAmounts, giroPayload, qrMatrix, textWidth, wrap,
+  };
+})();
+
+;
 /* Хранилище Supabase (версия для GitHub Pages). Таблица crm_docs: id, kind, data jsonb. */
 window.CrmSupabaseStore = (() => {
   const PAGE = 1000;
@@ -85,6 +3053,16 @@ window.CrmSupabaseStore = (() => {
         map.delete(id);
       },
       async lock() { return true; },
+      // Номер документа выдаёт база: с двух устройств одинаковый номер выйти не может
+      async nextDocNo(kind) {
+        const { data, error } = await sb.rpc('next_doc_no', { p_kind: kind });
+        if (error) throw new Error(error.message.includes('next_doc_no')
+          ? 'В базе нет счётчика номеров. Запустите файл 2_zapustit-v-supabase.sql ещё раз.'
+          : error.message);
+        const n = Number(data);
+        if (!Number.isFinite(n) || n < 1) throw new Error('База не выдала номер документа');
+        return n;
+      },
       async download(filename, data) {
         const url = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
         const a = document.createElement('a');
@@ -487,12 +3465,19 @@ window.CrmSupabaseStore = (() => {
   const isClosed = (d) => CLOSED.includes(d.status);
   const isOpen = (d) => !isClosed(d);
 
+  // Две цены у позиции: list_price — каталожная (справка, руками не правится,
+  // застывает в момент добавления), price — договорная по этой сделке.
+  // В расчёт идёт договорная, если она вписана, иначе каталожная.
+  const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : parseAmount(v));
+  const itemPrice = (it) => (Number.isFinite(it.price) ? it.price : (Number.isFinite(it.list_price) ? it.list_price : null));
+
   function normalizeItem(it) {
-    const x = { id: uid(), name: '', qty: 1, price: null, gross: false, product_id: null, sku: '', ...it };
+    const x = { id: uid(), name: '', qty: 1, price: null, list_price: null, gross: false, product_id: null, sku: '', ...it };
     x.id = x.id || uid();
     x.name = str(x.name);
     x.qty = parseQty(x.qty);
-    x.price = typeof x.price === 'number' && Number.isFinite(x.price) ? x.price : parseAmount(x.price);
+    x.price = num(x.price);
+    x.list_price = num(x.list_price);
     x.gross = Boolean(x.gross);           // цена из магазина — с НДС 19%; пересчёт в нетто будет в документах
     x.product_id = Number.isFinite(x.product_id) ? x.product_id : null;
     x.sku = str(x.sku);
@@ -505,7 +3490,7 @@ window.CrmSupabaseStore = (() => {
       id: uid(), title: '', product: '', invoice_no: '', amount: null,
       status: 'work', status_at: null, agreed: '', next: null,
       lost_reason: '', lost_at: null, returned_at: null,
-      items: [], created_at: born, closed_at: null,
+      items: [], docs: [], doc_note: '', created_at: born, closed_at: null,
       ...d,
     };
     x.id = x.id || uid();
@@ -517,6 +3502,8 @@ window.CrmSupabaseStore = (() => {
     x.lost_reason = str(x.lost_reason);
     x.amount = typeof x.amount === 'number' && Number.isFinite(x.amount) ? x.amount : parseAmount(x.amount);
     x.items = (Array.isArray(x.items) ? x.items : []).filter(Boolean).map(normalizeItem);
+    x.doc_note = str(x.doc_note);
+    x.docs = (Array.isArray(x.docs) ? x.docs : []).filter(Boolean).map(normalizeDocRec);
     if (x.next && (!x.next.at || x.next.done)) x.next = null;
     if (x.next) x.next = { at: x.next.at, kind: x.next.kind === 'meeting' ? 'meeting' : 'call' };
     if (!x.status_at) x.status_at = x.created_at;
@@ -859,7 +3846,15 @@ window.CrmSupabaseStore = (() => {
     return lastClosed(c) || c.deals[0] || null;
   }
   const purchases = (c) => c.deals.filter((d) => d.status === 'client').sort((a, b) => dealTime(b) - dealTime(a));
-  const itemsTotal = (d) => d.items.reduce((sum, it) => sum + (Number.isFinite(it.price) ? it.price * (it.qty || 1) : 0), 0);
+  // подпись под суммой позиций: всё брутто, всё нетто или вперемешку
+  function itemsKind(items) {
+    const priced = items.filter((it) => Number.isFinite(itemPrice(it)));
+    if (!priced.length) return '';
+    if (priced.every((it) => it.gross)) return ' брутто';
+    if (priced.every((it) => !it.gross)) return ' нетто';
+    return '';
+  }
+  const itemsTotal = (d) => d.items.reduce((sum, it) => { const p = itemPrice(it); return sum + (Number.isFinite(p) ? p * (it.qty || 1) : 0); }, 0);
 
   /* ===================================================================
      Поиск и сортировка
@@ -1421,6 +4416,23 @@ window.CrmSupabaseStore = (() => {
     if (out) out.innerHTML = catRowsHTML(q ? q.value : '');
   }
 
+  // Подпись под строкой позиции: каталожная цена как справка, скидка и пометка брутто/нетто
+  function itemMetaHTML(it) {
+    const list = Number.isFinite(it.list_price) ? it.list_price : null;
+    const own = Number.isFinite(it.price) ? it.price : null;
+    const diff = list !== null && own !== null ? Math.round((own - list) * 100) / 100 : null;
+    let badge = '';
+    if (diff !== null && diff < 0) {
+      const pc = Math.round((-diff / list) * 100);
+      badge = `<span class="item-diff is-cut">−${pc >= 1 ? pc + ' %' : esc(fmtMoney(-diff))}</span>`;
+    } else if (diff !== null && diff > 0) {
+      badge = `<span class="item-diff is-up">+${esc(fmtMoney(diff))}</span>`;
+    }
+    return `${list !== null ? `<span class="item-list" title="Цена каталога exded.com на день добавления">Каталог ${esc(fmtMoney(list))}</span>` : ''}
+${badge}
+<button type="button" class="item-tag" data-act="item-vat" aria-pressed="${it.gross}" title="Нажмите, чтобы переключить. Пометка относится к обеим ценам, НДС считается от той, что пошла в расчёт.">${it.gross ? 'брутто · с НДС 19 %' : 'нетто · без НДС'}</button>`;
+  }
+
   function dealsHTML(c, cur) {
     const tabs = c.deals.map((d) => {
       const on = cur && d.id === cur.id;
@@ -1434,9 +4446,9 @@ window.CrmSupabaseStore = (() => {
     const items = cur.items.map((it) => `<div class="item-row${it.gross ? ' is-gross' : ''}" data-item="${esc(it.id)}">
   <input data-ibind="name" value="${esc(it.name)}" placeholder="Наименование" aria-label="Наименование">
   <input data-ibind="qty" value="${esc(qtyInput(it.qty))}" inputmode="decimal" aria-label="Количество">
-  <input data-ibind="price" value="${esc(amountInput(it.price))}" inputmode="decimal" placeholder="цена" aria-label="Цена" title="${it.gross ? 'Цена из каталога, с НДС 19%' : 'Цена вписана руками'}">
+  <input data-ibind="price" value="${esc(amountInput(it.price))}" inputmode="decimal" placeholder="цена" aria-label="Ваша цена по этой сделке" title="Ваша цена по этой сделке. Пусто — в расчёт идёт каталожная.">
   <button type="button" class="icon-btn" data-act="item-del" aria-label="Удалить позицию">${ICON.trash}</button>
-  ${it.gross ? '<span class="item-tag">брутто, с НДС 19%</span>' : ''}
+  <div class="item-meta">${itemMetaHTML(it)}</div>
 </div>`).join('');
     return `<div class="cs-sec-head"><h3>Сделки</h3><span class="cs-count">${c.deals.length}</span></div>
 <div class="deal-tabs">${tabs}<button type="button" class="deal-tab deal-add" data-act="deal-add">${ICON.plus}<span class="deal-name">Новая сделка</span></button></div>
@@ -1448,12 +4460,12 @@ window.CrmSupabaseStore = (() => {
     <label class="f money"><span>Сумма, €</span><input data-dbind="amount" inputmode="decimal" value="${esc(amountInput(cur.amount))}"></label>
   </div>
   <div class="items">
-    <div class="items-head"><span>Позиции</span><span class="items-cols">кол-во · цена</span></div>
+    <div class="items-head"><span>Позиции</span><span class="items-cols">кол-во · ваша цена</span></div>
     ${catalogPickerHTML()}
     ${items}
     <div class="items-foot">
       <button type="button" class="link-btn" data-act="item-add">+ Добавить позицию</button>
-      ${total ? `<span class="items-total">Итого ${esc(fmtMoney(Math.round(total * 100) / 100))}${cur.items.some((it) => it.gross) ? ' брутто' : ''}</span>` : ''}
+      ${total ? `<span class="items-total">Итого ${esc(fmtMoney(Math.round(total * 100) / 100))}${itemsKind(cur.items)}</span>` : ''}
     </div>
   </div>
   <p class="hint deal-dates">Сделка создана ${esc(fmtLongDate(cur.created_at))}${cur.closed_at ? ` · закрыта ${esc(fmtLongDate(cur.closed_at))}` : ''}</p>
@@ -1541,6 +4553,277 @@ window.CrmSupabaseStore = (() => {
 </section>`;
   }
 
+  /* ===================================================================
+     Документы: Angebot и Proforma. Собираются в браузере (src/docs.js),
+     номер выдаёт база — он ставится один раз и больше не меняется.
+     ⛔ Rechnung не делаем: §14 UStG, счёт выписывается руками.
+     =================================================================== */
+  const DOC_KIND = {
+    angebot: { label: 'Angebot', prefix: 'AG' },
+    proforma: { label: 'Proforma', prefix: 'PF' },
+  };
+  const docNo = (prefix, n) => prefix + String(n).padStart(4, '0');
+  const docMoney = (n) => (window.ExdedDocs && Number.isFinite(n) ? ExdedDocs.moneyDE(n) : fmtMoney(n));
+  let docBusy = false;
+
+  function normalizeDocItem(it) {
+    const x = {
+      name: str(it && it.name),
+      qty: parseQty(it && it.qty),
+      price: num(it && it.price),
+      gross: Boolean(it && it.gross),
+      note: str(it && it.note),
+    };
+    // каталожную кладём только когда она есть: у документов, выпущенных раньше,
+    // её нет и быть не должно — иначе они пересоберутся иначе
+    const list = num(it && it.list_price);
+    if (list !== null) x.list_price = list;
+    return x;
+  }
+  function normalizeDocClient(x) {
+    const s = x && typeof x === 'object' ? x : {};
+    return { company: str(s.company), street: str(s.street), zip: str(s.zip), city: str(s.city), ustId: str(s.ustId), customerNo: str(s.customerNo) };
+  }
+  function normalizeDocRec(x) {
+    const r = {
+      id: uid(), kind: 'angebot', no: '', at: null, date: null, until: null,
+      plan: '100', plan_custom: null, subject: '', note: '',
+      client: null, items: [], net: null, vat: null, total: null,
+      ...(x && typeof x === 'object' ? x : {}),
+    };
+    r.id = r.id || uid();
+    r.kind = r.kind === 'proforma' ? 'proforma' : 'angebot';
+    r.no = str(r.no);
+    r.subject = str(r.subject);
+    r.note = str(r.note);
+    r.plan = str(r.plan) || '100';
+    r.plan_custom = Number.isFinite(r.plan_custom) ? r.plan_custom : null;
+    r.client = normalizeDocClient(r.client);
+    r.items = (Array.isArray(r.items) ? r.items : []).filter(Boolean).map(normalizeDocItem);
+    for (const k of ['net', 'vat', 'total']) r[k] = typeof r[k] === 'number' && Number.isFinite(r[k]) ? r[k] : null;
+    return r;
+  }
+
+  // Данные для сборки PDF: всё берётся из записи, поэтому документ
+  // через месяц соберётся ровно таким же, как в день создания.
+  function docPayload(rec) {
+    const base = { no: rec.no, date: rec.date, client: rec.client, subject: rec.subject, items: rec.items, note: rec.note };
+    if (rec.kind === 'proforma') return { ...base, dueDate: rec.until, plan: rec.plan, planCustom: rec.plan_custom };
+    return { ...base, validUntil: rec.until };
+  }
+  function docClientOf(c) {
+    const b = c.billing;
+    return normalizeDocClient({
+      company: b.company_legal || c.company,
+      street: b.street, zip: b.zip, city: b.city,
+      ustId: b.ust_id, customerNo: b.customer_no,
+    });
+  }
+  function docSubject(kind, d) {
+    const title = dealTitle(d);
+    if (kind !== 'proforma') return `${title} – Angebot`;
+    const ag = d.docs.filter((x) => x.kind === 'angebot').slice(-1)[0];
+    return ag ? `${title} · zum Angebot ${ag.no}` : `${title} – Proforma-Rechnung`;
+  }
+  const docItemsOf = (d) => d.items
+    .filter((it) => str(it.name).trim() && Number.isFinite(itemPrice(it)))
+    .map((it) => normalizeDocItem({ name: it.name, qty: it.qty, price: it.price, list_price: it.list_price, gross: it.gross }));
+
+  let shareOk = null;
+  function shareSupported() {
+    if (shareOk !== null) return shareOk;
+    shareOk = false;
+    try {
+      if (navigator.share && navigator.canShare && typeof File === 'function') {
+        const probe = new File([new Blob(['x'], { type: 'application/pdf' })], 'x.pdf', { type: 'application/pdf' });
+        shareOk = navigator.canShare({ files: [probe] });
+      }
+    } catch { shareOk = false; }
+    return shareOk;
+  }
+
+  function buildDoc(rec) {
+    if (!window.ExdedDocs) throw new Error('Модуль документов не загрузился, обновите страницу');
+    const doc = ExdedDocs.build(rec.kind, docPayload(rec));
+    return { doc, blob: new Blob([doc.bytes], { type: 'application/pdf' }) };
+  }
+  const OVERFLOW_MSG = 'Документ не помещается на один лист: уберите позиции или сократите примечание';
+  async function shareDoc(rec) {
+    let made;
+    try { made = buildDoc(rec); } catch (e) { toast(e.message || 'Документ не собрался', 'err'); return; }
+    if (made.doc.overflow) toast(OVERFLOW_MSG, 'err');
+    if (shareSupported()) {
+      try {
+        await navigator.share({ files: [new File([made.blob], made.doc.name, { type: 'application/pdf' })], title: made.doc.title });
+        return;
+      } catch (e) {
+        if (e && (e.name === 'AbortError' || e.name === 'NotAllowedError')) return;
+      }
+    }
+    const url = URL.createObjectURL(made.blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = made.doc.name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    toast('Документ скачан');
+  }
+
+  async function createDoc(kind, plan, planCustom) {
+    if (docBusy) return;
+    const c = state.clients.get(state.openId);
+    const d = currentDeal(c);
+    if (!c || !d) return;
+    const items = docItemsOf(d);
+    if (!items.length) { toast('В сделке нет позиций с ценой', 'err'); return; }
+    if (!window.ExdedDocs) { toast('Модуль документов не загрузился, обновите страницу', 'err'); return; }
+    if (!store || typeof store.nextDocNo !== 'function') { toast('Номера документов выдаёт база — эта версия CRM их не умеет', 'err'); return; }
+
+    docBusy = true;
+    const btns = $$('[data-act^="doc-make"]', $('#card-body'));
+    btns.forEach((b) => { b.disabled = true; });
+    ensureCustomerNo(c.id);
+    let n = null;
+    try {
+      n = await store.nextDocNo(DOC_KIND[kind].prefix);
+    } catch (e) {
+      toast((e && e.message) || 'Номер документа не выдан, документ не создан', 'err');
+    }
+    docBusy = false;
+    btns.forEach((b) => { b.disabled = false; });
+    if (!n) return;
+
+    const fresh = state.clients.get(c.id);
+    const deal = dealOf(fresh, d.id);
+    if (!fresh || !deal) return;
+    const now = new Date();
+    const until = new Date(now.getTime() + (kind === 'proforma' ? 7 : 30) * 86400000);
+    const t = ExdedDocs.totals(items);
+    const rec = normalizeDocRec({
+      kind,
+      no: docNo(DOC_KIND[kind].prefix, n),
+      at: now.toISOString(),
+      date: now.toISOString(),
+      until: until.toISOString(),
+      plan: kind === 'proforma' ? plan || '100' : '100',
+      plan_custom: kind === 'proforma' && plan === 'custom' ? planCustom : null,
+      subject: docSubject(kind, deal),
+      note: str(deal.doc_note).trim(),
+      client: docClientOf(fresh),
+      items,
+      net: t.net, vat: t.vat, total: t.total,
+    });
+    patchDeal(fresh.id, deal.id, { docs: [...clone(deal.docs), rec] }, { now: true });
+    if (state.openId === fresh.id) renderCard();
+    let made = null;
+    try { made = buildDoc(rec); } catch {}
+    if (made && made.doc.overflow) { toast(`${rec.no}: ${OVERFLOW_MSG}`, 'err'); return; }
+    toast(`${rec.no} готов`, '', { label: shareSupported() ? 'Отправить' : 'Скачать', fn: () => shareDoc(rec) });
+  }
+
+  function docsHTML(c, d) {
+    if (!d) return '';
+    const head = `<div class="cs-sec-head"><h3>Документы</h3>${d.docs.length ? `<span class="cs-count">${d.docs.length}</span>` : ''}</div>`;
+    if (!window.ExdedDocs) return `<section class="cs-sec" data-part="docs">${head}<p class="hint">Модуль документов не загрузился. Обновите страницу.</p></section>`;
+    const items = docItemsOf(d);
+    const t = items.length ? ExdedDocs.totals(items) : null;
+    const rows = d.docs.map((r) => {
+      const plan = r.kind === 'proforma' && r.plan !== '100'
+        ? ` · ${r.plan === 'custom' ? `${r.plan_custom} / ${100 - r.plan_custom}` : r.plan}`
+        : '';
+      return `<li data-doc="${esc(r.id)}">
+  <b>${esc(r.no)}</b>
+  <span class="doc-kind">${esc(DOC_KIND[r.kind].label)}${esc(plan)}</span>
+  <time>${esc(r.date ? fmtLongDate(r.date) : '')}</time>
+  <span class="doc-sum">${esc(docMoney(r.total))}</span>
+  <button type="button" class="btn small" data-act="doc-share">${shareSupported() ? 'Отправить' : 'Скачать'}</button>
+  <button type="button" class="icon-btn" data-act="doc-del" aria-label="Удалить документ из списка">${ICON.trash}</button>
+</li>`;
+    }).join('');
+    const totalsLine = t
+      ? `<p class="doc-totals">Нетто ${esc(docMoney(t.net))} · НДС 19 % ${esc(docMoney(t.vat))} · <b>Итого ${esc(docMoney(t.total))}</b></p>`
+      : '<p class="hint">Добавьте в сделку позиции с ценой — из них соберётся документ.</p>';
+    return `<section class="cs-sec" data-part="docs">
+  ${head}
+  ${totalsLine}
+  <label class="f"><span>Примечание (печатается в Angebot)</span><textarea data-dbind="doc_note" rows="2" placeholder="Например: Bei der angebotenen Autel Alpha handelt es sich um Neuware…">${esc(d.doc_note)}</textarea></label>
+  <div class="doc-make">
+    <button type="button" class="btn" data-act="doc-make-angebot"${items.length ? '' : ' disabled'}>Angebot</button>
+    <button type="button" class="btn" data-act="doc-make-proforma"${items.length ? '' : ' disabled'}>Proforma</button>
+  </div>
+  ${rows ? `<ul class="docs">${rows}</ul>` : ''}
+  <p class="hint">Номер присваивается один раз и не меняется. Rechnung здесь не делается: счёт выписывается руками.</p>
+</section>`;
+  }
+
+  // пересчитать блок документов, не трогая остальную карточку (иначе поле теряет фокус)
+  function refreshDocsUI() {
+    const box = $('[data-part="docs"]');
+    if (!box || box.contains(document.activeElement) === false) {
+      const c = state.clients.get(state.openId);
+      const d = c && currentDeal(c);
+      if (!box || !c || !d) return;
+      const next = docsHTML(c, d);
+      const wrap = document.createElement('div');
+      wrap.innerHTML = next;
+      const fresh = wrap.firstElementChild;
+      if (fresh && fresh.innerHTML !== box.innerHTML) box.innerHTML = fresh.innerHTML;
+    }
+  }
+
+  /* Схема оплаты для Proforma */
+  let planCtx = null;
+  function openPlan(clientId, dealId) {
+    const c = state.clients.get(clientId);
+    const d = dealOf(c, dealId);
+    if (!c || !d || !window.ExdedDocs) return;
+    const items = docItemsOf(d);
+    if (!items.length) { toast('В сделке нет позиций с ценой', 'err'); return; }
+    planCtx = { clientId, dealId, key: '100', custom: 50, total: ExdedDocs.totals(items).total };
+    $('#plan-sum').textContent = `${clientName(c)} · ${docMoney(planCtx.total)}`;
+    $('#plan-keys').innerHTML = [...Object.values(ExdedDocs.PLANS), { key: 'custom', label: 'Своя' }]
+      .map((p) => `<button type="button" data-plan="${esc(p.key)}"${p.key === '100' ? ' class="on"' : ''}>${esc(p.label)}</button>`).join('');
+    $('#form-plan').elements.custom.value = '50';
+    $('#plan-custom-wrap').hidden = true;
+    renderPlanPreview();
+    $('#dlg-plan').showModal();
+    fitSheets();
+  }
+  function renderPlanPreview() {
+    if (!planCtx) return;
+    const parts = ExdedDocs.planParts(planCtx.key, planCtx.custom);
+    const amounts = ExdedDocs.planAmounts(planCtx.total, parts);
+    $('#plan-preview').textContent = amounts.length === 1
+      ? `Один платёж ${docMoney(amounts[0].amount)}`
+      : amounts.map((a, i) => `${i ? 'Остаток' : 'Аванс'} ${a.percent} % — ${docMoney(a.amount)}`).join(' · ');
+  }
+  function bindPlan() {
+    const dlg = $('#dlg-plan');
+    const f = $('#form-plan');
+    $('#plan-keys').addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (!b || !planCtx) return;
+      planCtx.key = b.dataset.plan;
+      $$('#plan-keys button').forEach((x) => x.classList.toggle('on', x.dataset.plan === planCtx.key));
+      $('#plan-custom-wrap').hidden = planCtx.key !== 'custom';
+      renderPlanPreview();
+    });
+    f.elements.custom.addEventListener('input', (e) => {
+      if (!planCtx) return;
+      planCtx.custom = Math.min(100, Math.max(1, parseInt(e.target.value, 10) || 0)) || 50;
+      renderPlanPreview();
+    });
+    dlg.addEventListener('click', (e) => { if (e.target === dlg || e.target.closest('[data-close]')) dlg.close(); });
+    dlg.addEventListener('close', () => { planCtx = null; });
+    f.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (!planCtx) return;
+      const key = planCtx.key;
+      const custom = planCtx.custom;
+      dlg.close();
+      createDoc('proforma', key, key === 'custom' ? custom : null);
+    });
+  }
+
   function lostHTML(c, d) {
     const back = d.lost_at ? fmtLongDate(addMonths(d.lost_at, RETURN_MONTHS).toISOString()) : '';
     return `<section class="cs-sec cs-lost">
@@ -1587,6 +4870,7 @@ window.CrmSupabaseStore = (() => {
   <section class="cs-sec" data-part="log">${logHTML(c)}</section>
   ${buysHTML(c)}
   ${ordersHTML(c)}
+  ${docsHTML(c, d)}
 </div>
 <div class="cs-foot">
   <span>Создан ${esc(fmtLongDate(c.created_at))}</span>
@@ -1690,6 +4974,16 @@ window.CrmSupabaseStore = (() => {
           it[k] = k === 'price' ? parseAmount(el.value) : k === 'qty' ? parseQty(el.value) : el.value;
           patchDeal(c.id, d.id, { items });
           cardRenderedJSON = JSON.stringify(state.clients.get(c.id));
+          const meta = el.closest('[data-item]').querySelector('.item-meta');
+          if (meta) meta.innerHTML = itemMetaHTML(it);
+          const foot = $('.items-foot', body);
+          const sum = itemsTotal(state.clients.get(c.id).deals.find((x) => x.id === d.id) || d);
+          if (foot) {
+            let out = $('.items-total', foot);
+            if (sum && !out) { out = document.createElement('span'); out.className = 'items-total'; foot.appendChild(out); }
+            if (out) out.textContent = sum ? `Итого ${fmtMoney(Math.round(sum * 100) / 100)}${itemsKind(items)}` : '';
+          }
+          refreshDocsUI();
         }
       } else if (el.dataset.cbind) {
         const contactId = el.closest('[data-contact]').dataset.contact;
@@ -1752,7 +5046,7 @@ window.CrmSupabaseStore = (() => {
         if (!found) return;
         const qtyEl = $('[data-cat-qty]', body);
         const qty = parseQty(qtyEl ? qtyEl.value : 1);
-        const item = normalizeItem({ name: found.name, qty, price: found.price, gross: true, product_id: found.id, sku: found.sku });
+        const item = normalizeItem({ name: found.name, qty, list_price: found.price, price: null, gross: true, product_id: found.id, sku: found.sku });
         patchDeal(c.id, d.id, { items: [...clone(d.items), item] }, { now: true });
         if (!str(d.product).trim()) patchDeal(c.id, d.id, { product: found.name }, { now: true });
         renderCard();
@@ -1760,7 +5054,7 @@ window.CrmSupabaseStore = (() => {
         return;
       }
       if (act === 'item-add' && d) {
-        patchDeal(c.id, d.id, { items: [...clone(d.items), normalizeItem({})] }, { now: true });
+        patchDeal(c.id, d.id, { items: [...clone(d.items), normalizeItem({ gross: true })] }, { now: true });
         renderCard();
         const rows = $$('[data-ibind="name"]', body);
         if (rows.length) rows[rows.length - 1].focus();
@@ -1769,6 +5063,31 @@ window.CrmSupabaseStore = (() => {
       if (act === 'item-del' && d) {
         const row = btn.closest('[data-item]');
         patchDeal(c.id, d.id, { items: clone(d.items).filter((x) => x.id !== row.dataset.item) }, { now: true });
+        renderCard();
+        return;
+      }
+
+      if (act === 'doc-make-angebot') { createDoc('angebot', '100', null); return; }
+      if (act === 'doc-make-proforma' && d) { openPlan(c.id, d.id); return; }
+      if ((act === 'doc-share' || act === 'doc-del') && d) {
+        const li = btn.closest('[data-doc]');
+        const rec = d.docs.find((x) => x.id === (li && li.dataset.doc));
+        if (!rec) return;
+        if (act === 'doc-share') { shareDoc(rec); return; }
+        if (btn.dataset.confirm !== '1') { btn.dataset.confirm = '1'; btn.style.color = 'var(--red)'; btn.setAttribute('aria-label', 'Нажмите ещё раз, чтобы убрать из списка'); return; }
+        patchDeal(c.id, d.id, { docs: clone(d.docs).filter((x) => x.id !== rec.id) }, { now: true });
+        renderCard();
+        toast(`${rec.no} убран из списка. Номер остаётся занятым.`);
+        return;
+      }
+
+      if (act === 'item-vat' && d) {
+        const row = btn.closest('[data-item]');
+        const items = clone(d.items);
+        const it = items.find((x) => x.id === row.dataset.item);
+        if (!it) return;
+        it.gross = !it.gross;
+        patchDeal(c.id, d.id, { items }, { now: true });
         renderCard();
         return;
       }
@@ -2023,6 +5342,7 @@ window.CrmSupabaseStore = (() => {
       bindNew();
       bindCard();
       bindLost();
+      bindPlan();
       bindSettings();
       bindShortcuts();
       bindViewport();
@@ -2112,7 +5432,7 @@ window.CrmSupabaseStore = (() => {
   }
 
   // для проверок: чистые функции схемы, без данных
-  window.EXDED_CRM_TEST = { normalize, legacyToClients, boardDeals, activeDeal, dealTitle, normalizeDeal, loadCatalog, catalog, catalogFind, catalogBlocked, keepFocusVisible, fitSheets };
+  window.EXDED_CRM_TEST = { normalize, legacyToClients, boardDeals, activeDeal, dealTitle, normalizeDeal, loadCatalog, catalog, catalogFind, catalogBlocked, keepFocusVisible, fitSheets, docPayload, docSubject, docItemsOf, normalizeDocRec };
 
   function init() { registerSW(); boot(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
