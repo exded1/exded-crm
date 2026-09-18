@@ -398,7 +398,11 @@ input::placeholder, textarea::placeholder { color: var(--ink-3); }
 .vip svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; }
 .vip.on { color: #f2b81c; }
 .vip.on svg { fill: currentColor; }
-.card-co { flex: 1; min-width: 0; font-size: 15.5px; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+/* имя в 130 знаков занимало семь строк и выдавливало карточку: режем двумя */
+.card-co {
+  flex: 1; min-width: 0; font-size: 15.5px; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
 .card-sum { flex: none; font-weight: 700; font-variant-numeric: tabular-nums; font-size: 14.5px; }
 .card-product { color: var(--ink-2); font-size: 14px; overflow-wrap: anywhere; }
 .card-agreed {
@@ -672,6 +676,10 @@ input:not([type=file]), select, textarea {
   font-size: 11.5px; color: var(--ink-3); line-height: 18px;
 }
 .item-tag[aria-pressed="true"] { background: var(--surface-2); color: var(--ink-2); }
+.f-amount { display: inline-flex; align-items: baseline; gap: 8px; }
+.from-items { border: 0; background: transparent; padding: 0; font-size: 12px; font-weight: 600; color: var(--orange-ink); text-decoration: underline; }
+.item-row input.is-bad { border-color: var(--red) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 18%, transparent) !important; }
+.item-warn { font-size: 11.5px; font-weight: 600; color: var(--red-ink); }
 .items-foot { display: flex; align-items: center; gap: 10px; }
 .items-total { margin-left: auto; font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
@@ -802,7 +810,7 @@ input:not([type=file]), select, textarea {
   .tabs { padding-right: max(12px, var(--sar)); padding-left: max(12px, var(--sal)); }
   .tabs::-webkit-scrollbar { display: none; }
   .tabs button {
-    flex: 1 0 auto; min-height: 38px; padding: 0 10px; white-space: nowrap;
+    flex: 1 0 auto; min-height: 44px; padding: 0 10px; white-space: nowrap;   /* цель под палец */
     border: 1px solid var(--line); border-radius: 999px; background: var(--surface);
     color: var(--ink-2); font-size: 14px; font-weight: 600;
   }
