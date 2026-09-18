@@ -681,6 +681,20 @@ dialog::backdrop { background: rgba(20, 20, 19, .42); }
   .when input[type=date], .next-row input[type=date] { grid-column: 1 / -1; }
   .sheet-foot .btn { flex: 1; min-height: 48px; }
 }
+/* ---------- Узкий экран: боковые отступы, которые нечем сбить ----------
+   Те же отступы заданы выше одной строкой padding с max() и env(). Беда в том, что если
+   браузер не понимает max() или env(), он выбрасывает ВСЮ строку целиком — и доска, шапка
+   и вкладки разом оказываются впритык к краям. Именно так это и выглядит на телефоне.
+   Поэтому сначала простые значения без функций, следом те же с env(): кто понимает —
+   возьмёт вторую строку и учтёт вырез экрана, кто нет — останется с первой.
+   Шапка приведена к той же величине, что доска и вкладки: было 16px, стало 12px. */
+@media (max-width: 600px) {
+  .top { padding-left: 12px; padding-right: 12px; }
+  .top { padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
+  .agenda, .tabs, .board { padding-left: 12px; padding-right: 12px; }
+  .agenda, .tabs, .board { padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
+}
+
 @keyframes sheet-up { from { transform: translateY(40px); opacity: .6; } to { transform: none; opacity: 1; } }
 
 /* iPhone и iPad не увеличивают страницу при вводе, если шрифт полей от 16px */
