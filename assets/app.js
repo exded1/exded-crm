@@ -2454,12 +2454,27 @@ window.ExdedDocs = (() => {
     0x2013: 0x96, 0x2014: 0x97, 0x02dc: 0x98, 0x2122: 0x99, 0x0161: 0x9a, 0x203a: 0x9b,
     0x0153: 0x9c, 0x017e: 0x9e, 0x0178: 0x9f, 0x00a0: 0x20,
   };
+  // Шрифт документа — встроенная Helvetica с кодировкой WinAnsi: кириллицы в ней нет.
+  // ⚠️ Подменять неизвестный знак на «?» молча нельзя: 18.09.2026 так уехала к клиенту
+  // тема «?????? ? ?????, 18 ????». Поэтому всё, что не влезло в WinAnsi, копится
+  // и возвращается из build() в doc.unsupported — приложение об этом кричит.
+  const winOk = (c) => (c >= 0x20 && c <= 0x7e) || WIN[c] !== undefined || (c >= 0xa0 && c <= 0xff);
+  let badChars = null;
   function winCode(ch) {
     const c = ch.codePointAt(0);
     if (c >= 0x20 && c <= 0x7e) return c;
     if (WIN[c] !== undefined) return WIN[c];
     if (c >= 0xa0 && c <= 0xff) return c;
+    if (badChars) badChars.add(ch);
     return 0x3f;   // '?'
+  }
+  /** Какие знаки текста шрифт документа не возьмёт. Пустой список — можно печатать. */
+  function unsupported(text) {
+    const out = [];
+    for (const ch of String(text === undefined || text === null ? '' : text)) {
+      if (!winOk(ch.codePointAt(0)) && out.indexOf(ch) === -1) out.push(ch);
+    }
+    return out;
   }
   function textWidth(text, size, bold) {
     const w = bold ? WIDTHS().bold : WIDTHS().reg;
@@ -2633,6 +2648,14 @@ window.ExdedDocs = (() => {
      y — базовая линия строки, отсчёт сверху листа.
      =================================================================== */
   const M = { left: 51, right: 544.3 };
+  // Подвал прибит к низу листа: линия здесь, последняя строка реквизитов —
+  // в 57,5 pt от нижнего края. Так он стоит на одном месте в любом документе.
+  // Единственное исключение — когда текст дорос до этой отметки (Proforma
+  // с большим числом позиций): тогда подвал сдвигается вниз, чтобы не налезть
+  // на текст, а если и там не помещается — приложение говорит о переполнении.
+  const FOOT_TOP = 717.15;
+  const FOOT_H = 67.2;      // от линии до последней строки реквизитов
+  const FOOT_GAP = 12;      // минимальный зазор между текстом и линией подвала
   const COL = {
     pos: 59.3, name: 85.9, qty: 391, nameW: 270,
     unit: 480.1, sum: 535.9,          // правый край цифр в колонках
@@ -2728,7 +2751,8 @@ window.ExdedDocs = (() => {
     ops.push({ t: 'text', x: M.right, y: top + 21.1, size: 9.5, bold: true, color: C.ink, text: moneyDE(t.net), align: 'right' });
     ops.push({ t: 'text', x: 299.1, y: top + 41.9, size: 9.5, color: C.ink3, text: 'zzgl. 19 % USt.' });
     ops.push({ t: 'text', x: M.right, y: top + 41.9, size: 9.5, bold: true, color: C.ink, text: moneyDE(t.vat), align: 'right' });
-    ops.push({ t: 'text', x: 299.1, y: top + 66.5, size: 13.5, bold: true, color: C.green, text: 'Gesamtbetrag' });
+    // «Gesamtbetrag» фирменным оранжевым — тем же, что полоса врезки ниже (решение владельца 18.09.2026)
+    ops.push({ t: 'text', x: 299.1, y: top + 66.5, size: 13.5, bold: true, color: C.orange, text: 'Gesamtbetrag' });
     ops.push({ t: 'text', x: M.right, y: top + 66.5, size: 13.5, bold: true, color: C.ink, text: moneyDE(t.total), align: 'right' });
     return { ops, y: top + 66.5 };
   }
@@ -2744,18 +2768,6 @@ window.ExdedDocs = (() => {
     let y = top + 17.7;
     if (title) { ops.push({ t: 'text', x: M.left + 12, y, size: 9.5, bold: true, color: C.ink, text: title }); y += 17.9; }
     lines.forEach((line, i) => ops.push({ t: 'text', x: M.left + 12, y: y + i * 12.3, size: 8.5, color: C.ink3, text: line }));
-    return { ops, y: top + h };
-  }
-
-  // Тот же бумажный блок, но абзац с жирными кусками
-  function paperRunsBlock(top, title, runs) {
-    const ops = [];
-    const inner = M.right - M.left - 24;
-    const lines = wrapRuns(runs, 8.5, inner);
-    const h = 17.7 + 17.9 + (lines.length - 1) * 12.3 + 12.1;
-    ops.push({ t: 'rect', x: M.left, y: top, w: M.right - M.left, h, fill: C.paper });
-    ops.push({ t: 'text', x: M.left + 12, y: top + 17.7, size: 9.5, bold: true, color: C.ink, text: title });
-    lines.forEach((line, i) => ops.push(...runLineOps(line, M.left + 12, top + 35.6 + i * 12.3, 8.5, C.ink3)));
     return { ops, y: top + h };
   }
 
@@ -2812,9 +2824,15 @@ window.ExdedDocs = (() => {
 
     const titleY = 221.4 + head.extraLines * 5;
     ops.push({ t: 'text', x: M.left, y: titleY, size: 17, bold: true, color: C.ink, text: 'Angebot' });
-    if (data.subject) ops.push({ t: 'text', x: M.left, y: titleY + 20.3, size: 10.5, color: C.ink3, text: data.subject });
+    // Подстрочника может не быть вовсе (название сделки по-русски в документ не идёт) —
+    // тогда таблица поднимается, пустой строки под заголовком не остаётся.
+    let lastLine = titleY;
+    if (data.subject) {
+      lastLine = titleY + 20.3;
+      ops.push({ t: 'text', x: M.left, y: lastLine, size: 10.5, color: C.ink3, text: data.subject });
+    }
 
-    const table = tableOps(t.rows, titleY + 34.6);
+    const table = tableOps(t.rows, lastLine + 14.3);
     ops.push(...table.ops);
     const tot = totalsOps(t, table.y);
     ops.push(...tot.ops);
@@ -2835,8 +2853,10 @@ window.ExdedDocs = (() => {
       `${data.salutation || 'Sehr geehrte Damen und Herren'}, vielen Dank für Ihre Anfrage. Gerne unterbreiten wir Ihnen das oben aufgeführte Angebot. Alle Preise verstehen sich in Euro. Für Rückfragen stehen wir Ihnen gerne zur Verfügung.`,
     ]);
     ops.push(...cl.ops);
-    ops.push(...footerOps(cl.y + 21.4));
-    return { ops, totals: t, name: `EXDED-Angebot-${data.no}.pdf`, title: `Angebot ${data.no}` };
+    const contentY = lowestY(ops);
+    const footTop = Math.max(FOOT_TOP, contentY + FOOT_GAP);
+    ops.push(...footerOps(footTop));
+    return { ops, contentY, footTop, totals: t, name: `EXDED-Angebot-${data.no}.pdf`, title: `Angebot ${data.no}` };
   }
 
   /* ---------- Proforma-Rechnung ---------- */
@@ -2856,40 +2876,31 @@ window.ExdedDocs = (() => {
 
     const titleY = 221.4 + head.extraLines * 5;
     ops.push({ t: 'text', x: M.left, y: titleY, size: 17, bold: true, color: C.ink, text: 'Proforma-Rechnung' });
-    if (data.subject) ops.push({ t: 'text', x: M.left, y: titleY + 20.3, size: 10.5, color: C.ink3, text: data.subject });
+    let lastLine = titleY;
+    if (data.subject) {
+      lastLine = titleY + 20.3;
+      ops.push({ t: 'text', x: M.left, y: lastLine, size: 10.5, color: C.ink3, text: data.subject });
+    }
 
-    const table = tableOps(t.rows, titleY + 34.6);
+    const table = tableOps(t.rows, lastLine + 14.3);
     ops.push(...table.ops);
     const tot = totalsOps(t, table.y);
     ops.push(...tot.ops);
 
-    /* Zahlungsplan — словами, под выбранную схему */
-    const planRuns = [];
-    if (amounts.length === 1) {
-      planRuns.push({ text: `Zahlbar 100 % · ${moneyDE(amounts[0].amount)}`, bold: true });
-      planRuns.push({ text: ' – sofort. Lieferung nach Zahlungseingang.', bold: false });
-    } else {
-      amounts.forEach((a, i) => {
-        if (i) planRuns.push({ text: '  ·  ', bold: false });
-        planRuns.push({ text: `${i + 1}. ${i === 0 ? 'Anzahlung' : 'Restzahlung'} ${a.percent} % · ${moneyDE(a.amount)}`, bold: true });
-        planRuns.push({ text: i === 0
-          ? ' – sofort. Mit Zahlungseingang gilt der Auftrag als erteilt.'
-          : ' – vor Versand. Wir melden die Ware versandbereit; der Versand erfolgt nach Eingang der Restzahlung.', bold: false });
-      });
-    }
-    const plan = paperRunsBlock(tot.y + 11.9, 'Zahlungsplan', planRuns);
-    ops.push(...plan.ops);
+    /* Отдельного блока «Zahlungsplan» больше нет: он слово в слово повторял
+       платёжный блок ниже (там и «Zahlung 1 von 2 · Anzahlung 50 %», и сумма,
+       и строка про остаток) и съедал 72 pt — почти три позиции таблицы.
+       Решение владельца от 18.09.2026. Платёжный блок поднялся на его место:
+       под итогами он стоит с тем же зазором 7 pt, с каким всегда стоял под планом. */
 
     /* Girocode на первый платёж */
     const first = amounts[0];
     const purpose = `${data.no} ${amounts.length === 1 ? 'Zahlung' : 'Anzahlung'}`;
     const rows = qrMatrix(giroPayload(first.amount, purpose));
-    const boxTop = plan.y + 7;
+    const boxTop = tot.y + 7;
     const boxH = amounts.length === 1 ? 136 : 154;
-    ops.push({ t: 'line', x: M.left, y: boxTop, len: M.right - M.left, color: C.line, w: 0.8 });
-    ops.push({ t: 'line', x: M.left, y: boxTop + boxH, len: M.right - M.left, color: C.line, w: 0.8 });
-    ops.push({ t: 'rect', x: M.left, y: boxTop, w: 0.8, h: boxH, fill: C.line });
-    ops.push({ t: 'rect', x: M.right - 0.8, y: boxTop, w: 0.8, h: boxH, fill: C.line });
+    // Рамки вокруг платёжного блока нет (решение владельца 18.09.2026).
+    // boxH по-прежнему задаёт высоту блока: от неё считается всё, что ниже.
     if (rows) ops.push({ t: 'qr', x: 66.5, y: boxTop + 8.5, size: 82, rows });
     ops.push({ t: 'text', x: 107.5, y: boxTop + 101.8, size: 6.6, color: C.light, text: 'Girocode', align: 'center' });
     ops.push({ t: 'text', x: 107.5, y: boxTop + 110.1, size: 6.6, color: C.light, text: 'Banking-App scannen', align: 'center' });
@@ -2926,8 +2937,11 @@ window.ExdedDocs = (() => {
     }
 
     /* Оранжевый блок и подпись */
+    // ⚠️ При 100 % «Lieferung nach Zahlungseingang» стоит только здесь: раньше эта фраза
+    // жила в блоке «Zahlungsplan», а его убрали. В схемах с двумя платежами смысл несёт
+    // строка «… vor Versand» и текст под реквизитами, там повтор не нужен.
     const strong = amounts.length === 1
-      ? 'Zahlung vollständig im Voraus: 100 %'
+      ? 'Zahlung vollständig im Voraus: 100 % · Lieferung nach Zahlungseingang'
       : `Zahlung in ${amounts.length === 2 ? 'zwei' : 'mehreren'} Raten: ${first.percent} % Anzahlung, ${amounts.slice(1).map((a) => a.percent + ' %').join(' + ')} vor Versand`;
     const ob = orangeBlock(boxTop + boxH + 10.8, strong, [
       'Versand innerhalb Deutschlands · Neuware mit Herstellergarantie',
@@ -2939,12 +2953,14 @@ window.ExdedDocs = (() => {
       `${data.salutation || 'Sehr geehrte Damen und Herren'}, vielen Dank für Ihren Auftrag. Zur Abwicklung erhalten Sie diese Proforma-Rechnung. Alle Preise verstehen sich in Euro. Für Rückfragen stehen wir Ihnen gerne zur Verfügung.`,
     ], 8.6);
     ops.push(...cl.ops);
-    ops.push(...footerOps(cl.y + 20.9));
-    return { ops, totals: t, plan: amounts, name: `EXDED-Proforma-${data.no}.pdf`, title: `Proforma ${data.no}` };
+    const contentY = lowestY(ops);
+    const footTop = Math.max(FOOT_TOP, contentY + FOOT_GAP);
+    ops.push(...footerOps(footTop));
+    return { ops, contentY, footTop, totals: t, plan: amounts, name: `EXDED-Proforma-${data.no}.pdf`, title: `Proforma ${data.no}` };
   }
 
-  // Лист один. Если содержимое переросло страницу, приложение об этом скажет,
-  // а не выдаст молча обрезанный документ.
+  // Лист один. Если содержимое доросло до подвала, приложение об этом скажет,
+  // а не выдаст молча документ с наездом на реквизиты.
   const PAGE_H = 841.89;
   function lowestY(ops) {
     let low = 0;
@@ -2956,15 +2972,23 @@ window.ExdedDocs = (() => {
   }
 
   function build(kind, data) {
-    const doc = kind === 'proforma' ? proforma(data) : angebot(data);
-    doc.bytes = toPdf(doc.ops, doc.title);
+    badChars = new Set();
+    let doc;
+    try {
+      doc = kind === 'proforma' ? proforma(data) : angebot(data);
+      doc.bytes = toPdf(doc.ops, doc.title);
+      doc.unsupported = Array.from(badChars);
+    } finally {
+      badChars = null;
+    }
     doc.lowestY = lowestY(doc.ops);
-    doc.overflow = doc.lowestY > PAGE_H - 24;
+    doc.pinned = doc.footTop === FOOT_TOP;         // подвал на своём месте
+    doc.overflow = doc.footTop + FOOT_H > PAGE_H - 20;   // подвал уехал за край листа
     return doc;
   }
 
   return {
-    SELLER, VAT, PLANS, PAGE_H, build, angebot, proforma, toPdf, lowestY,
+    SELLER, VAT, PLANS, PAGE_H, FOOT_TOP, FOOT_H, build, angebot, proforma, toPdf, lowestY, unsupported,
     totals, netFromGross, moneyDE, dateDE, planParts, planAmounts, giroPayload, qrMatrix, textWidth, wrap,
   };
 })();
@@ -3138,6 +3162,7 @@ window.CrmSupabaseStore = (() => {
     check: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
     close: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
     wa: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1.3-4A8 8 0 1 1 8.2 19z"/><path d="M9 9.5c.3 2.3 2.2 4.2 4.5 4.6l1.2-1.2 1.8.8c-.2 1.3-1.2 2-2.5 1.9A6.3 6.3 0 0 1 8.2 10c-.1-1.3.6-2.3 1.9-2.5l.8 1.8z"/></svg>',
+    tg: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.4 3.6 11.1a.6.6 0 0 0 0 1.1l4.4 1.5 1.6 4.8a.6.6 0 0 0 1 .2l2.2-2.2 4 2.9a.6.6 0 0 0 .9-.3l3.5-13.9a.6.6 0 0 0-.4-.8z"/><path d="m8 13.7 11.4-8.6-7.6 8.7-.2 3.9"/></svg>',
     mail: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M4 7l8 6 8-6"/></svg>',
     link: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13.5a3.5 3.5 0 0 0 5 0l3-3a3.5 3.5 0 1 0-5-5l-1.2 1.2"/><path d="M14 10.5a3.5 3.5 0 0 0-5 0l-3 3a3.5 3.5 0 1 0 5 5l1.2-1.2"/></svg>',
     plus: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
@@ -3504,6 +3529,16 @@ window.CrmSupabaseStore = (() => {
     x.items = (Array.isArray(x.items) ? x.items : []).filter(Boolean).map(normalizeItem);
     x.doc_note = str(x.doc_note);
     x.docs = (Array.isArray(x.docs) ? x.docs : []).filter(Boolean).map(normalizeDocRec);
+    // Документы, выпущенные до 18.09.2026, хранят тему с кириллицей — в PDF она
+    // печаталась вопросительными знаками. Чиним только тему: номера, суммы, даты,
+    // позиции и реквизиты остаются как были.
+    if (window.ExdedDocs) {
+      x.docs = x.docs.map((doc, i) => {
+        if (!ExdedDocs.unsupported(doc.subject).length) return doc;
+        const ag = x.docs.slice(0, i).filter((y) => y.kind === 'angebot').slice(-1)[0];
+        return { ...doc, subject: doc.kind === 'proforma' && ag ? `zum Angebot ${ag.no}` : '' };
+      });
+    }
     if (x.next && (!x.next.at || x.next.done)) x.next = null;
     if (x.next) x.next = { at: x.next.at, kind: x.next.kind === 'meeting' ? 'meeting' : 'call' };
     if (!x.status_at) x.status_at = x.created_at;
@@ -3913,6 +3948,25 @@ window.CrmSupabaseStore = (() => {
 
   // Одна сделка = одна карточка. Когда у клиента на доске больше одной карточки,
   // подписываем номер сделки и её название: это не дубль компании, а разные сделки.
+  /* Кнопки связи на карточке доски. Показываем только отмеченные каналы:
+     проверить, есть ли у номера WhatsApp, приложение не может, поэтому
+     ничего не угадываем. Порядок всегда один: WhatsApp, Telegram, почта, телефон. */
+  function waysHTML(c) {
+    const m = mainContact(c);
+    if (!m) return '';
+    const ch = Array.isArray(m.channels) ? m.channels : [];
+    const wa = ch.includes('whatsapp') ? waDigits(m.phone) : '';
+    const tg = ch.includes('telegram') ? digits(m.phone) : '';
+    const mail = ch.includes('email') ? str(m.email).trim() : '';
+    const phone = str(m.phone).trim();
+    const out = [];
+    if (wa) out.push(`<a class="way way-wa" href="https://wa.me/${esc(wa)}" target="_blank" rel="noopener noreferrer" data-act="way" data-way="wa" aria-label="Написать в WhatsApp" title="WhatsApp">${ICON.wa}</a>`);
+    if (tg) out.push(`<a class="way way-tg" href="https://t.me/+${esc(tg)}" target="_blank" rel="noopener noreferrer" data-act="way" data-way="tg" aria-label="Написать в Telegram" title="Telegram">${ICON.tg}</a>`);
+    if (mail) out.push(`<button type="button" class="way way-mail" data-act="way" data-way="mail" data-value="${esc(mail)}" aria-label="Скопировать почту ${esc(mail)}" title="Скопировать почту">${ICON.mail}</button>`);
+    if (phone) out.push(`<button type="button" class="way way-call" data-act="way" data-way="phone" data-value="${esc(phone)}" aria-label="Телефон ${esc(phone)}" title="Позвонить или скопировать номер">${ICON.phone}</button>`);
+    return out.length ? `<div class="card-ways">${out.join('')}</div>` : '';
+  }
+
   function cardHTML({ c, d, multi, no, of }) {
     const main = mainContact(c);
     const due = d.next ? dueInfo(d.next) : null;
@@ -3934,7 +3988,7 @@ window.CrmSupabaseStore = (() => {
     ${recentReturn ? '<span class="badge-back">Вернулся из минуса</span>' : ''}
     ${d.invoice_no ? `<span class="num">Счёт ${esc(d.invoice_no)}</span>` : ''}
     ${main && main.name && main.name !== title ? `<span class="card-person">${esc(main.name)}</span>` : ''}
-    ${main && main.phone ? `<a class="call-link" href="tel:${esc(telHref(main.phone))}" data-act="call" aria-label="Позвонить">${ICON.phone}</a>` : ''}
+    ${waysHTML(c)}
   </div>
 </article>`;
   }
@@ -3948,6 +4002,7 @@ window.CrmSupabaseStore = (() => {
   }
 
   function renderBoard() {
+    closeAsk();
     const q = state.search.trim();
     const groups = { work: [], wait: [], client: [], lost: [] };
     for (const c of state.clients.values()) {
@@ -4007,6 +4062,69 @@ window.CrmSupabaseStore = (() => {
   }
 
   let justDragged = 0;
+  /* Нажатие на кнопку связи: ссылки уходят сами, почта и номер копируются,
+     у телефона спрашиваем прямо на карточке — звонить или скопировать. */
+  let askEl = null;
+  const closeAsk = () => { if (askEl) { askEl.remove(); askEl = null; } };
+
+  function flashWay(el) {
+    if (!el) return;
+    el.classList.remove('is-flash');
+    void el.offsetWidth;            // перезапуск анимации при быстрых нажатиях подряд
+    el.classList.add('is-flash');
+    setTimeout(() => el.classList.remove('is-flash'), 700);
+  }
+
+  async function copyText(text, okMsg) {
+    const value = str(text).trim();
+    if (!value) return false;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(value);
+        toast(okMsg);
+        return true;
+      }
+    } catch {}
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = value;
+      ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;top:-1000px;opacity:0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      ta.remove();
+      toast(ok ? okMsg : value, ok ? '' : 'err');
+      return ok;
+    } catch { toast(value, 'err'); return false; }
+  }
+
+  function askPhone(btn) {
+    const phone = btn.dataset.value;
+    const wasOpen = askEl && askEl.dataset.for === phone && btn.parentNode.contains(askEl);
+    closeAsk();
+    if (wasOpen) return;            // повторное нажатие закрывает
+    const box = document.createElement('div');
+    box.className = 'way-ask';
+    box.dataset.for = phone;
+    box.innerHTML = `<span class="way-ask-num">${esc(phone)}</span>
+<a class="way-ask-btn" href="tel:${esc(telHref(phone))}" data-act="way" data-way="call">Позвонить</a>
+<button type="button" class="way-ask-btn" data-act="way" data-way="copy" data-value="${esc(phone)}">Копировать</button>`;
+    btn.parentNode.appendChild(box);
+    askEl = box;
+  }
+
+  function onWay(btn, e) {
+    flashWay(btn);
+    const way = btn.dataset.way;
+    if (way === 'wa' || way === 'tg') return;                 // ссылка откроется сама
+    if (way === 'call') { setTimeout(closeAsk, 0); return; }  // tel: тоже ссылка, не мешаем
+    e.preventDefault();
+    if (way === 'mail') { copyText(btn.dataset.value, 'Почта скопирована'); closeAsk(); return; }
+    if (way === 'copy') { copyText(btn.dataset.value, 'Номер скопирован'); closeAsk(); return; }
+    if (way === 'phone') askPhone(btn);
+  }
+
   function bindBoard() {
     const board = $('#board');
     $$('.col-list').forEach((el) => { el.dataset.emptyDefault = el.dataset.empty; });
@@ -4017,7 +4135,7 @@ window.CrmSupabaseStore = (() => {
       const item = e.target.closest('[data-id]');
       if (!item) return;
       const id = item.dataset.id;
-      if (act && act.dataset.act === 'call') return;
+      if (act && act.dataset.act === 'way') { onWay(act, e); return; }
       if (act && act.dataset.act === 'vip') {
         const c = state.clients.get(id);
         if (c) patch(id, { vip: !c.vip }, { now: true });
@@ -4025,6 +4143,13 @@ window.CrmSupabaseStore = (() => {
       }
       openCard(id, item.dataset.deal);
     });
+    document.addEventListener('click', (e) => {
+      if (!askEl) return;
+      if (e.target.closest('.way-ask') || e.target.closest('[data-way="phone"]')) return;
+      closeAsk();
+    }, true);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAsk(); });
+
     board.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter' || !e.target.matches('[data-id]')) return;
       e.preventDefault();
@@ -4619,24 +4744,37 @@ ${badge}
       ustId: b.ust_id, customerNo: b.customer_no,
     });
   }
+  // Тема уходит клиенту и печатается шрифтом документа, а кириллицы в нём нет.
+  // Название сделки по-русски («Заявка с сайта, 18 сент») в документ не идёт вовсе —
+  // остаётся только немецкая часть. Латинское название печатается как было.
   function docSubject(kind, d) {
-    const title = dealTitle(d);
-    if (kind !== 'proforma') return `${title} – Angebot`;
+    const title = str(dealTitle(d)).trim();
+    const printable = Boolean(title) && window.ExdedDocs && ExdedDocs.unsupported(title).length === 0;
     const ag = d.docs.filter((x) => x.kind === 'angebot').slice(-1)[0];
-    return ag ? `${title} · zum Angebot ${ag.no}` : `${title} – Proforma-Rechnung`;
+    // Нечего печатать — подстрочника нет вовсе: заголовок документа и так «Angebot».
+    // У Proforma остаётся только ссылка на предложение, если оно было.
+    if (kind !== 'proforma') return printable ? `${title} – Angebot` : '';
+    if (printable) return ag ? `${title} · zum Angebot ${ag.no}` : `${title} – Proforma-Rechnung`;
+    return ag ? `zum Angebot ${ag.no}` : '';
   }
   const docItemsOf = (d) => d.items
     .filter((it) => str(it.name).trim() && Number.isFinite(itemPrice(it)))
     .map((it) => normalizeDocItem({ name: it.name, qty: it.qty, price: it.price, list_price: it.list_price, gross: it.gross }));
 
+  // Умеет ли это устройство отдавать PDF в системное меню. Спрашиваем про файл,
+  // а не про «есть ли share вообще»: на ноутбуке share обычно есть, а файл не берёт.
+  function canShareFile(file) {
+    try {
+      return Boolean(navigator.share && navigator.canShare && navigator.canShare({ files: [file] }));
+    } catch { return false; }
+  }
   let shareOk = null;
   function shareSupported() {
     if (shareOk !== null) return shareOk;
     shareOk = false;
     try {
-      if (navigator.share && navigator.canShare && typeof File === 'function') {
-        const probe = new File([new Blob(['x'], { type: 'application/pdf' })], 'x.pdf', { type: 'application/pdf' });
-        shareOk = navigator.canShare({ files: [probe] });
+      if (typeof File === 'function') {
+        shareOk = canShareFile(new File([new Blob(['x'], { type: 'application/pdf' })], 'x.pdf', { type: 'application/pdf' }));
       }
     } catch { shareOk = false; }
     return shareOk;
@@ -4648,24 +4786,63 @@ ${badge}
     return { doc, blob: new Blob([doc.bytes], { type: 'application/pdf' }) };
   }
   const OVERFLOW_MSG = 'Документ не помещается на один лист: уберите позиции или сократите примечание';
+
+  function saveDoc(made) {
+    const url = URL.createObjectURL(made.blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = made.doc.name;      // имя говорящее: EXDED-Angebot-AG0011.pdf
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  }
+
+  // Одно нажатие — один файл. Кнопка в тосте и кнопка в строке документа стоят
+  // друг над другом: на телефоне после нажатия по тосту «сквозной» клик попадал
+  // в кнопку под ним, и один и тот же документ уходил дважды.
+  let lastShare = { id: '', at: 0 };
   async function shareDoc(rec) {
+    const now = Date.now();
+    if (lastShare.id === rec.id && now - lastShare.at < 2000) return;
+    lastShare = { id: rec.id, at: now };
+
     let made;
     try { made = buildDoc(rec); } catch (e) { toast(e.message || 'Документ не собрался', 'err'); return; }
     if (made.doc.overflow) toast(OVERFLOW_MSG, 'err');
-    if (shareSupported()) {
-      try {
-        await navigator.share({ files: [new File([made.blob], made.doc.name, { type: 'application/pdf' })], title: made.doc.title });
-        return;
-      } catch (e) {
-        if (e && (e.name === 'AbortError' || e.name === 'NotAllowedError')) return;
-      }
+    if (made.doc.unsupported && made.doc.unsupported.length) {
+      toast(`Осторожно: в этом документе знаки ${made.doc.unsupported.join(' ')} печатаются как «?». Он выпущен до правки шрифта.`, 'err');
     }
-    const url = URL.createObjectURL(made.blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = made.doc.name;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 10000);
-    toast('Документ скачан');
+    const file = new File([made.blob], made.doc.name, { type: 'application/pdf' });
+
+    // Не умеет отдать файл — не зовём меню вовсе, сразу сохраняем
+    if (!canShareFile(file)) { saveDoc(made); toast('Документ скачан'); return; }
+
+    try {
+      // ⚠️ Только files. С title или text мессенджеры (проверено на Telegram)
+      // берут текст, а вложение выбрасывают — приходило «Angebot AG0011» без файла.
+      await navigator.share({ files: [file] });
+    } catch (e) {
+      if (e && e.name === 'AbortError') { lastShare = { id: '', at: 0 }; return; }   // сам закрыл меню — не ошибка, можно сразу снова
+      saveDoc(made);
+      toast('Меню отправки не сработало, документ скачан', 'err');
+    } finally {
+      lastShare.at = Date.now();                   // отсчёт двух секунд — от конца отправки
+    }
+  }
+
+  // Пробная сборка с ненастоящим номером: узнаём про непечатаемые знаки и переполнение,
+  // ничего при этом не создавая
+  function docProbe(kind, c, d, items, plan, planCustom) {
+    const rec = normalizeDocRec({
+      kind, no: kind === 'proforma' ? 'PF0000' : 'AG0000',
+      date: nowIso(), until: nowIso(),
+      plan: kind === 'proforma' ? plan || '100' : '100',
+      plan_custom: kind === 'proforma' && plan === 'custom' ? planCustom : null,
+      subject: docSubject(kind, d), note: str(d.doc_note).trim(),
+      client: docClientOf(c), items,
+    });
+    try {
+      const doc = ExdedDocs.build(kind, docPayload(rec));
+      return { unsupported: doc.unsupported || [], overflow: Boolean(doc.overflow) };
+    } catch { return { unsupported: [], overflow: false }; }
   }
 
   async function createDoc(kind, plan, planCustom) {
@@ -4677,6 +4854,14 @@ ${badge}
     if (!items.length) { toast('В сделке нет позиций с ценой', 'err'); return; }
     if (!window.ExdedDocs) { toast('Модуль документов не загрузился, обновите страницу', 'err'); return; }
     if (!store || typeof store.nextDocNo !== 'function') { toast('Номера документов выдаёт база — эта версия CRM их не умеет', 'err'); return; }
+
+    // Проверяем ДО того, как взять номер: с непечатаемыми знаками документ не собираем,
+    // иначе клиенту уедет строка из вопросительных знаков, а номер сгорит зря.
+    const probe = docProbe(kind, c, d, items, plan, planCustom);
+    if (probe.unsupported.length) {
+      toast(`В документе есть знаки, которых нет в шрифте: ${probe.unsupported.join(' ')}. Уберите их из названий позиций, реквизитов и примечания.`, 'err');
+      return;
+    }
 
     docBusy = true;
     const btns = $$('[data-act^="doc-make"]', $('#card-body'));
