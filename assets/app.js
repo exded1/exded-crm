@@ -3224,6 +3224,7 @@ window.CrmSupabaseStore = (() => {
     phone: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h3.5l1.8 4.4-2.2 1.5a11 11 0 0 0 6 6l1.5-2.2L20 15.5V19a1.5 1.5 0 0 1-1.6 1.5A16.5 16.5 0 0 1 3.5 5.6 1.5 1.5 0 0 1 5 4z"/></svg>',
     meet: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19.5c.6-3 2.8-4.8 5.5-4.8s4.9 1.8 5.5 4.8M16 5.2a3 3 0 0 1 0 5.7M17.6 14.9c1.6.6 2.6 2.2 2.9 4.6"/></svg>',
     cal: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
+    unlist: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5h11M4 12h8M4 17.5h6"/><circle cx="17.5" cy="16.5" r="4"/><path d="M15.7 16.5h3.6"/></svg>',
     trash: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>',
     check: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
     close: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
@@ -4111,6 +4112,14 @@ window.CrmSupabaseStore = (() => {
     return out.length ? `<div class="card-ways">${out.join('')}</div>` : '';
   }
 
+  // Сумма на карточке: вписанная руками главнее, пусто — показываем итог позиций
+  const itemsSum = (d) => Math.round(itemsTotal(d) * 100) / 100;
+  function cardSum(d) {
+    if (Number.isFinite(d.amount)) return fmtMoney(d.amount);
+    const s = itemsSum(d);
+    return s ? fmtMoney(s) : '';
+  }
+
   // Когда завели клиента: коротко и приглушённо, это справка, а не заголовок
   function bornShort(iso) {
     if (!iso) return '';
@@ -4136,7 +4145,7 @@ window.CrmSupabaseStore = (() => {
   <div class="card-top">
     <button type="button" class="vip${c.vip ? ' on' : ''}" data-act="vip" aria-pressed="${c.vip}" aria-label="VIP клиент">${ICON.star}</button>
     <h3 class="card-co">${esc(title)}</h3>
-    ${Number.isFinite(d.amount) ? `<span class="card-sum">${esc(fmtMoney(d.amount))}</span>` : ''}
+    ${cardSum(d) ? `<span class="card-sum">${esc(cardSum(d))}</span>` : ''}
   </div>
   ${multi ? `<p class="card-deal"><i class="card-dealmark" aria-hidden="true"></i>Сделка ${no} из ${of} · ${esc(dealTitle(d))}</p>` : ''}
   ${line ? `<p class="card-product">${esc(line)}</p>` : (multi ? '' : `<p class="card-product">${esc(dealTitle(d))}</p>`)}
@@ -4776,6 +4785,22 @@ window.CrmSupabaseStore = (() => {
     if (out) out.innerHTML = catRowsHTML(q ? q.value : '');
   }
 
+  // Пусто — человек ещё набирает, ругаться рано. Ноль, минус и мусор — не принимаем.
+  function qtyBad(raw) {
+    const t = String(raw == null ? '' : raw).trim();
+    if (!t) return false;
+    const n = Number(t.replace(',', '.'));
+    return !Number.isFinite(n) || n < 1;
+  }
+  function markQty(input, bad) {
+    input.classList.toggle('is-bad', bad);
+    const meta = input.closest('[data-item]').querySelector('.item-meta');
+    if (!meta) return;
+    let warn = meta.querySelector('.item-warn');
+    if (bad && !warn) { warn = document.createElement('span'); warn.className = 'item-warn'; warn.textContent = 'не меньше 1'; meta.prepend(warn); }
+    if (!bad && warn) warn.remove();
+  }
+
   // Подпись под строкой позиции: каталожная цена как справка, скидка и пометка брутто/нетто
   function itemMetaHTML(it) {
     const list = Number.isFinite(it.list_price) ? it.list_price : null;
@@ -4806,6 +4831,13 @@ ${badge}
     return `<button type="button" class="deal-del${docs.length ? ' has-docs' : ''}" data-act="deal-del" data-deal="${esc(d.id)}" aria-label="${esc(why)}" title="${esc(why)}">${ICON.close}</button>`;
   }
 
+  // Кнопка показывается, только когда есть что подставить и это не то же самое
+  function amountFromItemsHTML(d) {
+    const s = itemsSum(d);
+    if (!s || s === d.amount) return '';
+    return `<button type="button" class="from-items" data-act="amount-from-items" title="Поставить в поле итог позиций: ${esc(fmtMoney(s))}">из позиций</button>`;
+  }
+
   function dealsHTML(c, cur) {
     const tabs = c.deals.map((d) => {
       const on = cur && d.id === cur.id;
@@ -4833,7 +4865,7 @@ ${badge}
   <label class="f"><span>Что хочет купить</span><textarea data-dbind="product" rows="2">${esc(cur.product)}</textarea></label>
   <div class="cs-grid">
     <label class="f"><span>Счёт №</span><input data-dbind="invoice_no" value="${esc(cur.invoice_no)}"></label>
-    <label class="f money"><span>Сумма, €</span><input data-dbind="amount" inputmode="decimal" value="${esc(amountInput(cur.amount))}"></label>
+    <label class="f money"><span class="f-amount">Сумма, €${amountFromItemsHTML(cur)}</span><input data-dbind="amount" inputmode="decimal" value="${esc(amountInput(cur.amount))}"></label>
   </div>
   <div class="items">
     <div class="items-head"><span>Позиции</span><span class="items-cols">кол-во · ваша цена</span></div>
@@ -5172,7 +5204,7 @@ ${badge}
   <time>${esc(r.date ? fmtLongDate(r.date) : '')}</time>
   <span class="doc-sum">${esc(docMoney(r.total))}</span>
   <button type="button" class="btn small" data-act="doc-share">${shareSupported() ? 'Отправить' : 'Скачать'}</button>
-  <button type="button" class="icon-btn" data-act="doc-del" aria-label="Удалить документ из списка">${ICON.trash}</button>
+  <button type="button" class="icon-btn" data-act="doc-del" aria-label="Убрать ${esc(r.no)} из списка" title="Убрать из списка — сам документ и номер останутся">${ICON.unlist}</button>
 </li>`;
     }).join('');
     const totalsLine = t
@@ -5422,6 +5454,10 @@ ${badge}
         const it = items.find((x) => x.id === itemId);
         if (it) {
           const k = el.dataset.ibind;
+          // ⚠️ количество меньше 1 не принимаем и не подменяем молча: подсвечиваем поле,
+          // в расчёт идёт последнее верное значение
+          if (k === 'qty' && qtyBad(el.value)) { markQty(el, true); return; }
+          if (k === 'qty') markQty(el, false);
           it[k] = k === 'price' ? parseAmount(el.value) : k === 'qty' ? parseQty(el.value) : el.value;
           patchDeal(c.id, d.id, { items });
           cardRenderedJSON = JSON.stringify(state.clients.get(c.id));
@@ -5512,6 +5548,14 @@ ${badge}
         toast(`Добавлено: ${found.name}`);
         return;
       }
+      if (act === 'amount-from-items' && d) {
+        const s = itemsSum(d);
+        if (!s) return;
+        patchDeal(c.id, d.id, { amount: s }, { now: true });
+        renderCard();
+        toast(`Сумма сделки: ${fmtMoney(s)}`);
+        return;
+      }
       if (act === 'item-add' && d) {
         patchDeal(c.id, d.id, { items: [...clone(d.items), normalizeItem({ gross: true })] }, { now: true });
         renderCard();
@@ -5533,10 +5577,7 @@ ${badge}
         const rec = d.docs.find((x) => x.id === (li && li.dataset.doc));
         if (!rec) return;
         if (act === 'doc-share') { shareDoc(rec); return; }
-        if (btn.dataset.confirm !== '1') { btn.dataset.confirm = '1'; btn.style.color = 'var(--red)'; btn.setAttribute('aria-label', 'Нажмите ещё раз, чтобы убрать из списка'); return; }
-        patchDeal(c.id, d.id, { docs: clone(d.docs).filter((x) => x.id !== rec.id) }, { now: true });
-        renderCard();
-        toast(`${rec.no} убран из списка. Номер остаётся занятым.`);
+        openDocHide(c.id, d.id, rec.id, rec.no);
         return;
       }
 
@@ -5793,6 +5834,35 @@ ${badge}
     let lines = [];
     try { lines = changeLines(prev ? JSON.parse(prev) : null, snap); } catch (e) { console.warn('история', e); return; }
     pushLog(snap, lines);
+  }
+
+  /* Убрать документ из списка. ⚠️ Последствие неочевидное: номер остаётся занятым,
+     а сделка перестаёт считаться сделкой с документами — ПИН при удалении больше
+     не спросят. Поэтому спрашиваем честно и полным текстом. */
+  let docHideCtx = null;
+  function openDocHide(clientId, dealId, docId, no) {
+    docHideCtx = { clientId, dealId, docId, no };
+    $('#doc-hide-text').textContent = `Убрать ${no} из списка? Сам документ и его номер останутся занятыми, но сделка перестанет считаться сделкой с документами, и ПИН при удалении спрашиваться не будет.`;
+    $('#dlg-doc-hide').showModal();
+    fitSheets();
+  }
+  function bindDocHide() {
+    const dlg = $('#dlg-doc-hide');
+    if (!dlg) return;
+    dlg.addEventListener('click', (e) => { if (e.target === dlg || e.target.closest('[data-close]')) dlg.close(); });
+    dlg.addEventListener('close', () => { docHideCtx = null; });
+    $('#doc-hide-go').addEventListener('click', () => {
+      if (!docHideCtx) return;
+      const { clientId, dealId, docId, no } = docHideCtx;
+      docHideCtx = null;
+      dlg.close();
+      const c = state.clients.get(clientId);
+      const d = dealOf(c, dealId);
+      if (!c || !d) return;
+      patchDeal(clientId, dealId, { docs: clone(d.docs).filter((x) => x.id !== docId) }, { now: true });
+      if (state.openId === clientId) renderCard();
+      toast(`${no} убран из списка. Номер остаётся занятым.`);
+    });
   }
 
   /* Удаление сделки: только по подтверждению, одним нажатием не удаляется */
@@ -6341,6 +6411,7 @@ ${badge}
       bindCard();
       bindLost();
       bindDealDel();
+      bindDocHide();
       bindDealPwd();
       bindPlan();
       bindLogView();
