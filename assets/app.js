@@ -539,7 +539,7 @@ window.CrmSupabaseStore = (() => {
     const legacy = !Array.isArray(src.deals);
     const c = {
       company: '', vip: false, contacts: [], log: [], about: '',
-      links: null, billing: null, deals: [],
+      links: null, billing: null, deals: [], orders: [],
       created_at: null, updated_at: null, last_contact_at: null,
       ...src,
     };
@@ -550,6 +550,16 @@ window.CrmSupabaseStore = (() => {
     if (!Array.isArray(c.log)) c.log = [];
     c.contacts = c.contacts.filter(Boolean).map((ct) => ({ id: ct.id || uid(), name: '', role: '', phone: '', email: '', dm: false, main: false, channels: [], ...ct, channels: Array.isArray(ct.channels) ? ct.channels : [] }));
     c.log = c.log.filter((e) => e && e.text !== undefined).map((e) => ({ id: e.id || uid(), at: e.at || c.created_at || nowIso(), text: String(e.text) }));
+    // Заказы магазина: только строка для глаз, хозяин заказов — WooCommerce
+    if (!Array.isArray(c.orders)) c.orders = [];
+    c.orders = c.orders.filter((o) => o && (o.id !== undefined || o.number)).map((o) => ({
+      id: str(o.id || o.number),
+      number: str(o.number || o.id),
+      total: typeof o.total === 'number' && Number.isFinite(o.total) ? o.total : parseAmount(o.total),
+      at: o.at || null,
+      url: str(o.url),
+      status: str(o.status),
+    })).sort((a, b) => Date.parse(b.at || 0) - Date.parse(a.at || 0));
 
     const links = c.links && typeof c.links === 'object' ? c.links : {};
     c.links = {};
@@ -872,7 +882,8 @@ window.CrmSupabaseStore = (() => {
   function matches(c, q) {
     const qd = digits(q);
     if (qd.length >= 3 && c.contacts.some((x) => digits(x.phone).includes(qd))) return true;
-    const hay = [c.company, c.about, c.billing.company_legal, c.billing.customer_no, c.billing.ust_id, c.billing.city,
+    const hay = [c.company, c.about, c.billing.company_legal, c.billing.customer_no, c.billing.ust_id, c.billing.tax_no, c.billing.city,
+      ...c.orders.map((o) => o.number),
       ...c.deals.flatMap((d) => [d.title, d.product, d.invoice_no, d.agreed, d.lost_reason, ...d.items.map((it) => it.name)]),
       ...c.contacts.flatMap((x) => [x.name, x.role, x.email, x.phone]),
       ...c.log.map((e) => e.text)].join(' ').toLowerCase();
@@ -1515,6 +1526,21 @@ window.CrmSupabaseStore = (() => {
 </section>`;
   }
 
+  function ordersHTML(c) {
+    if (!c.orders.length) return '';
+    const sum = c.orders.reduce((acc, o) => acc + (Number.isFinite(o.total) ? o.total : 0), 0);
+    return `<section class="cs-sec">
+  <div class="cs-sec-head"><h3>Заказы с сайта</h3>${sum ? `<span class="cs-count">${esc(fmtMoney(Math.round(sum)))}</span>` : ''}</div>
+  <ul class="orders">${c.orders.map((o) => `<li>
+    <b>№ ${esc(o.number)}</b>
+    <time>${esc(o.at ? fmtDateTime(o.at) : '')}</time>
+    <span class="order-sum">${esc(Number.isFinite(o.total) ? fmtMoney(o.total) : '')}</span>
+    ${o.url ? `<a class="order-link" href="${esc(o.url)}" target="_blank" rel="noopener noreferrer">Открыть в магазине</a>` : ''}
+  </li>`).join('')}</ul>
+  <p class="hint">Заказы ведёт сам магазин: статусы, оплата и отправка — там. Здесь только отметка, что заказ был.</p>
+</section>`;
+  }
+
   function lostHTML(c, d) {
     const back = d.lost_at ? fmtLongDate(addMonths(d.lost_at, RETURN_MONTHS).toISOString()) : '';
     return `<section class="cs-sec cs-lost">
@@ -1560,6 +1586,7 @@ window.CrmSupabaseStore = (() => {
   <section class="cs-sec" data-part="billing">${billingHTML(c)}</section>
   <section class="cs-sec" data-part="log">${logHTML(c)}</section>
   ${buysHTML(c)}
+  ${ordersHTML(c)}
 </div>
 <div class="cs-foot">
   <span>Создан ${esc(fmtLongDate(c.created_at))}</span>
