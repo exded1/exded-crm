@@ -3,6 +3,6 @@
 // Publishable key: Project Settings -> API Keys.
 // Это не пароль: без входа по email и паролю по ним ничего не открыть.
 window.EXDED_CRM_CONFIG = {
-  supabaseUrl: '',
-  supabaseKey: '',
+  supabaseUrl: 'https://stuomxznmummudoryiob.supabase.co',
+  supabaseKey: 'sb_publishable_2wv2uQO217rySojniUC-Og_mf_CdpoA',
 };
