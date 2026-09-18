@@ -161,6 +161,18 @@
     </form>
   </dialog>
 
+  <!-- Удаление сделки -->
+  <dialog id="dlg-deal-del" class="modal" aria-labelledby="deal-del-title">
+    <div class="modal-box">
+      <h2 id="deal-del-title">Удалить сделку?</h2>
+      <p class="sub" id="deal-del-text"></p>
+      <footer class="modal-foot">
+        <button type="button" class="btn ghost" data-close>Отмена</button>
+        <button type="button" class="btn danger" id="deal-del-go">Удалить</button>
+      </footer>
+    </div>
+  </dialog>
+
   <!-- Proforma: схема оплаты -->
   <dialog id="dlg-plan" class="modal" aria-labelledby="plan-title">
     <form id="form-plan" class="modal-box" autocomplete="off">

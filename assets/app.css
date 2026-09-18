@@ -613,6 +613,21 @@ input:not([type=file]), select, textarea {
 .deal-tab.s-client .deal-dot { background: var(--green); }
 .deal-tab.s-lost .deal-dot { background: var(--red); }
 .deal-add { color: var(--orange-ink); border-style: dashed; }
+/* крестик живёт внутри таблетки открытой сделки: кнопка в кнопку не вкладывается,
+   поэтому обёртка и абсолютное положение */
+.deal-box { position: relative; display: inline-flex; max-width: 100%; }
+.deal-box.has-del .deal-tab { padding-right: 32px; }
+.deal-del {
+  position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+  display: grid; place-items: center; width: 24px; height: 24px; padding: 0;
+  border: 0; border-radius: 50%; background: transparent; color: var(--ink-3);
+}
+.deal-del svg { width: 13px; height: 13px; }
+.deal-del.is-off { opacity: .4; cursor: default; }
+@media (hover: hover) {
+  .deal-del:hover { background: var(--red-soft); color: var(--red-ink); }
+  .deal-del.is-off:hover { background: transparent; color: var(--ink-3); }
+}
 .deal-add svg { width: 16px; height: 16px; }
 .deal-body { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
 .deal-dates { margin: 0; }
@@ -865,6 +880,8 @@ input:not([type=file]), select, textarea {
   .way-ask-btn { min-height: 44px; }
   .card .vip, .cs-head .vip, .contact .main-star { width: 44px; height: 44px; }
   .chips button, .seg button, .pill, .deal-tab { min-height: 44px; }
+  .deal-del { width: 34px; height: 34px; right: 3px; }
+  .deal-box.has-del .deal-tab { padding-right: 40px; }
   .btn, .next-actions .btn, .match .btn { min-height: 44px; }
   .docs .btn.small { min-height: 44px; }
   .docs .icon-btn { width: 44px; height: 44px; }
