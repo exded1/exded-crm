@@ -320,14 +320,23 @@ window.CrmSupabaseStore = (() => {
       if (foot) dlg.style.setProperty('--foot-h', Math.ceil(foot.getBoundingClientRect().height) + 'px');
     }
   }
+  // Клавиатура выходит уже ПОСЛЕ того, как раскрылся список или встало поле:
+  // лист ужимается, и то, с чем человек работает, оказывается под клавиатурой. Возвращаем в вид.
+  function keepFocusVisible() {
+    const el = document.activeElement;
+    if (!el || !el.matches || !el.matches('input, textarea, select')) return;
+    const box = el.closest('.cat-pick') || el.closest('.f') || el;
+    if (box.scrollIntoView) box.scrollIntoView({ block: 'nearest' });
+  }
   let fitTimer = null;
   const fitSoon = () => { clearTimeout(fitTimer); fitTimer = setTimeout(fitSheets, 60); };
+  const onViewportResize = () => { fitSheets(); keepFocusVisible(); };
   function bindViewport() {
     fitSheets();
-    window.addEventListener('resize', fitSoon);
+    window.addEventListener('resize', onViewportResize);
     window.addEventListener('orientationchange', fitSoon);
     if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', fitSheets);
+      window.visualViewport.addEventListener('resize', onViewportResize);
       window.visualViewport.addEventListener('scroll', fitSheets);
     }
     // клавиатура открывается после фокуса, размеры приходят с задержкой
@@ -358,6 +367,7 @@ window.CrmSupabaseStore = (() => {
      Если каталог не ответил, товар вписывается руками — это запасной путь, не ошибка.
      =================================================================== */
   const catalog = { items: [], at: null, status: 'idle', error: '' };
+  const catPick = { open: false };      // раскрыт ли список товаров в карточке
 
   function catalogUrl() {
     const cfg = window.EXDED_CRM_CONFIG || {};
@@ -444,14 +454,15 @@ window.CrmSupabaseStore = (() => {
     refreshCatalogUI();
   }
 
+  // Пустой запрос — весь каталог: владелец хочет листать модели глазами, как на сайте.
   function catalogFind(q) {
     const words = String(q || '').toLowerCase().split(/\s+/).filter(Boolean);
-    if (!words.length) return [];
+    if (!words.length) return catalog.items.slice();
     const hit = catalog.items.filter((it) => {
       const hay = (it.name + ' ' + it.sku).toLowerCase();
       return words.every((w) => hay.includes(w));
     });
-    return hit.sort((a, b) => a.name.length - b.name.length).slice(0, 8);
+    return hit.sort((a, b) => a.name.length - b.name.length);
   }
 
   /* ===================================================================
@@ -894,19 +905,22 @@ window.CrmSupabaseStore = (() => {
     return { cls: '', label: `${shortDate(d)} ${t}` };
   }
 
-  function cardHTML({ c, d, many }) {
+  // Одна сделка = одна карточка. Когда у клиента на доске больше одной карточки,
+  // подписываем номер сделки и её название: это не дубль компании, а разные сделки.
+  function cardHTML({ c, d, multi, no, of }) {
     const main = mainContact(c);
     const due = d.next ? dueInfo(d.next) : null;
     const title = clientName(c);
     const recentReturn = d.returned_at && d.status === 'work' && Date.now() - Date.parse(d.returned_at) < 14 * 86400000;
-    const line = many ? dealTitle(d) : str(d.product).trim() || dealTitle(d);
-    return `<article class="card${c.vip ? ' is-vip' : ''}" data-id="${esc(c.id)}" data-deal="${esc(d.id)}" tabindex="0">
+    const line = str(d.product).trim();
+    return `<article class="card${c.vip ? ' is-vip' : ''}${multi ? ' is-multi' : ''}" data-id="${esc(c.id)}" data-deal="${esc(d.id)}" tabindex="0">
   <div class="card-top">
     <button type="button" class="vip${c.vip ? ' on' : ''}" data-act="vip" aria-pressed="${c.vip}" aria-label="VIP клиент">${ICON.star}</button>
     <h3 class="card-co">${esc(title)}</h3>
     ${Number.isFinite(d.amount) ? `<span class="card-sum">${esc(fmtMoney(d.amount))}</span>` : ''}
   </div>
-  ${line ? `<p class="card-product">${many ? '<i class="card-dealmark" aria-hidden="true"></i>' : ''}${esc(line)}</p>` : ''}
+  ${multi ? `<p class="card-deal"><i class="card-dealmark" aria-hidden="true"></i>Сделка ${no} из ${of} · ${esc(dealTitle(d))}</p>` : ''}
+  ${line ? `<p class="card-product">${esc(line)}</p>` : (multi ? '' : `<p class="card-product">${esc(dealTitle(d))}</p>`)}
   ${d.agreed ? `<p class="card-agreed">${esc(d.agreed)}</p>` : ''}
   <div class="card-foot">
     ${due ? `<span class="due ${due.cls}">${d.next.kind === 'meeting' ? ICON.meet : ICON.phone}${esc(due.label)}</span>` : ''}
@@ -919,11 +933,11 @@ window.CrmSupabaseStore = (() => {
 </article>`;
   }
 
-  function lostRowHTML({ c, d, many }) {
-    return `<article class="lost-row" data-id="${esc(c.id)}" data-deal="${esc(d.id)}" tabindex="0">
+  function lostRowHTML({ c, d, multi }) {
+    return `<article class="lost-row${multi ? ' is-multi' : ''}" data-id="${esc(c.id)}" data-deal="${esc(d.id)}" tabindex="0">
   <b>${esc(clientName(c))}</b>
   <time>${d.lost_at ? esc(shortDate(new Date(d.lost_at))) : ''}</time>
-  <span>${esc(d.lost_reason || 'Причина не указана')}${many ? ` · ${esc(dealTitle(d))}` : ''}</span>
+  <span>${esc(d.lost_reason || 'Причина не указана')}${multi ? ` · ${esc(dealTitle(d))}` : ''}</span>
 </article>`;
   }
 
@@ -933,8 +947,8 @@ window.CrmSupabaseStore = (() => {
     for (const c of state.clients.values()) {
       if (q && !matches(c, q)) continue;
       const rows = boardDeals(c);
-      const many = rows.length > 1 || c.deals.length > 1;
-      for (const d of rows) groups[d.status].push({ c, d, many });
+      const multi = rows.length > 1;
+      for (const d of rows) groups[d.status].push({ c, d, multi, no: c.deals.indexOf(d) + 1, of: c.deals.length });
     }
     for (const s of STATUS_KEYS) {
       groups[s].sort(sortFor(s));
@@ -1351,14 +1365,32 @@ window.CrmSupabaseStore = (() => {
     if (!catalog.items.length) {
       return `<p class="hint cat-off">Каталог сайта не отвечает${catalog.error ? ` (${esc(catalog.error)})` : ''}. Впишите товар руками кнопкой ниже.</p>`;
     }
-    const q2 = String(q || '').trim();
-    if (!q2) return `<p class="hint">В каталоге ${catalog.items.length} ${plural(catalog.items.length, 'товар', 'товара', 'товаров')}${catalog.at ? ` · обновлён ${esc(fmtDateTime(catalog.at))}` : ''}</p>`;
-    const rows = catalogFind(q2);
+    const count = `В каталоге ${catalog.items.length} ${plural(catalog.items.length, 'товар', 'товара', 'товаров')}`;
+    if (!catPick.open) return `<p class="hint">${esc(count)}${catalog.at ? ` · обновлён ${esc(fmtDateTime(catalog.at))}` : ''} · нажмите на поле, чтобы посмотреть</p>`;
+    const rows = catalogFind(q);
     if (!rows.length) return '<p class="hint">Ничего не нашлось. Впишите товар руками кнопкой ниже.</p>';
-    return `<div class="cat-list">${rows.map((it) => `<button type="button" class="cat-row" data-act="cat-add" data-pid="${it.id}">
+    const total = String(q || '').trim() ? `Нашлось ${rows.length} из ${catalog.items.length}` : count;
+    return `<div class="cat-head">${esc(total)}</div>
+<div class="cat-list" role="listbox">${rows.map((it) => `<button type="button" class="cat-row" data-act="cat-add" data-pid="${it.id}" role="option">
   <span class="cat-name">${esc(it.name)}</span>
   <span class="cat-price">${it.price === null ? '' : (it.from ? 'от ' : '') + esc(fmtMoney(it.price))}</span>
 </button>`).join('')}</div>`;
+  }
+
+  function openCatList(scroll) {
+    if (catPick.open || !catalog.items.length) return;
+    catPick.open = true;
+    refreshCatalogUI();
+    if (scroll) {
+      const box = $('.cat-pick');
+      if (box) box.scrollIntoView({ block: 'nearest' });
+    }
+  }
+  function closeCatList() {
+    if (!catPick.open) return false;
+    catPick.open = false;
+    refreshCatalogUI();
+    return true;
   }
 
   function catalogPickerHTML() {
@@ -1497,6 +1529,7 @@ window.CrmSupabaseStore = (() => {
     const c = state.clients.get(state.openId);
     const body = $('#card-body');
     if (!c) { $('#dlg-card').close(); return; }
+    catPick.open = false;
     const d = currentDeal(c);
     state.openDeal = d ? d.id : null;
     const scroller = $('.cs-scroll', body);
@@ -1573,6 +1606,15 @@ window.CrmSupabaseStore = (() => {
     const dlg = $('#dlg-card');
     const body = $('#card-body');
 
+    // список товаров: раскрывается по нажатию на поле, закрывается по Esc и по клику мимо
+    body.addEventListener('focusin', (e) => {
+      if (e.target.dataset && e.target.dataset.catQ !== undefined) setTimeout(() => openCatList(true), 0);
+    });
+    body.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('[data-cat-q]')) openCatList(true);
+      else if (!e.target.closest('.cat-pick')) closeCatList();
+    });
+
     dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
     dlg.addEventListener('close', () => {
       const id = state.openId;
@@ -1594,7 +1636,7 @@ window.CrmSupabaseStore = (() => {
       if (!c) return;
       const el = e.target;
       const d = currentDeal(c);
-      if (el.dataset.catQ !== undefined) { refreshCatalogUI(); return; }
+      if (el.dataset.catQ !== undefined) { catPick.open = true; refreshCatalogUI(); return; }
       if (el.dataset.catQty !== undefined) return;
       if (el.dataset.bind) {
         const key = el.dataset.bind;
@@ -1648,6 +1690,7 @@ window.CrmSupabaseStore = (() => {
     });
 
     body.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && catPick.open) { e.preventDefault(); e.stopPropagation(); closeCatList(); return; }
       if (e.target.matches('[data-talk]') && e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         $('[data-act="log-add"]', body).click();
@@ -2042,7 +2085,7 @@ window.CrmSupabaseStore = (() => {
   }
 
   // для проверок: чистые функции схемы, без данных
-  window.EXDED_CRM_TEST = { normalize, legacyToClients, boardDeals, activeDeal, dealTitle, normalizeDeal, loadCatalog, catalog, catalogFind, catalogBlocked };
+  window.EXDED_CRM_TEST = { normalize, legacyToClients, boardDeals, activeDeal, dealTitle, normalizeDeal, loadCatalog, catalog, catalogFind, catalogBlocked, keepFocusVisible, fitSheets };
 
   function init() { registerSW(); boot(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

@@ -533,7 +533,10 @@ dialog::backdrop { background: rgba(20, 20, 19, .42); }
 .cat-fields { display: grid; grid-template-columns: minmax(0, 1fr) 68px; gap: 6px; }
 .cat-fields input { min-height: 38px !important; padding: 7px 10px !important; }
 .cat-fields input[data-cat-qty] { text-align: right; font-variant-numeric: tabular-nums; }
-.cat-list { display: flex; flex-direction: column; gap: 2px; max-height: 232px; overflow-y: auto; }
+/* список раскрывается на ~10 строк, дальше прокрутка внутри него;
+   при открытой клавиатуре --vvh меньше, и список ужимается вместе с видимой частью экрана */
+.cat-head { font-size: 12px; color: var(--ink-3); padding: 2px 8px; }
+.cat-list { display: flex; flex-direction: column; gap: 2px; max-height: min(380px, calc(var(--vvh, 100vh) * .45)); overflow-y: auto; overscroll-behavior: contain; }
 .cat-row { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 38px; padding: 6px 8px; border: 0; border-radius: 8px; background: transparent; text-align: left; }
 .cat-row:hover, .cat-row:focus-visible { background: var(--surface-2); }
 .cat-name { flex: 1; min-width: 0; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -561,7 +564,12 @@ dialog::backdrop { background: rgba(20, 20, 19, .42); }
 .buys time { grid-column: 1 / -1; font-size: 12.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
 .buys p { grid-column: 1; font-size: 14.5px; overflow-wrap: anywhere; }
 .buys b { grid-column: 2; grid-row: 2; font-variant-numeric: tabular-nums; }
+/* у клиента на доске больше одной карточки: подписываем номер сделки,
+   слева тонкая полоса — глазу видно, что это не дубль компании, а её вторая сделка */
 .card-dealmark { display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: var(--line-2); vertical-align: middle; }
+.card-deal { font-size: 12.5px; color: var(--ink-3); overflow-wrap: anywhere; }
+.card.is-multi { border-left: 3px solid var(--line-2); padding-left: 9px; }
+.lost-row.is-multi { border-left: 3px solid var(--line-2); padding-left: 8px; }
 
 .log-add { display: flex; flex-direction: column; gap: 8px; }
 .log-add .btn { align-self: flex-end; }
@@ -678,6 +686,7 @@ dialog::backdrop { background: rgba(20, 20, 19, .42); }
   :where(input:not([type=checkbox]):not([type=radio]), select, textarea) { min-height: 44px !important; }
   .contact-fields input, .item-row input, .link-row input, .cat-fields input { min-height: 44px !important; }
   .cat-row { min-height: 44px; }
+  .cat-list { max-height: min(440px, calc(var(--vvh, 100vh) * .45)); }
   .icon-btn, .contact-go a, .link-row .icon-btn, .item-row .icon-btn, .log .icon-btn { width: 44px; height: 44px; }
   .card .vip, .cs-head .vip, .contact .main-star { width: 44px; height: 44px; }
   .chips button, .seg button, .pill, .deal-tab { min-height: 44px; }
