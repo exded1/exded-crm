@@ -498,6 +498,71 @@ dialog::backdrop { background: rgba(20, 20, 19, .42); }
 .contact-go a svg { width: 16px; height: 16px; }
 .link-btn { align-self: flex-start; border: 0; background: transparent; padding: 4px 0; color: var(--orange-ink); font-weight: 600; font-size: 14px; }
 
+/* --- сделки внутри карточки --- */
+.cs-sec-head .cs-count { margin-left: auto; font-size: 12.5px; font-weight: 600; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.cs-status-hint { display: block; margin-top: 6px; font-size: 12.5px; color: var(--ink-3); overflow-wrap: anywhere; }
+.deal-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.deal-tab {
+  display: flex; align-items: center; gap: 7px; min-height: 38px; padding: 5px 12px; max-width: 100%;
+  border: 1px solid var(--line-2); border-radius: 999px; background: var(--surface); text-align: left;
+  font-size: 13.5px; color: var(--ink-2);
+}
+.deal-tab .deal-name { font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 14em; }
+.deal-tab .deal-meta { font-size: 12.5px; color: var(--ink-3); white-space: nowrap; }
+.deal-tab.on { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); background: var(--surface-2); }
+.deal-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--line-2); }
+.deal-tab.s-work .deal-dot { background: var(--orange); }
+.deal-tab.s-wait .deal-dot { background: var(--amber); }
+.deal-tab.s-client .deal-dot { background: var(--green); }
+.deal-tab.s-lost .deal-dot { background: var(--red); }
+.deal-add { color: var(--orange-ink); border-style: dashed; }
+.deal-add svg { width: 16px; height: 16px; }
+.deal-body { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
+.deal-dates { margin: 0; }
+
+.items { display: flex; flex-direction: column; gap: 6px; }
+.items-head { display: flex; align-items: baseline; gap: 8px; font-size: 12.5px; color: var(--ink-3); }
+.items-head span:first-child { font-weight: 600; color: var(--ink-2); }
+.items-cols { margin-left: auto; }
+.item-row { display: grid; grid-template-columns: minmax(0, 1fr) 68px 96px auto; gap: 6px; align-items: center; }
+.item-row input { min-height: 38px !important; padding: 7px 10px !important; }
+.item-row input[data-ibind="qty"], .item-row input[data-ibind="price"] { text-align: right; font-variant-numeric: tabular-nums; }
+.item-row .icon-btn { width: 34px; height: 34px; color: var(--ink-3); }
+.item-row .icon-btn svg { width: 16px; height: 16px; }
+.cat-pick { display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px dashed var(--line-2); border-radius: 12px; }
+.cat-fields { display: grid; grid-template-columns: minmax(0, 1fr) 68px; gap: 6px; }
+.cat-fields input { min-height: 38px !important; padding: 7px 10px !important; }
+.cat-fields input[data-cat-qty] { text-align: right; font-variant-numeric: tabular-nums; }
+.cat-list { display: flex; flex-direction: column; gap: 2px; max-height: 232px; overflow-y: auto; }
+.cat-row { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 38px; padding: 6px 8px; border: 0; border-radius: 8px; background: transparent; text-align: left; }
+.cat-row:hover, .cat-row:focus-visible { background: var(--surface-2); }
+.cat-name { flex: 1; min-width: 0; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cat-price { flex: none; font-size: 13.5px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.cat-pick .hint { margin: 0; }
+.cat-off { color: var(--red-ink); }
+.item-row.is-gross { position: relative; }
+.item-tag { grid-column: 1 / -1; font-size: 11.5px; color: var(--ink-3); margin-top: -2px; }
+.items-foot { display: flex; align-items: center; gap: 10px; }
+.items-total { margin-left: auto; font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* --- ссылки, о клиенте, реквизиты, покупки --- */
+.links { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.link-row { display: grid; grid-template-columns: 84px minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.link-label { font-size: 13px; color: var(--ink-3); }
+.link-row input { min-height: 38px !important; padding: 7px 10px !important; }
+.link-row .icon-btn { width: 34px; height: 34px; border-radius: 50%; background: var(--surface-2); color: var(--ink-2); }
+.link-row .icon-btn svg { width: 16px; height: 16px; }
+.icon-btn.is-off { background: transparent; pointer-events: none; }
+.bill-grid { display: grid; grid-template-columns: 90px minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.bill-grid .f.money input { font-variant-numeric: tabular-nums; }
+.bill-grid .f.wide { grid-column: 1 / -1; }
+.buys { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.buys li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; padding: 10px 0; border-top: 1px solid var(--line); cursor: pointer; }
+.buys time { grid-column: 1 / -1; font-size: 12.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.buys p { grid-column: 1; font-size: 14.5px; overflow-wrap: anywhere; }
+.buys b { grid-column: 2; grid-row: 2; font-variant-numeric: tabular-nums; }
+.card-dealmark { display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: var(--line-2); vertical-align: middle; }
+
 .log-add { display: flex; flex-direction: column; gap: 8px; }
 .log-add .btn { align-self: flex-end; }
 .log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
@@ -580,12 +645,24 @@ dialog::backdrop { background: rgba(20, 20, 19, .42); }
   .fab svg { width: 26px; height: 26px; }
   .fab:active { transform: scale(.94); }
 
+  /* Лист занимает ровно видимую часть экрана и стоит над клавиатурой:
+     --vvh и --vvb ставит fitSheets() по visualViewport. Без JS работает как раньше, по svh. */
   .sheet[open], .drawer[open] {
-    width: 100vw; max-width: 100vw; height: calc(100dvh - max(12px, env(safe-area-inset-top))); max-height: none;
-    margin: auto 0 0 0; border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+    width: 100vw; max-width: 100vw;
+    height: min(var(--vvh, 100svh), calc(100svh - max(12px, env(safe-area-inset-top))));
+    max-height: none;
+    margin: 0; inset: auto 0 var(--vvb, 0px) 0;
+    border-radius: var(--r-sheet) var(--r-sheet) 0 0;
     animation: sheet-up 220ms cubic-bezier(.2, .8, .2, 1);
   }
+  /* содержимое прокручивается НАД панелью кнопок: запас = высота панели + безопасная зона */
+  .sheet-scroll, .cs-scroll { padding-bottom: calc(var(--foot-h, 76px) + env(safe-area-inset-bottom) + 8px); }
+  .sheet-foot, .cs-foot { flex: none; }
   .row2, .cs-grid, .contact-fields { grid-template-columns: minmax(0, 1fr); }
+  .bill-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .item-row { grid-template-columns: minmax(0, 1fr) 60px 84px auto; }
+  .link-row { grid-template-columns: 70px minmax(0, 1fr) auto; }
+  .deal-tab .deal-name { max-width: 10em; }
   .when, .next-row { grid-template-columns: 1fr 1fr; }
   .when input[type=date], .next-row input[type=date] { grid-column: 1 / -1; }
   .sheet-foot .btn { flex: 1; min-height: 48px; }
@@ -595,7 +672,17 @@ dialog::backdrop { background: rgba(20, 20, 19, .42); }
 /* iPhone и iPad не увеличивают страницу при вводе, если шрифт полей от 16px */
 @media (pointer: coarse) {
   :where(input:not([type=checkbox]):not([type=radio]), select, textarea) { font-size: 16px; }
-  .search input[type=search], .contact-fields input { font-size: 16px !important; }
+  .search input[type=search], .contact-fields input, .item-row input, .link-row input, .cat-fields input { font-size: 16px !important; }
+
+  /* пальцем попадать в цель 44px: только на сенсорных экранах, вид на ноутбуке не меняется */
+  :where(input:not([type=checkbox]):not([type=radio]), select, textarea) { min-height: 44px !important; }
+  .contact-fields input, .item-row input, .link-row input, .cat-fields input { min-height: 44px !important; }
+  .cat-row { min-height: 44px; }
+  .icon-btn, .contact-go a, .link-row .icon-btn, .item-row .icon-btn, .log .icon-btn { width: 44px; height: 44px; }
+  .card .vip, .cs-head .vip, .contact .main-star { width: 44px; height: 44px; }
+  .chips button, .seg button, .pill, .deal-tab { min-height: 44px; }
+  .btn, .next-actions .btn, .match .btn { min-height: 44px; }
+  .link-btn { min-height: 44px; display: inline-flex; align-items: center; }
 }
 
 @media (prefers-reduced-motion: reduce) {

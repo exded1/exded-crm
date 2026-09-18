@@ -114,6 +114,7 @@ window.CrmSupabaseStore = (() => {
   ];
   const STATUS_KEYS = STATUSES.map((s) => s.key);
   const TITLE = Object.fromEntries(STATUSES.map((s) => [s.key, s.title]));
+  const CLOSED = ['client', 'lost'];
   const LOST_REASONS = ['Дорого', 'Купили у другого', 'Нет бюджета', 'Не отвечает', 'Передумали', 'Нет в наличии', 'Долгий срок поставки'];
   const CHANNELS = [
     { key: 'phone', label: 'Звонок' },
@@ -121,10 +122,31 @@ window.CrmSupabaseStore = (() => {
     { key: 'telegram', label: 'Telegram' },
     { key: 'email', label: 'Email' },
   ];
+  const LINKS = [
+    { key: 'website', label: 'Сайт', placeholder: 'example.de' },
+    { key: 'instagram', label: 'Instagram', placeholder: 'instagram.com/…' },
+    { key: 'linkedin', label: 'LinkedIn', placeholder: 'linkedin.com/company/…' },
+    { key: 'facebook', label: 'Facebook', placeholder: 'facebook.com/…' },
+  ];
+  const BILLING = [
+    { key: 'company_legal', label: 'Юридическое название', wide: true, placeholder: 'Muster GmbH' },
+    { key: 'street', label: 'Улица и дом', wide: true, placeholder: 'Musterstraße 1' },
+    { key: 'zip', label: 'Индекс', placeholder: '01067' },
+    { key: 'city', label: 'Город', placeholder: 'Dresden' },
+    { key: 'ust_id', label: 'USt-IdNr.', placeholder: 'DE123456789' },
+    { key: 'tax_no', label: 'Steuernummer', placeholder: '201/123/12345' },
+    { key: 'customer_no', label: 'Номер клиента', placeholder: '10001' },
+  ];
+  // поля первой схемы: лежали прямо на клиенте, теперь живут в сделке
+  const LEGACY_DEAL_KEYS = ['product', 'invoice_no', 'amount', 'agreed', 'status', 'status_at', 'next', 'lost_reason', 'lost_at', 'returned_at'];
   const DAY_START = 8 * 60;
   const DAY_END = 20 * 60;
   const RETURN_MONTHS = 3;
+  const CUSTOMER_NO_START = 10001;
   const CFG_KEY = 'exded-crm-config';
+  const CAT_KEY = 'exded-crm-catalog';
+  const CAT_TTL = 24 * 60 * 60 * 1000;         // держим каталог сутки, обновляем в фоне
+  const CAT_URL = 'https://exded.com/wp-json/wc/store/v1/products';
   const TAB_KEY = 'exded-crm-tab';
   const MQ_PHONE = window.matchMedia('(max-width: 699px)');
   const MQ_TABLET = window.matchMedia('(min-width: 700px) and (max-width: 1023px)');
@@ -139,6 +161,8 @@ window.CrmSupabaseStore = (() => {
     close: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
     wa: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1.3-4A8 8 0 1 1 8.2 19z"/><path d="M9 9.5c.3 2.3 2.2 4.2 4.5 4.6l1.2-1.2 1.8.8c-.2 1.3-1.2 2-2.5 1.9A6.3 6.3 0 0 1 8.2 10c-.1-1.3.6-2.3 1.9-2.5l.8 1.8z"/></svg>',
     mail: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M4 7l8 6 8-6"/></svg>',
+    link: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13.5a3.5 3.5 0 0 0 5 0l3-3a3.5 3.5 0 1 0-5-5l-1.2 1.2"/><path d="M14 10.5a3.5 3.5 0 0 0-5 0l-3 3a3.5 3.5 0 1 0 5 5l1.2-1.2"/></svg>',
+    plus: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   };
 
   /* ===================================================================
@@ -156,6 +180,7 @@ window.CrmSupabaseStore = (() => {
       return (ch === 'x' ? r : (r & 0x3) | 0x8).toString(16);
     }));
   const digits = (s) => String(s || '').replace(/\D/g, '');
+  const str = (v) => (v === undefined || v === null ? '' : String(v));
 
   const tzFmt = new Intl.DateTimeFormat('en-GB', {
     timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
@@ -208,8 +233,8 @@ window.CrmSupabaseStore = (() => {
   const moneyFmt = new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
   const moneyFmt2 = new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fmtMoney = (n) => (Number.isFinite(n) ? (Number.isInteger(n) ? moneyFmt : moneyFmt2).format(n) : '');
-  function parseAmount(str) {
-    let s = String(str || '').replace(/[\s\u00a0\u202f€]/g, '').replace(/eur/i, '');
+  function parseAmount(str_) {
+    let s = String(str_ || '').replace(/[\s  €]/g, '').replace(/eur/i, '');
     if (!s) return null;
     if (s.includes('.') && s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
     else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
@@ -218,6 +243,12 @@ window.CrmSupabaseStore = (() => {
     return Number.isFinite(n) ? Math.round(n * 100) / 100 : null;
   }
   const amountInput = (n) => (Number.isFinite(n) ? (Number.isInteger(n) ? String(n) : n.toFixed(2).replace('.', ',')) : '');
+  function parseQty(v) {
+    const n = Number(String(v ?? '').replace(',', '.').replace(/[^\d.]/g, ''));
+    if (!Number.isFinite(n) || n <= 0) return 1;
+    return Math.round(n * 100) / 100;
+  }
+  const qtyInput = (n) => (Number.isFinite(n) ? String(n).replace('.', ',') : '1');
   function plural(n, one, few, many) {
     const m10 = n % 10;
     const m100 = n % 100;
@@ -245,6 +276,13 @@ window.CrmSupabaseStore = (() => {
     if (d.startsWith('0')) return '49' + d.slice(1);
     return d;
   }
+  function linkHref(v) {
+    const s = str(v).trim();
+    if (!s) return '';
+    if (/^https?:\/\//i.test(s)) return s;
+    if (/^[\w.-]+\.[a-z]{2,}/i.test(s)) return 'https://' + s;
+    return '';
+  }
   function timeOptions(selected) {
     let html = '';
     for (let m = DAY_START; m <= DAY_END; m += 15) {
@@ -261,6 +299,40 @@ window.CrmSupabaseStore = (() => {
     if (m < DAY_START) m = DAY_START;
     if (m > DAY_END) return { date: addDaysKey(today, 1), time: '10:00' };
     return { date: today, time: `${pad(Math.floor(m / 60))}:${pad(m % 60)}` };
+  }
+
+  /* Листы на телефоне. Высоту берём по ВИДИМОЙ части экрана: когда открыта клавиатура,
+     iOS оставляет layout-высоту прежней, и низ листа с кнопками уезжает под клавиатуру.
+     visualViewport даёт настоящую видимую высоту и величину, на которую снизу «съедено».
+     Ещё меряем панель кнопок, чтобы контент над ней прокручивался с запасом и не залезал под неё. */
+  function fitSheets() {
+    const root = document.documentElement;
+    const vv = window.visualViewport;
+    if (vv) {
+      root.style.setProperty('--vvh', Math.round(vv.height) + 'px');
+      root.style.setProperty('--vvb', Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)) + 'px');
+    } else {
+      root.style.removeProperty('--vvh');
+      root.style.removeProperty('--vvb');
+    }
+    for (const dlg of document.querySelectorAll('dialog[open]')) {
+      const foot = dlg.querySelector('.sheet-foot, .cs-foot, .modal-foot');
+      if (foot) dlg.style.setProperty('--foot-h', Math.ceil(foot.getBoundingClientRect().height) + 'px');
+    }
+  }
+  let fitTimer = null;
+  const fitSoon = () => { clearTimeout(fitTimer); fitTimer = setTimeout(fitSheets, 60); };
+  function bindViewport() {
+    fitSheets();
+    window.addEventListener('resize', fitSoon);
+    window.addEventListener('orientationchange', fitSoon);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', fitSheets);
+      window.visualViewport.addEventListener('scroll', fitSheets);
+    }
+    // клавиатура открывается после фокуса, размеры приходят с задержкой
+    document.addEventListener('focusin', fitSoon);
+    document.addEventListener('focusout', fitSoon);
   }
 
   let toastTimer = null;
@@ -280,13 +352,117 @@ window.CrmSupabaseStore = (() => {
   }
 
   /* ===================================================================
-     Данные
+     Каталог товаров с сайта exded.com (WooCommerce Store API, без ключей).
+     Живой запрос при запуске, копия в localStorage на сутки, обновление в фоне.
+     Цены магазина — БРУТТО (с 19% НДС), поэтому у позиции ставим пометку gross.
+     Если каталог не ответил, товар вписывается руками — это запасной путь, не ошибка.
+     =================================================================== */
+  const catalog = { items: [], at: null, status: 'idle', error: '' };
+
+  function catalogUrl() {
+    const cfg = window.EXDED_CRM_CONFIG || {};
+    return String(cfg.catalogUrl || CAT_URL).replace(/\/+$/, '');
+  }
+
+  // В артефакте claude.ai страница живёт с origin null: магазин не может выписать разрешение
+  // на такой адрес, запрос всё равно отказался бы. Не ходим вовсе — ни ошибок, ни повторов.
+  function catalogBlocked() {
+    const cfg = window.EXDED_CRM_CONFIG || {};
+    if (cfg.catalogUrl) return '';                       // адрес задан явно (проверки, свой источник)
+    if (location.origin === 'null' || location.protocol === 'file:') return 'artifact';
+    if (window.claude && typeof window.claude.use === 'function') return 'artifact';
+    return '';
+  }
+
+  function readCatalogCache() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(CAT_KEY) || 'null');
+      if (raw && Array.isArray(raw.items) && raw.items.length) return raw;
+    } catch {}
+    return null;
+  }
+
+  function priceFromStore(p) {
+    if (!p) return { price: null, from: false };
+    const unit = Number.isFinite(p.currency_minor_unit) ? p.currency_minor_unit : 2;
+    const range = p.price_range;
+    const raw = range ? range.min_amount : p.price;
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return { price: null, from: Boolean(range) };
+    return { price: Math.round(n) / Math.pow(10, unit), from: Boolean(range && range.min_amount !== range.max_amount) };
+  }
+
+  async function fetchCatalog() {
+    const q = String.fromCharCode(63);
+    const amp = String.fromCharCode(38);
+    const fields = 'id,name,sku,type,prices,is_in_stock';
+    const out = [];
+    for (let page = 1; page <= 5; page += 1) {
+      const url = `${catalogUrl()}${q}per_page=100${amp}page=${page}${amp}_fields=${fields}`;
+      const res = await fetch(url, { credentials: 'omit', cache: 'no-store' });
+      if (!res.ok) throw new Error('сайт ответил ' + res.status);
+      const rows = await res.json();
+      if (!Array.isArray(rows) || !rows.length) break;
+      for (const r of rows) {
+        const { price, from } = priceFromStore(r.prices);
+        out.push({ id: r.id, name: String(r.name || '').trim(), sku: String(r.sku || ''), price, from: from || undefined, stock: r.is_in_stock !== false });
+      }
+      if (rows.length < 100) break;
+    }
+    return out;
+  }
+
+  async function loadCatalog({ background = false } = {}) {
+    if (catalogBlocked()) {
+      catalog.status = 'off';
+      catalog.items = [];
+      refreshCatalogUI();
+      return;
+    }
+    const cached = readCatalogCache();
+    if (cached && !catalog.items.length) {
+      catalog.items = cached.items;
+      catalog.at = cached.at;
+      catalog.status = 'ok';
+    }
+    const fresh = cached && cached.at && Date.now() - Date.parse(cached.at) < CAT_TTL;
+    if (fresh && background) return;            // копия свежая, в фоне не дёргаем
+    if (!catalog.items.length) catalog.status = 'loading';
+    try {
+      const items = await fetchCatalog();
+      if (items.length) {
+        catalog.items = items;
+        catalog.at = nowIso();
+        catalog.status = 'ok';
+        catalog.error = '';
+        try { localStorage.setItem(CAT_KEY, JSON.stringify({ at: catalog.at, items })); } catch {}
+      }
+    } catch (err) {
+      catalog.error = (err && err.message) || 'нет связи';
+      if (!catalog.items.length) catalog.status = 'error';
+    }
+    refreshCatalogUI();
+  }
+
+  function catalogFind(q) {
+    const words = String(q || '').toLowerCase().split(/\s+/).filter(Boolean);
+    if (!words.length) return [];
+    const hit = catalog.items.filter((it) => {
+      const hay = (it.name + ' ' + it.sku).toLowerCase();
+      return words.every((w) => hay.includes(w));
+    });
+    return hit.sort((a, b) => a.name.length - b.name.length).slice(0, 8);
+  }
+
+  /* ===================================================================
+     Данные: клиент = компания и люди, внутри — массив сделок
      =================================================================== */
   const state = {
     clients: new Map(),
     search: '',
     tab: 'work',
     openId: null,
+    openDeal: null,
   };
   let store = null;
   const dirty = new Map();       // id -> Set полей, ещё не отправленных
@@ -294,29 +470,127 @@ window.CrmSupabaseStore = (() => {
   const creating = new Set();
   const deleting = new Set();
   const saveTimers = new Map();
+  const migrating = new Set();   // документы первой схемы, переписываемые под новую
   let appStarted = false;
 
-  function normalize(d) {
-    const c = {
-      company: '', product: '', invoice_no: '', amount: null, agreed: '',
-      status: 'work', vip: false, lost_reason: '', lost_at: null, returned_at: null, status_at: null,
-      contacts: [], log: [], next: null, created_at: null, updated_at: null, last_contact_at: null,
+  const isClosed = (d) => CLOSED.includes(d.status);
+  const isOpen = (d) => !isClosed(d);
+
+  function normalizeItem(it) {
+    const x = { id: uid(), name: '', qty: 1, price: null, gross: false, product_id: null, sku: '', ...it };
+    x.id = x.id || uid();
+    x.name = str(x.name);
+    x.qty = parseQty(x.qty);
+    x.price = typeof x.price === 'number' && Number.isFinite(x.price) ? x.price : parseAmount(x.price);
+    x.gross = Boolean(x.gross);           // цена из магазина — с НДС 19%; пересчёт в нетто будет в документах
+    x.product_id = Number.isFinite(x.product_id) ? x.product_id : null;
+    x.sku = str(x.sku);
+    return x;
+  }
+
+  function normalizeDeal(d, fallbackCreated) {
+    const born = (d && d.created_at) || fallbackCreated || nowIso();
+    const x = {
+      id: uid(), title: '', product: '', invoice_no: '', amount: null,
+      status: 'work', status_at: null, agreed: '', next: null,
+      lost_reason: '', lost_at: null, returned_at: null,
+      items: [], created_at: born, closed_at: null,
       ...d,
     };
-    if (!STATUS_KEYS.includes(c.status)) c.status = 'work';
+    x.id = x.id || uid();
+    if (!STATUS_KEYS.includes(x.status)) x.status = 'work';
+    x.title = str(x.title);
+    x.product = str(x.product);
+    x.invoice_no = str(x.invoice_no);
+    x.agreed = str(x.agreed);
+    x.lost_reason = str(x.lost_reason);
+    x.amount = typeof x.amount === 'number' && Number.isFinite(x.amount) ? x.amount : parseAmount(x.amount);
+    x.items = (Array.isArray(x.items) ? x.items : []).filter(Boolean).map(normalizeItem);
+    if (x.next && (!x.next.at || x.next.done)) x.next = null;
+    if (x.next) x.next = { at: x.next.at, kind: x.next.kind === 'meeting' ? 'meeting' : 'call' };
+    if (!x.status_at) x.status_at = x.created_at;
+    if (isClosed(x)) { if (!x.closed_at) x.closed_at = x.status_at; } else x.closed_at = null;
+    if (x.status !== 'lost') x.lost_at = null;   // «вернётся через 3 месяца» считается только у минуса
+    return x;
+  }
+
+  // название сделки: своё, иначе по товару, иначе по дате
+  function dealTitle(d) {
+    const t = str(d.title).trim();
+    if (t) return t;
+    const p = str(d.product).trim().replace(/\s+/g, ' ');
+    if (p) return p.length > 48 ? p.slice(0, 47).replace(/[\s,;]+\S*$/, '') + '…' : p;
+    return `Сделка от ${shortDate(new Date(d.created_at))}`;
+  }
+
+  function normalize(d) {
+    const src = d && typeof d === 'object' ? d : {};
+    const legacy = !Array.isArray(src.deals);
+    const c = {
+      company: '', vip: false, contacts: [], log: [], about: '',
+      links: null, billing: null, deals: [],
+      created_at: null, updated_at: null, last_contact_at: null,
+      ...src,
+    };
+    c.company = str(c.company);
+    c.about = str(c.about);
+    c.vip = Boolean(c.vip);
     if (!Array.isArray(c.contacts)) c.contacts = [];
     if (!Array.isArray(c.log)) c.log = [];
     c.contacts = c.contacts.filter(Boolean).map((ct) => ({ id: ct.id || uid(), name: '', role: '', phone: '', email: '', dm: false, main: false, channels: [], ...ct, channels: Array.isArray(ct.channels) ? ct.channels : [] }));
     c.log = c.log.filter((e) => e && e.text !== undefined).map((e) => ({ id: e.id || uid(), at: e.at || c.created_at || nowIso(), text: String(e.text) }));
-    if (c.next && (!c.next.at || c.next.done)) c.next = null;
-    c.amount = typeof c.amount === 'number' && Number.isFinite(c.amount) ? c.amount : parseAmount(c.amount);
-    c.vip = Boolean(c.vip);
+
+    const links = c.links && typeof c.links === 'object' ? c.links : {};
+    c.links = {};
+    for (const l of LINKS) c.links[l.key] = str(links[l.key]).trim();
+
+    const bill = c.billing && typeof c.billing === 'object' ? c.billing : {};
+    c.billing = {};
+    for (const b of BILLING) c.billing[b.key] = str(bill[b.key]).trim();
+
+    if (legacy) {
+      // первая схема: сделка лежала прямо на клиенте. Ничего не теряем, id сделки = id клиента,
+      // чтобы два устройства получили один и тот же результат миграции.
+      const one = {};
+      for (const k of LEGACY_DEAL_KEYS) if (src[k] !== undefined) one[k] = src[k];
+      one.id = src.id || uid();
+      one.created_at = c.created_at || src.status_at || nowIso();
+      if (CLOSED.includes(one.status)) one.closed_at = src.status_at || src.lost_at || null;
+      c.deals = [normalizeDeal(one, c.created_at)];
+    } else {
+      c.deals = src.deals.filter(Boolean).map((x) => normalizeDeal(x, c.created_at));
+    }
+    if (!c.deals.length) c.deals = [normalizeDeal({ id: c.id || uid() }, c.created_at)];
+    // поля первой схемы на клиенте больше не нужны — они уже внутри сделки
+    for (const k of LEGACY_DEAL_KEYS) delete c[k];
+    c.schema = 2;
+    Object.defineProperty(c, '__legacy', { value: legacy, enumerable: false, configurable: true });
     return c;
+  }
+
+  function newDeal(fields = {}) {
+    const t = nowIso();
+    return normalizeDeal({ id: uid(), created_at: t, status_at: t, ...fields }, t);
   }
 
   function newClient(fields = {}) {
     const t = nowIso();
-    return normalize({ id: uid(), created_at: t, updated_at: t, status_at: t, last_contact_at: t, ...fields });
+    return normalize({ id: uid(), created_at: t, updated_at: t, last_contact_at: t, ...fields });
+  }
+
+  // номер клиента для документов: один раз, начиная с 10001
+  function nextCustomerNo() {
+    let max = CUSTOMER_NO_START - 1;
+    for (const c of state.clients.values()) {
+      const n = parseInt(c.billing.customer_no, 10);
+      if (Number.isFinite(n) && n > max) max = n;
+    }
+    return String(max + 1);
+  }
+  function ensureCustomerNo(id) {
+    const c = state.clients.get(id);
+    if (!c || c.billing.customer_no || !c.deals.length) return;
+    patch(id, { billing: { ...c.billing, customer_no: nextCustomerNo() } });
   }
 
   // первая версия CRM (таблицы companies/contacts/notes/events) -> клиенты
@@ -351,7 +625,13 @@ window.CrmSupabaseStore = (() => {
 
   function onData(docs) {
     const incoming = new Map();
-    for (const d of docs) if (d && d.id) incoming.set(d.id, normalize(d));
+    const legacyIds = [];
+    for (const d of docs) {
+      if (!d || !d.id) continue;
+      const c = normalize(d);
+      incoming.set(d.id, c);
+      if (c.__legacy) legacyIds.push(d.id);
+    }
     for (const [id, d] of incoming) {
       if (deleting.has(id)) continue;
       const local = state.clients.get(id);
@@ -363,6 +643,22 @@ window.CrmSupabaseStore = (() => {
     }
     scheduleRender();
     syncOpenCard();
+    for (const id of legacyIds) migrateDoc(id);
+  }
+
+  // переписать документ первой схемы под новую: полная замена, id сделки предсказуем
+  async function migrateDoc(id) {
+    if (migrating.has(id) || deleting.has(id) || dirty.has(id) || inflight.has(id)) return;
+    const c = state.clients.get(id);
+    if (!c || !c.__legacy) return;
+    migrating.add(id);
+    try {
+      await store.save(clone(c), null);
+    } catch {
+      // не вышло — попробуем при следующей загрузке, данные в памяти уже новой схемы
+    } finally {
+      migrating.delete(id);
+    }
   }
 
   function onStatus(mode, message) {
@@ -382,6 +678,18 @@ window.CrmSupabaseStore = (() => {
     dirty.set(id, keys);
     scheduleRender();
     scheduleSave(id, now ? 0 : 500);
+  }
+
+  // правка одной сделки внутри клиента
+  function patchDeal(clientId, dealId, changes, opts) {
+    const c = state.clients.get(clientId);
+    if (!c) return null;
+    const deals = clone(c.deals);
+    const d = deals.find((x) => x.id === dealId);
+    if (!d) return null;
+    Object.assign(d, typeof changes === 'function' ? changes(d, deals) || {} : changes);
+    patch(clientId, { deals }, opts);
+    return d;
   }
 
   function scheduleSave(id, delay) {
@@ -417,6 +725,7 @@ window.CrmSupabaseStore = (() => {
 
   async function createClient(fields) {
     const c = newClient(fields);
+    if (!c.billing.customer_no && c.deals.length) c.billing = { ...c.billing, customer_no: nextCustomerNo() };
     state.clients.set(c.id, c);
     creating.add(c.id);
     dirty.set(c.id, new Set(Object.keys(c)));
@@ -445,61 +754,115 @@ window.CrmSupabaseStore = (() => {
     }
   }
 
-  function setStatus(id, status, extra = {}) {
-    const c = state.clients.get(id);
-    if (!c || (c.status === status && !Object.keys(extra).length)) { scheduleRender(); return; }
-    const changes = { status, status_at: nowIso(), ...extra };
-    if (c.status === 'lost' && status !== 'lost') {
-      changes.lost_at = null;
-      changes.log = [{ id: uid(), at: nowIso(), text: `Вернули из минуса в «${TITLE[status]}».` }, ...c.log];
-    }
-    patch(id, changes, { now: true });
+  function addDeal(clientId, fields = {}) {
+    const c = state.clients.get(clientId);
+    if (!c) return null;
+    const d = newDeal(fields);
+    const deals = [...clone(c.deals), d];
+    const changes = { deals };
+    if (!c.billing.customer_no) changes.billing = { ...c.billing, customer_no: nextCustomerNo() };
+    patch(clientId, changes, { now: true });
+    return d;
   }
 
-  function markLost(id, reason) {
-    const c = state.clients.get(id);
-    if (!c) return;
-    patch(id, {
-      status: 'lost', status_at: nowIso(), lost_at: nowIso(), lost_reason: reason, next: null,
-      log: [{ id: uid(), at: nowIso(), text: `Минус. Причина: ${reason || 'не указана'}` }, ...c.log],
-    }, { now: true });
+  function setDealStatus(clientId, dealId, status, extra = {}) {
+    const c = state.clients.get(clientId);
+    const d = c && c.deals.find((x) => x.id === dealId);
+    if (!c || !d) return;
+    if (d.status === status && !Object.keys(extra).length) { scheduleRender(); return; }
+    const wasLost = d.status === 'lost';
+    const t = nowIso();
+    const changes = { status, status_at: t, closed_at: CLOSED.includes(status) ? t : null, ...extra };
+    if (wasLost && status !== 'lost') changes.lost_at = null;
+    patchDeal(clientId, dealId, changes, { now: true });
+    if (wasLost && status !== 'lost') {
+      const fresh = state.clients.get(clientId);
+      patch(clientId, { log: [{ id: uid(), at: t, text: `«${dealTitle(d)}»: вернули из минуса в «${TITLE[status]}».` }, ...fresh.log] }, { now: true });
+    }
+  }
+
+  function markLost(clientId, dealId, reason) {
+    const c = state.clients.get(clientId);
+    const d = c && c.deals.find((x) => x.id === dealId);
+    if (!c || !d) return;
+    const t = nowIso();
+    patchDeal(clientId, dealId, { status: 'lost', status_at: t, closed_at: t, lost_at: t, lost_reason: reason, next: null }, { now: true });
+    const fresh = state.clients.get(clientId);
+    patch(clientId, { log: [{ id: uid(), at: t, text: `«${dealTitle(d)}» в минус. Причина: ${reason || 'не указана'}` }, ...fresh.log] }, { now: true });
     toast(`«${c.company || 'Клиент'}» в минусе. Вернётся в работу через 3 месяца.`);
   }
 
   async function checkReturns() {
-    const due = Array.from(state.clients.values())
-      .filter((c) => c.status === 'lost' && c.lost_at && addMonths(c.lost_at, RETURN_MONTHS).getTime() <= Date.now());
+    const due = [];
+    for (const c of state.clients.values()) {
+      for (const d of c.deals) {
+        if (d.status === 'lost' && d.lost_at && addMonths(d.lost_at, RETURN_MONTHS).getTime() <= Date.now()) due.push({ c, d });
+      }
+    }
     if (!due.length || !(await store.lock('return-lost'))) return;
-    for (const c of due) {
+    for (const { c, d } of due) {
       const fresh = state.clients.get(c.id);
-      if (!fresh || fresh.status !== 'lost') continue;
-      patch(c.id, {
-        status: 'work', status_at: nowIso(), returned_at: nowIso(), lost_at: null,
-        log: [{ id: uid(), at: nowIso(), text: `Прошло 3 месяца после минуса${fresh.lost_reason ? ` (причина: ${fresh.lost_reason})` : ''}. Вернули в работу, пробуем ещё раз.` }, ...fresh.log],
-      }, { now: true });
+      const fd = fresh && fresh.deals.find((x) => x.id === d.id);
+      if (!fd || fd.status !== 'lost') continue;
+      const t = nowIso();
+      patchDeal(c.id, d.id, { status: 'work', status_at: t, closed_at: null, returned_at: t, lost_at: null }, { now: true });
+      const after = state.clients.get(c.id);
+      patch(c.id, { log: [{ id: uid(), at: t, text: `«${dealTitle(fd)}»: прошло 3 месяца после минуса${fd.lost_reason ? ` (причина: ${fd.lost_reason})` : ''}. Вернули в работу, пробуем ещё раз.` }, ...after.log] }, { now: true });
     }
     toast(`Вернулись в работу через 3 месяца: ${due.length}`);
   }
 
   /* ===================================================================
+     Сделки: какие видно на доске
+     =================================================================== */
+  const dealOf = (c, dealId) => (c ? c.deals.find((x) => x.id === dealId) || null : null);
+  const openDeals = (c) => c.deals.filter(isOpen);
+  const dealTime = (d) => Date.parse(d.closed_at || d.status_at || d.created_at || 0) || 0;
+  const lastClosed = (c) => c.deals.filter(isClosed).sort((a, b) => dealTime(a) - dealTime(b)).slice(-1)[0] || null;
+
+  // На доске: каждая открытая сделка — своя карточка, плюс последняя покупка.
+  // Клиент, который уже купил, остаётся в «Клиентах», даже когда с ним идёт новый разговор,
+  // а старые закрытые сделки доску не засоряют — они видны в карточке, в «Покупках».
+  // Минус показываем, только если у клиента больше ничего нет: ни открытой сделки, ни покупки.
+  // Иначе одна компания висела бы сразу в «Минусе» и в «В работе».
+  function boardDeals(c) {
+    const open = openDeals(c);
+    const bought = c.deals.filter((d) => d.status === 'client').sort((a, b) => dealTime(a) - dealTime(b)).slice(-1);
+    if (open.length || bought.length) return [...open, ...bought];
+    return c.deals.filter((d) => d.status === 'lost').sort((a, b) => dealTime(a) - dealTime(b)).slice(-1);
+  }
+  // сделка, с которой работает переключатель колонок в шапке карточки
+  function activeDeal(c) {
+    const open = openDeals(c);
+    if (open.length) return open[0];
+    return lastClosed(c) || c.deals[0] || null;
+  }
+  const purchases = (c) => c.deals.filter((d) => d.status === 'client').sort((a, b) => dealTime(b) - dealTime(a));
+  const itemsTotal = (d) => d.items.reduce((sum, it) => sum + (Number.isFinite(it.price) ? it.price * (it.qty || 1) : 0), 0);
+
+  /* ===================================================================
      Поиск и сортировка
      =================================================================== */
   const mainContact = (c) => c.contacts.find((x) => x.main) || c.contacts[0] || null;
-  const nextTs = (c) => (c.next && c.next.at ? Date.parse(c.next.at) : Infinity);
+  const clientName = (c) => c.company || (mainContact(c) || {}).name || (mainContact(c) || {}).phone || 'Без названия';
+  const nextTs = (d) => (d.next && d.next.at ? Date.parse(d.next.at) : Infinity);
   const cmp = (a, b) => (a === b ? 0 : a < b ? -1 : 1);
 
+  // сортируются карточки: пара клиент+сделка
   function sortFor(status) {
-    const byNext = (a, b) => { const d = nextTs(a) - nextTs(b); return Number.isNaN(d) ? 0 : d; };
-    if (status === 'lost') return (a, b) => cmp(b.lost_at || b.status_at || '', a.lost_at || a.status_at || '');
-    if (status === 'client') return (a, b) => (b.vip - a.vip) || cmp(b.updated_at || '', a.updated_at || '');
-    if (status === 'wait') return (a, b) => (b.vip - a.vip) || byNext(a, b) || cmp(a.status_at || '', b.status_at || '');
-    return (a, b) => (b.vip - a.vip) || byNext(a, b) || cmp(b.updated_at || '', a.updated_at || '');
+    const byNext = (a, b) => { const x = nextTs(a.d) - nextTs(b.d); return Number.isNaN(x) ? 0 : x; };
+    const vip = (a, b) => (b.c.vip - a.c.vip);
+    if (status === 'lost') return (a, b) => cmp(b.d.lost_at || b.d.status_at || '', a.d.lost_at || a.d.status_at || '');
+    if (status === 'client') return (a, b) => vip(a, b) || cmp(b.d.closed_at || b.c.updated_at || '', a.d.closed_at || a.c.updated_at || '');
+    if (status === 'wait') return (a, b) => vip(a, b) || byNext(a, b) || cmp(a.d.status_at || '', b.d.status_at || '');
+    return (a, b) => vip(a, b) || byNext(a, b) || cmp(b.c.updated_at || '', a.c.updated_at || '');
   }
 
   function matches(c, q) {
     const qd = digits(q);
     if (qd.length >= 3 && c.contacts.some((x) => digits(x.phone).includes(qd))) return true;
-    const hay = [c.company, c.product, c.invoice_no, c.agreed, c.lost_reason,
+    const hay = [c.company, c.about, c.billing.company_legal, c.billing.customer_no, c.billing.ust_id, c.billing.city,
+      ...c.deals.flatMap((d) => [d.title, d.product, d.invoice_no, d.agreed, d.lost_reason, ...d.items.map((it) => it.name)]),
       ...c.contacts.flatMap((x) => [x.name, x.role, x.email, x.phone]),
       ...c.log.map((e) => e.text)].join(' ').toLowerCase();
     return q.toLowerCase().split(/\s+/).filter(Boolean).every((w) => hay.includes(w));
@@ -531,35 +894,36 @@ window.CrmSupabaseStore = (() => {
     return { cls: '', label: `${shortDate(d)} ${t}` };
   }
 
-  function cardHTML(c) {
+  function cardHTML({ c, d, many }) {
     const main = mainContact(c);
-    const due = c.next ? dueInfo(c.next) : null;
-    const title = c.company || (main && main.name) || (main && main.phone) || 'Без названия';
-    const recentReturn = c.returned_at && c.status === 'work' && Date.now() - Date.parse(c.returned_at) < 14 * 86400000;
-    return `<article class="card${c.vip ? ' is-vip' : ''}" data-id="${esc(c.id)}" tabindex="0">
+    const due = d.next ? dueInfo(d.next) : null;
+    const title = clientName(c);
+    const recentReturn = d.returned_at && d.status === 'work' && Date.now() - Date.parse(d.returned_at) < 14 * 86400000;
+    const line = many ? dealTitle(d) : str(d.product).trim() || dealTitle(d);
+    return `<article class="card${c.vip ? ' is-vip' : ''}" data-id="${esc(c.id)}" data-deal="${esc(d.id)}" tabindex="0">
   <div class="card-top">
     <button type="button" class="vip${c.vip ? ' on' : ''}" data-act="vip" aria-pressed="${c.vip}" aria-label="VIP клиент">${ICON.star}</button>
     <h3 class="card-co">${esc(title)}</h3>
-    ${Number.isFinite(c.amount) ? `<span class="card-sum">${esc(fmtMoney(c.amount))}</span>` : ''}
+    ${Number.isFinite(d.amount) ? `<span class="card-sum">${esc(fmtMoney(d.amount))}</span>` : ''}
   </div>
-  ${c.product ? `<p class="card-product">${esc(c.product)}</p>` : ''}
-  ${c.agreed ? `<p class="card-agreed">${esc(c.agreed)}</p>` : ''}
+  ${line ? `<p class="card-product">${many ? '<i class="card-dealmark" aria-hidden="true"></i>' : ''}${esc(line)}</p>` : ''}
+  ${d.agreed ? `<p class="card-agreed">${esc(d.agreed)}</p>` : ''}
   <div class="card-foot">
-    ${due ? `<span class="due ${due.cls}">${c.next.kind === 'meeting' ? ICON.meet : ICON.phone}${esc(due.label)}</span>` : ''}
-    ${c.status === 'wait' ? `<span class="waiting">Ждём ${esc(daysSince(c.status_at))}</span>` : ''}
+    ${due ? `<span class="due ${due.cls}">${d.next.kind === 'meeting' ? ICON.meet : ICON.phone}${esc(due.label)}</span>` : ''}
+    ${d.status === 'wait' ? `<span class="waiting">Ждём ${esc(daysSince(d.status_at))}</span>` : ''}
     ${recentReturn ? '<span class="badge-back">Вернулся из минуса</span>' : ''}
-    ${c.invoice_no ? `<span class="num">Счёт ${esc(c.invoice_no)}</span>` : ''}
+    ${d.invoice_no ? `<span class="num">Счёт ${esc(d.invoice_no)}</span>` : ''}
     ${main && main.name && main.name !== title ? `<span class="card-person">${esc(main.name)}</span>` : ''}
     ${main && main.phone ? `<a class="call-link" href="tel:${esc(telHref(main.phone))}" data-act="call" aria-label="Позвонить">${ICON.phone}</a>` : ''}
   </div>
 </article>`;
   }
 
-  function lostRowHTML(c) {
-    return `<article class="lost-row" data-id="${esc(c.id)}" tabindex="0">
-  <b>${esc(c.company || (mainContact(c) || {}).name || 'Без названия')}</b>
-  <time>${c.lost_at ? esc(shortDate(new Date(c.lost_at))) : ''}</time>
-  <span>${esc(c.lost_reason || 'Причина не указана')}</span>
+  function lostRowHTML({ c, d, many }) {
+    return `<article class="lost-row" data-id="${esc(c.id)}" data-deal="${esc(d.id)}" tabindex="0">
+  <b>${esc(clientName(c))}</b>
+  <time>${d.lost_at ? esc(shortDate(new Date(d.lost_at))) : ''}</time>
+  <span>${esc(d.lost_reason || 'Причина не указана')}${many ? ` · ${esc(dealTitle(d))}` : ''}</span>
 </article>`;
   }
 
@@ -568,7 +932,9 @@ window.CrmSupabaseStore = (() => {
     const groups = { work: [], wait: [], client: [], lost: [] };
     for (const c of state.clients.values()) {
       if (q && !matches(c, q)) continue;
-      groups[c.status].push(c);
+      const rows = boardDeals(c);
+      const many = rows.length > 1 || c.deals.length > 1;
+      for (const d of rows) groups[d.status].push({ c, d, many });
     }
     for (const s of STATUS_KEYS) {
       groups[s].sort(sortFor(s));
@@ -578,7 +944,7 @@ window.CrmSupabaseStore = (() => {
       $$(`[data-count="${s}"]`).forEach((el) => { el.textContent = groups[s].length; });
       const sumEl = $(`[data-sum="${s}"]`);
       if (sumEl) {
-        const sum = groups[s].reduce((acc, c) => acc + (Number.isFinite(c.amount) ? c.amount : 0), 0);
+        const sum = groups[s].reduce((acc, x) => acc + (Number.isFinite(x.d.amount) ? x.d.amount : 0), 0);
         sumEl.textContent = sum ? fmtMoney(Math.round(sum)) : '';
       }
     }
@@ -593,15 +959,18 @@ window.CrmSupabaseStore = (() => {
     const now = Date.now();
     const today = dayKey(new Date());
     const tomorrow = addDaysKey(today, 1);
-    const items = Array.from(state.clients.values())
-      .filter((c) => c.next && c.status !== 'lost')
-      .map((c) => ({ c, at: new Date(c.next.at) }))
-      .sort((a, b) => a.at - b.at);
+    const items = [];
+    for (const c of state.clients.values()) {
+      for (const d of c.deals) {
+        if (d.next && d.status !== 'lost') items.push({ c, d, at: new Date(d.next.at) });
+      }
+    }
+    items.sort((a, b) => a.at - b.at);
     const overdue = items.filter((x) => x.at.getTime() < now);
     const todays = items.filter((x) => x.at.getTime() >= now && dayKey(x.at) === today);
     const tomorrows = items.filter((x) => dayKey(x.at) === tomorrow);
     if (!overdue.length && !todays.length && !tomorrows.length) { el.innerHTML = ''; return; }
-    const chip = (x, cls, label) => `<button type="button" class="task ${cls}" data-open="${esc(x.c.id)}"><i class="dot"></i><time>${esc(label)}</time><span>${esc(x.c.company || (mainContact(x.c) || {}).name || 'Без названия')}</span></button>`;
+    const chip = (x, cls, label) => `<button type="button" class="task ${cls}" data-open="${esc(x.c.id)}" data-deal="${esc(x.d.id)}"><i class="dot"></i><time>${esc(label)}</time><span>${esc(clientName(x.c))}</span></button>`;
     let html = '<span class="agenda-title">Перезвонить</span>';
     html += overdue.map((x) => chip(x, 'is-overdue', dayKey(x.at) === today ? timeStr(x.at) : `${shortDate(x.at)} ${timeStr(x.at)}`)).join('');
     html += todays.map((x) => chip(x, 'is-today', timeStr(x.at))).join('');
@@ -634,17 +1003,17 @@ window.CrmSupabaseStore = (() => {
         if (c) patch(id, { vip: !c.vip }, { now: true });
         return;
       }
-      openCard(id);
+      openCard(id, item.dataset.deal);
     });
     board.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter' || !e.target.matches('[data-id]')) return;
       e.preventDefault();
-      openCard(e.target.dataset.id);
+      openCard(e.target.dataset.id, e.target.dataset.deal);
     });
 
     $('#agenda').addEventListener('click', (e) => {
       const b = e.target.closest('[data-open]');
-      if (b) openCard(b.dataset.open);
+      if (b) openCard(b.dataset.open, b.dataset.deal);
     });
 
     $$('#tabs button').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.tab)));
@@ -695,12 +1064,13 @@ window.CrmSupabaseStore = (() => {
         document.body.classList.remove('dragging');
         justDragged = Date.now();
         const id = evt.item.dataset.id;
+        const dealId = evt.item.dataset.deal;
         const to = evt.to.dataset.status;
         if (evt.from === evt.to) { scheduleRender(); return; }
-        if (to === 'lost') { openLost(id, () => scheduleRender()); scheduleRender(); return; }
-        setStatus(id, to);
+        if (to === 'lost') { openLost(id, dealId, () => scheduleRender()); scheduleRender(); return; }
+        setDealStatus(id, dealId, to);
         const c = state.clients.get(id);
-        if (c) toast(`«${c.company || 'Клиент'}» в «${TITLE[to]}»`);
+        if (c) toast(`«${clientName(c)}» в «${TITLE[to]}»`);
       },
     }));
   }
@@ -726,7 +1096,8 @@ window.CrmSupabaseStore = (() => {
     $('#new-save').textContent = 'Сохранить';
     $('#new-title').textContent = 'Новый звонок';
     dlg.showModal();
-    setTimeout(() => f.elements.phone.focus(), 30);
+    fitSheets();
+    setTimeout(() => { f.elements.phone.focus(); fitSheets(); }, 30);
   }
 
   function findMatch(phone, company) {
@@ -750,8 +1121,9 @@ window.CrmSupabaseStore = (() => {
     const box = $('#new-match');
     if (newState.matchId) {
       const c = state.clients.get(newState.matchId);
+      const open = c ? openDeals(c) : [];
       box.hidden = false;
-      box.innerHTML = `<span>Запишу разговор к клиенту <b>${esc(c ? c.company || 'без названия' : '')}</b></span><button type="button" class="btn ghost" data-match="cancel">Это другой клиент</button>`;
+      box.innerHTML = `<span>Запишу разговор к клиенту <b>${esc(c ? clientName(c) : '')}</b>${c ? (open.length ? ` · в сделку «${esc(dealTitle(open[0]))}»` : ' · новой сделкой') : ''}</span><button type="button" class="btn ghost" data-match="cancel">Это другой клиент</button>`;
       $('#new-save').textContent = 'Записать к клиенту';
       $('#new-title').textContent = 'Звонок клиента';
       return;
@@ -760,8 +1132,9 @@ window.CrmSupabaseStore = (() => {
     $('#new-save').textContent = 'Сохранить';
     $('#new-title').textContent = 'Новый звонок';
     if (!c) { box.hidden = true; box.innerHTML = ''; return; }
+    const d = activeDeal(c);
     box.hidden = false;
-    box.innerHTML = `<span>Уже есть: <b>${esc(c.company || (mainContact(c) || {}).name || 'без названия')}</b> в колонке «${esc(TITLE[c.status])}»</span><button type="button" class="btn" data-match="use" data-id="${esc(c.id)}">Записать к нему</button><button type="button" class="btn ghost" data-match="no" data-id="${esc(c.id)}">Нет, новый</button>`;
+    box.innerHTML = `<span>Уже есть: <b>${esc(clientName(c))}</b> в колонке «${esc(TITLE[d ? d.status : 'work'])}»</span><button type="button" class="btn" data-match="use" data-id="${esc(c.id)}">Записать к нему</button><button type="button" class="btn ghost" data-match="no" data-id="${esc(c.id)}">Нет, новый</button>`;
   }
 
   function bindNew() {
@@ -781,7 +1154,9 @@ window.CrmSupabaseStore = (() => {
         const c = state.clients.get(b.dataset.id);
         if (c) {
           if (!f.elements.company.value) f.elements.company.value = c.company;
-          const st = c.status === 'lost' ? 'work' : c.status;
+          // открытая сделка есть — предлагаем её колонку; если все закрыты, разговор начинает новую сделку
+          const open = openDeals(c);
+          const st = open.length ? open[0].status : 'work';
           newState.status = st;
           $$('#new-status button').forEach((x) => x.classList.toggle('on', x.dataset.status === st));
         }
@@ -816,7 +1191,14 @@ window.CrmSupabaseStore = (() => {
     });
 
     const filled = () => ['phone', 'company', 'name', 'product', 'talk', 'agreed'].some((n) => f.elements[n].value.trim());
-    dlg.addEventListener('click', (e) => { if (e.target === dlg && !filled()) dlg.close(); });
+    dlg.addEventListener('click', (e) => {
+      // «Отмена» и «✕»: на телефоне закрыть лист больше нечем — фона вокруг него нет
+      if (e.target.closest('[data-close]')) {
+        if (!filled() || window.confirm('Закрыть без сохранения?')) dlg.close();
+        return;
+      }
+      if (e.target === dlg && !filled()) dlg.close();
+    });
     dlg.addEventListener('cancel', (e) => { if (filled() && !window.confirm('Закрыть без сохранения?')) e.preventDefault(); });
     f.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); f.requestSubmit(); } });
 
@@ -834,9 +1216,11 @@ window.CrmSupabaseStore = (() => {
         if (at.getTime() < Date.now() - 60000) { toast('Это время уже прошло', 'err'); return; }
         next = { at: at.toISOString(), kind: f.elements.kind.value === 'meeting' ? 'meeting' : 'call' };
       }
-      const logEntry = talk ? [{ id: uid(), at: nowIso(), text: talk }] : [];
+      const t = nowIso();
+      const logEntry = talk ? [{ id: uid(), at: t, text: talk }] : [];
 
       let savedId;
+      let savedDeal;
       if (newState.matchId && state.clients.get(newState.matchId)) {
         const c = state.clients.get(newState.matchId);
         const contacts = clone(c.contacts);
@@ -848,28 +1232,44 @@ window.CrmSupabaseStore = (() => {
         } else if (phone || name) {
           contacts.push({ id: uid(), name, role: '', phone, email: '', dm: false, main: !contacts.length, channels: phone ? ['phone'] : [] });
         }
-        const changes = { contacts, log: [...logEntry, ...c.log], last_contact_at: nowIso() };
-        if (company && !c.company) changes.company = company;
-        if (product) changes.product = product;
-        if (agreed) changes.agreed = agreed;
-        if (next) changes.next = next;
-        if (newState.status !== c.status) {
-          changes.status = newState.status;
-          changes.status_at = nowIso();
-          if (c.status === 'lost') changes.lost_at = null;
+        // открытая сделка есть — дописываем в неё; все закрыты — это новая покупка, новая сделка
+        const open = openDeals(c);
+        const deals = clone(c.deals);
+        let d = open.length ? deals.find((x) => x.id === open[0].id) : null;
+        if (!d) {
+          d = newDeal({ product, agreed, next, status: newState.status });
+          if (CLOSED.includes(d.status)) d.closed_at = t;
+          deals.push(d);
+        } else {
+          if (product) d.product = product;
+          if (agreed) d.agreed = agreed;
+          if (next) d.next = next;
+          if (newState.status !== d.status) {
+            d.status = newState.status;
+            d.status_at = t;
+            d.closed_at = CLOSED.includes(d.status) ? t : null;
+            if (d.status !== 'lost') d.lost_at = null;
+          }
         }
+        const changes = { contacts, deals, log: [...logEntry, ...c.log], last_contact_at: t };
+        if (company && !c.company) changes.company = company;
+        if (!c.billing.customer_no) changes.billing = { ...c.billing, customer_no: nextCustomerNo() };
         patch(c.id, changes, { now: true });
         savedId = c.id;
+        savedDeal = d.id;
       } else {
+        const deal = newDeal({ product, agreed, next, status: newState.status });
+        if (CLOSED.includes(deal.status)) deal.closed_at = deal.status_at;
         const created = await createClient({
-          company, product, agreed, next, status: newState.status, log: logEntry,
+          company, log: logEntry, deals: [deal],
           contacts: phone || name ? [{ id: uid(), name, role: '', phone, email: '', dm: false, main: true, channels: phone ? ['phone'] : [] }] : [],
         });
         savedId = created.id;
+        savedDeal = created.deals[0].id;
       }
       dlg.close();
-      setTab(state.clients.get(savedId).status);
-      toast('Сохранено', '', { label: 'Открыть', fn: () => openCard(savedId) });
+      setTab(newState.status);
+      toast('Сохранено', '', { label: 'Открыть', fn: () => openCard(savedId, savedDeal) });
     });
   }
 
@@ -878,30 +1278,39 @@ window.CrmSupabaseStore = (() => {
      =================================================================== */
   let cardRenderedJSON = '';
 
-  function openCard(id) {
-    if (!state.clients.has(id)) return;
+  function currentDeal(c) {
+    if (!c) return null;
+    return dealOf(c, state.openDeal) || activeDeal(c);
+  }
+
+  function openCard(id, dealId) {
+    const c = state.clients.get(id);
+    if (!c) return;
     state.openId = id;
+    state.openDeal = (dealId && dealOf(c, dealId) ? dealId : (activeDeal(c) || {}).id) || null;
+    ensureCustomerNo(id);
     renderCard();
     const dlg = $('#dlg-card');
     if (!dlg.open) dlg.showModal();
+    fitSheets();
     const scroller = $('.cs-scroll');
     if (scroller) scroller.scrollTop = 0;
   }
 
-  function gcalUrl(c) {
+  function gcalUrl(c, d) {
     const main = mainContact(c);
-    const start = new Date(c.next.at);
-    const end = new Date(start.getTime() + (c.next.kind === 'meeting' ? 60 : 15) * 60000);
-    const stamp = (d) => { const p = tzParts(d); return `${p.y}${pad(p.m)}${pad(p.d)}T${pad(p.h)}${pad(p.mi)}00`; };
+    const start = new Date(d.next.at);
+    const end = new Date(start.getTime() + (d.next.kind === 'meeting' ? 60 : 15) * 60000);
+    const stamp = (x) => { const p = tzParts(x); return `${p.y}${pad(p.m)}${pad(p.d)}T${pad(p.h)}${pad(p.mi)}00`; };
     const details = [
-      c.product ? `Товар: ${c.product}` : '',
-      c.agreed ? `Договорились: ${c.agreed}` : '',
+      d.product ? `Товар: ${d.product}` : '',
+      d.agreed ? `Договорились: ${d.agreed}` : '',
       main && main.name ? `Контакт: ${main.name}` : '',
       main && main.phone ? `Телефон: ${main.phone}` : '',
     ].filter(Boolean).join('\n');
     const params = new URLSearchParams({
       action: 'TEMPLATE',
-      text: `${c.next.kind === 'meeting' ? 'Встреча' : 'Позвонить'}: ${c.company || (main && main.name) || 'клиент'}`,
+      text: `${d.next.kind === 'meeting' ? 'Встреча' : 'Позвонить'}: ${c.company || (main && main.name) || 'клиент'}`,
       dates: `${stamp(start)}/${stamp(end)}`,
       ctz: TZ,
       details,
@@ -909,8 +1318,8 @@ window.CrmSupabaseStore = (() => {
     return `https://calendar.google.com/calendar/render?${params}`;
   }
 
-  function nextHTML(c) {
-    if (!c.next) {
+  function nextHTML(c, d) {
+    if (!d.next) {
       return `<div class="cs-sec-head"><h3>Перезвонить</h3></div>
 <div class="chips">
   <button type="button" data-act="next-set" data-days="0">Сегодня</button>
@@ -919,20 +1328,92 @@ window.CrmSupabaseStore = (() => {
   <button type="button" data-act="next-set" data-days="7">Через неделю</button>
 </div>`;
     }
-    const d = new Date(c.next.at);
-    const due = dueInfo(c.next);
+    const dt = new Date(d.next.at);
+    const due = dueInfo(d.next);
     return `<div class="cs-sec-head"><h3>Перезвонить</h3><span class="due ${due.cls}">${esc(due.label)}</span></div>
 <div class="next">
   <div class="next-row">
-    <input type="date" data-next="date" value="${esc(dayKey(d))}" aria-label="Дата">
-    <select data-next="time" aria-label="Время">${timeOptions(timeStr(d))}</select>
-    <select data-next="kind" aria-label="Что"><option value="call"${c.next.kind !== 'meeting' ? ' selected' : ''}>Звонок</option><option value="meeting"${c.next.kind === 'meeting' ? ' selected' : ''}>Встреча</option></select>
+    <input type="date" data-next="date" value="${esc(dayKey(dt))}" aria-label="Дата">
+    <select data-next="time" aria-label="Время">${timeOptions(timeStr(dt))}</select>
+    <select data-next="kind" aria-label="Что"><option value="call"${d.next.kind !== 'meeting' ? ' selected' : ''}>Звонок</option><option value="meeting"${d.next.kind === 'meeting' ? ' selected' : ''}>Встреча</option></select>
   </div>
   <div class="next-actions">
     <button type="button" class="btn" data-act="next-done">${ICON.check}Сделано</button>
-    <a class="btn" href="${esc(gcalUrl(c))}" target="_blank" rel="noopener noreferrer">${ICON.cal}В Google Календарь</a>
+    <a class="btn" href="${esc(gcalUrl(c, d))}" target="_blank" rel="noopener noreferrer">${ICON.cal}В Google Календарь</a>
     <button type="button" class="btn ghost" data-act="next-clear">Не нужно</button>
   </div>
+</div>`;
+  }
+
+  function catRowsHTML(q) {
+    if (catalog.status === 'off') return '<p class="hint cat-off">Каталог сайта здесь не работает: он подключён в версии CRM на GitHub. Впишите товар руками кнопкой ниже.</p>';
+    if (catalog.status === 'loading' && !catalog.items.length) return '<p class="hint">Загружаю каталог сайта…</p>';
+    if (!catalog.items.length) {
+      return `<p class="hint cat-off">Каталог сайта не отвечает${catalog.error ? ` (${esc(catalog.error)})` : ''}. Впишите товар руками кнопкой ниже.</p>`;
+    }
+    const q2 = String(q || '').trim();
+    if (!q2) return `<p class="hint">В каталоге ${catalog.items.length} ${plural(catalog.items.length, 'товар', 'товара', 'товаров')}${catalog.at ? ` · обновлён ${esc(fmtDateTime(catalog.at))}` : ''}</p>`;
+    const rows = catalogFind(q2);
+    if (!rows.length) return '<p class="hint">Ничего не нашлось. Впишите товар руками кнопкой ниже.</p>';
+    return `<div class="cat-list">${rows.map((it) => `<button type="button" class="cat-row" data-act="cat-add" data-pid="${it.id}">
+  <span class="cat-name">${esc(it.name)}</span>
+  <span class="cat-price">${it.price === null ? '' : (it.from ? 'от ' : '') + esc(fmtMoney(it.price))}</span>
+</button>`).join('')}</div>`;
+  }
+
+  function catalogPickerHTML() {
+    return `<div class="cat-pick">
+  <div class="cat-fields">
+    <input data-cat-q placeholder="Товар из каталога exded.com" aria-label="Поиск товара в каталоге" autocomplete="off">
+    <input data-cat-qty value="1" inputmode="decimal" aria-label="Количество" title="Количество">
+  </div>
+  <div data-cat-out>${catRowsHTML('')}</div>
+</div>`;
+  }
+
+  // перерисовать только подборщик — чтобы поле поиска не теряло фокус
+  function refreshCatalogUI() {
+    const out = $('[data-cat-out]');
+    const q = $('[data-cat-q]');
+    if (out) out.innerHTML = catRowsHTML(q ? q.value : '');
+  }
+
+  function dealsHTML(c, cur) {
+    const tabs = c.deals.map((d) => {
+      const on = cur && d.id === cur.id;
+      const sum = Number.isFinite(d.amount) ? fmtMoney(d.amount) : '';
+      return `<button type="button" class="deal-tab s-${d.status}${on ? ' on' : ''}" data-act="deal-pick" data-deal="${esc(d.id)}" aria-pressed="${on}">
+  <i class="deal-dot" aria-hidden="true"></i><span class="deal-name">${esc(dealTitle(d))}</span><span class="deal-meta">${esc(TITLE[d.status])}${sum ? ' · ' + esc(sum) : ''}</span>
+</button>`;
+    }).join('');
+    if (!cur) return `<div class="cs-sec-head"><h3>Сделки</h3></div><div class="deal-tabs">${tabs}</div>`;
+    const total = itemsTotal(cur);
+    const items = cur.items.map((it) => `<div class="item-row${it.gross ? ' is-gross' : ''}" data-item="${esc(it.id)}">
+  <input data-ibind="name" value="${esc(it.name)}" placeholder="Наименование" aria-label="Наименование">
+  <input data-ibind="qty" value="${esc(qtyInput(it.qty))}" inputmode="decimal" aria-label="Количество">
+  <input data-ibind="price" value="${esc(amountInput(it.price))}" inputmode="decimal" placeholder="цена" aria-label="Цена" title="${it.gross ? 'Цена из каталога, с НДС 19%' : 'Цена вписана руками'}">
+  <button type="button" class="icon-btn" data-act="item-del" aria-label="Удалить позицию">${ICON.trash}</button>
+  ${it.gross ? '<span class="item-tag">брутто, с НДС 19%</span>' : ''}
+</div>`).join('');
+    return `<div class="cs-sec-head"><h3>Сделки</h3><span class="cs-count">${c.deals.length}</span></div>
+<div class="deal-tabs">${tabs}<button type="button" class="deal-tab deal-add" data-act="deal-add">${ICON.plus}<span class="deal-name">Новая сделка</span></button></div>
+<div class="deal-body">
+  <label class="f"><span>Название сделки</span><input data-dbind="title" value="${esc(cur.title)}" placeholder="${esc(dealTitle(cur))}"></label>
+  <label class="f"><span>Что хочет купить</span><textarea data-dbind="product" rows="2">${esc(cur.product)}</textarea></label>
+  <div class="cs-grid">
+    <label class="f"><span>Счёт №</span><input data-dbind="invoice_no" value="${esc(cur.invoice_no)}"></label>
+    <label class="f money"><span>Сумма, €</span><input data-dbind="amount" inputmode="decimal" value="${esc(amountInput(cur.amount))}"></label>
+  </div>
+  <div class="items">
+    <div class="items-head"><span>Позиции</span><span class="items-cols">кол-во · цена</span></div>
+    ${catalogPickerHTML()}
+    ${items}
+    <div class="items-foot">
+      <button type="button" class="link-btn" data-act="item-add">+ Добавить позицию</button>
+      ${total ? `<span class="items-total">Итого ${esc(fmtMoney(Math.round(total * 100) / 100))}${cur.items.some((it) => it.gross) ? ' брутто' : ''}</span>` : ''}
+    </div>
+  </div>
+  <p class="hint deal-dates">Сделка создана ${esc(fmtLongDate(cur.created_at))}${cur.closed_at ? ` · закрыта ${esc(fmtLongDate(cur.closed_at))}` : ''}</p>
 </div>`;
   }
 
@@ -959,7 +1440,28 @@ window.CrmSupabaseStore = (() => {
   </div>
 </div>`;
     }).join('');
-    return `<div class="cs-sec-head"><h3>Контакты</h3></div>${rows}<button type="button" class="link-btn" data-act="c-add">+ Добавить контакт</button>`;
+    const links = LINKS.map((l) => {
+      const href = linkHref(c.links[l.key]);
+      return `<div class="link-row">
+  <span class="link-label">${esc(l.label)}</span>
+  <input data-lbind="${l.key}" value="${esc(c.links[l.key])}" placeholder="${esc(l.placeholder)}" inputmode="url" aria-label="${esc(l.label)}">
+  ${href ? `<a class="icon-btn" href="${esc(href)}" target="_blank" rel="noopener noreferrer" aria-label="Открыть ${esc(l.label)}">${ICON.link}</a>` : '<span class="icon-btn is-off" aria-hidden="true"></span>'}
+</div>`;
+    }).join('');
+    return `<div class="cs-sec-head"><h3>Контакты</h3></div>${rows}<button type="button" class="link-btn" data-act="c-add">+ Добавить контакт</button>
+<div class="links">${links}</div>`;
+  }
+
+  function aboutHTML(c) {
+    return `<div class="cs-sec-head"><h3>О клиенте</h3></div>
+<textarea data-bind="about" rows="3" placeholder="Чем занимается, кто принимает решения, о чём помнить при разговоре" aria-label="О клиенте">${esc(c.about)}</textarea>`;
+  }
+
+  function billingHTML(c) {
+    const fields = BILLING.map((b) => `<label class="f${b.wide ? ' wide' : ''}${b.key === 'customer_no' ? ' money' : ''}"><span>${esc(b.label)}</span><input data-bbind="${b.key}" value="${esc(c.billing[b.key])}" placeholder="${esc(b.placeholder || '')}"${b.key === 'customer_no' ? ' inputmode="numeric"' : ''}></label>`).join('');
+    return `<div class="cs-sec-head"><h3>Реквизиты</h3></div>
+<div class="bill-grid">${fields}</div>
+<p class="hint">Отсюда данные пойдут в счета и предложения. Номер клиента присваивается сам при первой сделке, начиная с 10001; менять его без нужды не стоит.</p>`;
   }
 
   function logHTML(c) {
@@ -967,12 +1469,26 @@ window.CrmSupabaseStore = (() => {
     return `<div class="cs-sec-head"><h3>История разговоров</h3></div>${items ? `<ul class="log">${items}</ul>` : '<p class="hint">Пока нет записей.</p>'}`;
   }
 
-  function lostHTML(c) {
-    const back = c.lost_at ? fmtLongDate(addMonths(c.lost_at, RETURN_MONTHS).toISOString()) : '';
+  function buysHTML(c) {
+    const rows = purchases(c);
+    if (!rows.length) return '';
+    const sum = rows.reduce((acc, d) => acc + (Number.isFinite(d.amount) ? d.amount : 0), 0);
+    return `<section class="cs-sec">
+  <div class="cs-sec-head"><h3>Покупки</h3>${sum ? `<span class="cs-count">${esc(fmtMoney(Math.round(sum)))}</span>` : ''}</div>
+  <ul class="buys">${rows.map((d) => `<li data-act="deal-pick" data-deal="${esc(d.id)}" tabindex="0">
+    <time>${esc(d.closed_at ? fmtLongDate(d.closed_at) : '')}</time>
+    <p>${esc(str(d.product).trim() || dealTitle(d))}</p>
+    <b>${esc(Number.isFinite(d.amount) ? fmtMoney(d.amount) : '')}</b>
+  </li>`).join('')}</ul>
+</section>`;
+  }
+
+  function lostHTML(c, d) {
+    const back = d.lost_at ? fmtLongDate(addMonths(d.lost_at, RETURN_MONTHS).toISOString()) : '';
     return `<section class="cs-sec cs-lost">
   <div class="cs-sec-head"><h3>Почему минус</h3></div>
-  <div class="chips">${LOST_REASONS.map((r) => `<button type="button" data-act="lost-reason" data-reason="${esc(r)}"${c.lost_reason === r ? ' class="on"' : ''}>${esc(r)}</button>`).join('')}</div>
-  <textarea data-bind="lost_reason" rows="2" placeholder="Своими словами" aria-label="Причина">${esc(c.lost_reason)}</textarea>
+  <div class="chips">${LOST_REASONS.map((r) => `<button type="button" data-act="lost-reason" data-reason="${esc(r)}"${d.lost_reason === r ? ' class="on"' : ''}>${esc(r)}</button>`).join('')}</div>
+  <textarea data-dbind="lost_reason" rows="2" placeholder="Своими словами" aria-label="Причина">${esc(d.lost_reason)}</textarea>
   ${back ? `<p class="hint">Вернётся в «В работе» ${esc(back)}</p>` : ''}
 </section>`;
   }
@@ -981,6 +1497,8 @@ window.CrmSupabaseStore = (() => {
     const c = state.clients.get(state.openId);
     const body = $('#card-body');
     if (!c) { $('#dlg-card').close(); return; }
+    const d = currentDeal(c);
+    state.openDeal = d ? d.id : null;
     const scroller = $('.cs-scroll', body);
     const top = scroller ? scroller.scrollTop : 0;
     body.innerHTML = `
@@ -989,26 +1507,26 @@ window.CrmSupabaseStore = (() => {
   <input class="cs-company" data-bind="company" value="${esc(c.company)}" placeholder="Название компании" aria-label="Компания">
   <button type="button" class="icon-btn" data-close aria-label="Закрыть">${ICON.close}</button>
 </div>
-<div class="cs-status"><div class="seg">${STATUSES.map((s) => `<button type="button" data-act="status" data-status="${s.key}"${c.status === s.key ? ' class="on"' : ''}>${s.title}</button>`).join('')}</div></div>
+<div class="cs-status">
+  <div class="seg">${STATUSES.map((s) => `<button type="button" data-act="status" data-status="${s.key}"${d && d.status === s.key ? ' class="on"' : ''}>${s.title}</button>`).join('')}</div>
+  ${c.deals.length > 1 && d ? `<span class="cs-status-hint">сделка «${esc(dealTitle(d))}»</span>` : ''}
+</div>
 <div class="cs-scroll">
-  ${c.status === 'lost' ? lostHTML(c) : ''}
+  ${d && d.status === 'lost' ? lostHTML(c, d) : ''}
+  <section class="cs-sec" data-part="deals">${dealsHTML(c, d)}</section>
   <section class="cs-sec">
     <label class="f"><span>О чём говорили сейчас</span><textarea data-talk rows="3" placeholder="Коротко, что сказал клиент"></textarea></label>
     <div class="log-add"><button type="button" class="btn primary" data-act="log-add">Записать в историю</button></div>
   </section>
   <section class="cs-sec">
-    <label class="f"><span>О чём договорились</span><textarea data-bind="agreed" rows="3" placeholder="Например: отправить КП до пятницы">${esc(c.agreed)}</textarea></label>
+    <label class="f"><span>О чём договорились</span><textarea data-dbind="agreed" rows="3" placeholder="Например: отправить КП до пятницы">${esc(d ? d.agreed : '')}</textarea></label>
   </section>
-  <section class="cs-sec" data-part="next">${nextHTML(c)}</section>
-  <section class="cs-sec">
-    <label class="f"><span>Что хочет купить</span><textarea data-bind="product" rows="2">${esc(c.product)}</textarea></label>
-    <div class="cs-grid">
-      <label class="f"><span>Счёт №</span><input data-bind="invoice_no" value="${esc(c.invoice_no)}"></label>
-      <label class="f money"><span>Сумма, €</span><input data-bind="amount" inputmode="decimal" value="${esc(amountInput(c.amount))}"></label>
-    </div>
-  </section>
+  <section class="cs-sec" data-part="next">${d ? nextHTML(c, d) : ''}</section>
   <section class="cs-sec" data-part="contacts">${contactsHTML(c)}</section>
+  <section class="cs-sec" data-part="about">${aboutHTML(c)}</section>
+  <section class="cs-sec" data-part="billing">${billingHTML(c)}</section>
   <section class="cs-sec" data-part="log">${logHTML(c)}</section>
+  ${buysHTML(c)}
 </div>
 <div class="cs-foot">
   <span>Создан ${esc(fmtLongDate(c.created_at))}</span>
@@ -1017,6 +1535,7 @@ window.CrmSupabaseStore = (() => {
 </div>`;
     const newScroller = $('.cs-scroll', body);
     if (newScroller) newScroller.scrollTop = top;
+    fitSheets();
     cardRenderedJSON = JSON.stringify(c);
   }
 
@@ -1030,10 +1549,13 @@ window.CrmSupabaseStore = (() => {
     const active = document.activeElement;
     const typing = active && $('#card-body').contains(active) && active.matches('input, textarea, select');
     if (!typing) { renderCard(); return; }
-    $$('[data-bind]', $('#card-body')).forEach((el) => {
+    const d = currentDeal(c) || {};
+    $$('[data-bind], [data-dbind]', $('#card-body')).forEach((el) => {
       if (el === active) return;
-      const key = el.dataset.bind;
-      const val = key === 'amount' ? amountInput(c.amount) : (c[key] || '');
+      const dk = el.dataset.dbind;
+      const key = dk || el.dataset.bind;
+      const src = dk ? d : c;
+      const val = key === 'amount' ? amountInput(src[key]) : (src[key] || '');
       if (el.value !== val) el.value = val;
     });
     cardRenderedJSON = json;
@@ -1064,18 +1586,42 @@ window.CrmSupabaseStore = (() => {
       }
       if (id) flush(id);
       state.openId = null;
+      state.openDeal = null;
     });
 
     body.addEventListener('input', (e) => {
       const c = state.clients.get(state.openId);
       if (!c) return;
       const el = e.target;
+      const d = currentDeal(c);
+      if (el.dataset.catQ !== undefined) { refreshCatalogUI(); return; }
+      if (el.dataset.catQty !== undefined) return;
       if (el.dataset.bind) {
         const key = el.dataset.bind;
-        const value = key === 'amount' ? parseAmount(el.value) : el.value;
-        patch(c.id, { [key]: value });
+        patch(c.id, { [key]: el.value });
         cardRenderedJSON = JSON.stringify(c);
+      } else if (el.dataset.dbind && d) {
+        const key = el.dataset.dbind;
+        const value = key === 'amount' ? parseAmount(el.value) : el.value;
+        patchDeal(c.id, d.id, { [key]: value });
+        cardRenderedJSON = JSON.stringify(state.clients.get(c.id));
         if (key === 'lost_reason') $$('[data-act="lost-reason"]', body).forEach((b) => b.classList.toggle('on', b.dataset.reason === el.value));
+      } else if (el.dataset.lbind) {
+        patch(c.id, { links: { ...c.links, [el.dataset.lbind]: el.value } });
+        cardRenderedJSON = JSON.stringify(c);
+      } else if (el.dataset.bbind) {
+        patch(c.id, { billing: { ...c.billing, [el.dataset.bbind]: el.value } });
+        cardRenderedJSON = JSON.stringify(c);
+      } else if (el.dataset.ibind && d) {
+        const itemId = el.closest('[data-item]').dataset.item;
+        const items = clone(d.items);
+        const it = items.find((x) => x.id === itemId);
+        if (it) {
+          const k = el.dataset.ibind;
+          it[k] = k === 'price' ? parseAmount(el.value) : k === 'qty' ? parseQty(el.value) : el.value;
+          patchDeal(c.id, d.id, { items });
+          cardRenderedJSON = JSON.stringify(state.clients.get(c.id));
+        }
       } else if (el.dataset.cbind) {
         const contactId = el.closest('[data-contact]').dataset.contact;
         const contacts = updateContact(c, contactId, (x) => { x[el.dataset.cbind] = el.value; });
@@ -1086,16 +1632,19 @@ window.CrmSupabaseStore = (() => {
     body.addEventListener('change', (e) => {
       const c = state.clients.get(state.openId);
       const el = e.target;
-      if (!c || !el.dataset.next || !c.next) return;
-      const d = new Date(c.next.at);
-      const date = el.dataset.next === 'date' ? el.value : dayKey(d);
-      const time = el.dataset.next === 'time' ? el.value : timeStr(d);
-      const kind = el.dataset.next === 'kind' ? el.value : c.next.kind;
+      if (!c) return;
+      const d = currentDeal(c);
+      if (!el.dataset.next || !d || !d.next) return;
+      const dt = new Date(d.next.at);
+      const date = el.dataset.next === 'date' ? el.value : dayKey(dt);
+      const time = el.dataset.next === 'time' ? el.value : timeStr(dt);
+      const kind = el.dataset.next === 'kind' ? el.value : d.next.kind;
       const at = date ? dateFromKeyTime(date, time) : null;
       if (!at || Number.isNaN(at.getTime())) { renderCard(); return; }
-      patch(c.id, { next: { at: at.toISOString(), kind } }, { now: true });
-      $('[data-part="next"]', body).innerHTML = nextHTML(state.clients.get(c.id));
-      cardRenderedJSON = JSON.stringify(state.clients.get(c.id));
+      patchDeal(c.id, d.id, { next: { at: at.toISOString(), kind } }, { now: true });
+      const fresh = state.clients.get(c.id);
+      $('[data-part="next"]', body).innerHTML = nextHTML(fresh, currentDeal(fresh));
+      cardRenderedJSON = JSON.stringify(fresh);
     });
 
     body.addEventListener('keydown', (e) => {
@@ -1103,6 +1652,7 @@ window.CrmSupabaseStore = (() => {
         e.preventDefault();
         $('[data-act="log-add"]', body).click();
       }
+      if (e.key === 'Enter' && e.target.matches('.buys li')) { e.preventDefault(); e.target.click(); }
     });
 
     body.addEventListener('click', (e) => {
@@ -1111,22 +1661,60 @@ window.CrmSupabaseStore = (() => {
       if (!btn) return;
       const c = state.clients.get(state.openId);
       if (!c) return;
+      const d = currentDeal(c);
       const act = btn.dataset.act;
 
       if (act === 'vip') { patch(c.id, { vip: !c.vip }, { now: true }); renderCard(); return; }
 
+      if (act === 'deal-pick') {
+        state.openDeal = btn.dataset.deal;
+        renderCard();
+        return;
+      }
+      if (act === 'deal-add') {
+        const added = addDeal(c.id, {});
+        if (added) { state.openDeal = added.id; renderCard(); toast('Новая сделка'); const t = $('[data-dbind="title"]', body); if (t) t.focus(); }
+        return;
+      }
+      if (act === 'cat-add' && d) {
+        const pid = Number(btn.dataset.pid);
+        const found = catalog.items.find((x) => x.id === pid);
+        if (!found) return;
+        const qtyEl = $('[data-cat-qty]', body);
+        const qty = parseQty(qtyEl ? qtyEl.value : 1);
+        const item = normalizeItem({ name: found.name, qty, price: found.price, gross: true, product_id: found.id, sku: found.sku });
+        patchDeal(c.id, d.id, { items: [...clone(d.items), item] }, { now: true });
+        if (!str(d.product).trim()) patchDeal(c.id, d.id, { product: found.name }, { now: true });
+        renderCard();
+        toast(`Добавлено: ${found.name}`);
+        return;
+      }
+      if (act === 'item-add' && d) {
+        patchDeal(c.id, d.id, { items: [...clone(d.items), normalizeItem({})] }, { now: true });
+        renderCard();
+        const rows = $$('[data-ibind="name"]', body);
+        if (rows.length) rows[rows.length - 1].focus();
+        return;
+      }
+      if (act === 'item-del' && d) {
+        const row = btn.closest('[data-item]');
+        patchDeal(c.id, d.id, { items: clone(d.items).filter((x) => x.id !== row.dataset.item) }, { now: true });
+        renderCard();
+        return;
+      }
+
       if (act === 'status') {
         const s = btn.dataset.status;
-        if (s === c.status) return;
-        if (s === 'lost') { openLost(c.id, () => renderCard()); return; }
-        setStatus(c.id, s);
+        if (!d || s === d.status) return;
+        if (s === 'lost') { openLost(c.id, d.id, () => renderCard()); return; }
+        setDealStatus(c.id, d.id, s);
         renderCard();
         toast(`Перенесено в «${TITLE[s]}»`);
         return;
       }
 
-      if (act === 'lost-reason') {
-        patch(c.id, { lost_reason: btn.dataset.reason });
+      if (act === 'lost-reason' && d) {
+        patchDeal(c.id, d.id, { lost_reason: btn.dataset.reason });
         renderCard();
         return;
       }
@@ -1150,21 +1738,22 @@ window.CrmSupabaseStore = (() => {
         return;
       }
 
-      if (act === 'next-set') {
+      if (act === 'next-set' && d) {
         const slot = defaultSlot(Number(btn.dataset.days));
-        patch(c.id, { next: { at: dateFromKeyTime(slot.date, slot.time).toISOString(), kind: 'call' } }, { now: true });
+        patchDeal(c.id, d.id, { next: { at: dateFromKeyTime(slot.date, slot.time).toISOString(), kind: 'call' } }, { now: true });
         renderCard();
         return;
       }
-      if (act === 'next-done') {
-        patch(c.id, { next: null, last_contact_at: nowIso() }, { now: true });
+      if (act === 'next-done' && d) {
+        patchDeal(c.id, d.id, { next: null }, { now: true });
+        patch(c.id, { last_contact_at: nowIso() }, { now: true });
         renderCard();
         const talk = $('[data-talk]', body);
         talk.focus();
         toast('Отмечено. Запишите, о чём говорили.');
         return;
       }
-      if (act === 'next-clear') { patch(c.id, { next: null }, { now: true }); renderCard(); return; }
+      if (act === 'next-clear' && d) { patchDeal(c.id, d.id, { next: null }, { now: true }); renderCard(); return; }
 
       if (act === 'c-add') {
         const contacts = [...clone(c.contacts), { id: uid(), name: '', role: '', phone: '', email: '', dm: false, main: !c.contacts.length, channels: ['phone'] }];
@@ -1203,15 +1792,17 @@ window.CrmSupabaseStore = (() => {
      Минус
      =================================================================== */
   let lostCtx = null;
-  function openLost(id, onCancel) {
+  function openLost(id, dealId, onCancel) {
     const c = state.clients.get(id);
-    if (!c) return;
-    lostCtx = { id, onCancel, done: false, reason: '' };
+    const d = dealOf(c, dealId);
+    if (!c || !d) return;
+    lostCtx = { id, dealId, onCancel, done: false, reason: '' };
     const f = $('#form-lost');
     f.reset();
-    $('#lost-company').textContent = c.company || (mainContact(c) || {}).name || '';
+    $('#lost-company').textContent = c.deals.length > 1 ? `${clientName(c)} · ${dealTitle(d)}` : clientName(c);
     $('#lost-reasons').innerHTML = LOST_REASONS.map((r) => `<button type="button" data-reason="${esc(r)}">${esc(r)}</button>`).join('');
     $('#dlg-lost').showModal();
+    fitSheets();
   }
   function bindLost() {
     const dlg = $('#dlg-lost');
@@ -1222,7 +1813,7 @@ window.CrmSupabaseStore = (() => {
       lostCtx.reason = lostCtx.reason === b.dataset.reason ? '' : b.dataset.reason;
       $$('#lost-reasons button').forEach((x) => x.classList.toggle('on', x.dataset.reason === lostCtx.reason));
     });
-    dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
+    dlg.addEventListener('click', (e) => { if (e.target === dlg || e.target.closest('[data-close]')) dlg.close(); });
     dlg.addEventListener('close', () => {
       if (lostCtx && !lostCtx.done && lostCtx.onCancel) lostCtx.onCancel();
       lostCtx = null;
@@ -1235,7 +1826,8 @@ window.CrmSupabaseStore = (() => {
       if (!reason) { toast('Выберите или напишите причину', 'err'); return; }
       lostCtx.done = true;
       const id = lostCtx.id;
-      markLost(id, reason);
+      const dealId = lostCtx.dealId;
+      markLost(id, dealId, reason);
       dlg.close();
       if (state.openId === id) renderCard();
     });
@@ -1252,12 +1844,13 @@ window.CrmSupabaseStore = (() => {
         : `Вы вошли как ${store.user && store.user.email ? store.user.email : ''}. Клиенты хранятся в вашей базе Supabase.`;
       $('#btn-logout').hidden = store.kind !== 'supabase';
       dlg.showModal();
+      fitSheets();
     });
     dlg.addEventListener('click', (e) => { if (e.target === dlg || e.target.closest('[data-close]')) dlg.close(); });
 
     $('#btn-export').addEventListener('click', async () => {
       flushAll();
-      const data = JSON.stringify({ app: 'exded-crm', version: 2, exported_at: nowIso(), clients: Array.from(state.clients.values()) }, null, 2);
+      const data = JSON.stringify({ app: 'exded-crm', version: 3, exported_at: nowIso(), clients: Array.from(state.clients.values()) }, null, 2);
       const d = new Date();
       try {
         await store.download(`exded-crm-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}.json`, data);
@@ -1277,6 +1870,8 @@ window.CrmSupabaseStore = (() => {
       const list = Array.isArray(data.clients) ? data.clients.map(normalize) : legacyToClients(data);
       let added = 0;
       let failed = 0;
+      let deals = 0;
+      let notes = 0;
       dlg.close();
       toast('Загружаю…');
       for (const raw of list) {
@@ -1288,6 +1883,8 @@ window.CrmSupabaseStore = (() => {
           await store.save(clone(c), null);
           creating.delete(c.id);
           added += 1;
+          deals += c.deals.length;
+          notes += c.log.length;
         } catch {
           state.clients.delete(c.id);
           creating.delete(c.id);
@@ -1295,7 +1892,9 @@ window.CrmSupabaseStore = (() => {
         }
       }
       scheduleRender();
-      toast(failed ? `Добавлено ${added}, не удалось ${failed}` : `Добавлено клиентов: ${added}`, failed ? 'err' : '');
+      toast(failed
+        ? `Добавлено ${added}, не удалось ${failed}`
+        : `Добавлено: клиентов ${added}, сделок ${deals}, записей истории ${notes}`, failed ? 'err' : '');
     });
 
     $('#btn-logout').addEventListener('click', async () => {
@@ -1356,8 +1955,19 @@ window.CrmSupabaseStore = (() => {
       bindLost();
       bindSettings();
       bindShortcuts();
-      setInterval(() => { scheduleRender(); if (state.openId) { const part = $('[data-part="next"] .due'); if (part && state.clients.get(state.openId)?.next) part.textContent = dueInfo(state.clients.get(state.openId).next).label; } }, 60000);
+      bindViewport();
+      setInterval(() => {
+        scheduleRender();
+        if (state.openId) {
+          const c = state.clients.get(state.openId);
+          const d = c && currentDeal(c);
+          const part = $('[data-part="next"] .due');
+          if (part && d && d.next) part.textContent = dueInfo(d.next).label;
+        }
+      }, 60000);
       setInterval(checkReturns, 60 * 60 * 1000);
+      loadCatalog();
+      if (!catalogBlocked()) setInterval(() => loadCatalog({ background: true }), 60 * 60 * 1000);
     }
     renderBoard();
     renderAgenda();
@@ -1430,6 +2040,9 @@ window.CrmSupabaseStore = (() => {
     if (!window.EXDED_CRM_SW || !('serviceWorker' in navigator)) return;
     if (location.protocol === 'https:' || location.hostname === 'localhost') navigator.serviceWorker.register('sw.js').catch(() => {});
   }
+
+  // для проверок: чистые функции схемы, без данных
+  window.EXDED_CRM_TEST = { normalize, legacyToClients, boardDeals, activeDeal, dealTitle, normalizeDeal, loadCatalog, catalog, catalogFind, catalogBlocked };
 
   function init() { registerSW(); boot(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
