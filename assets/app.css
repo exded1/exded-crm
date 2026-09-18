@@ -380,11 +380,41 @@ input::placeholder, textarea::placeholder { color: var(--ink-3); }
 .due.is-today { background: var(--orange-soft); color: var(--orange-ink); }
 .waiting { font-variant-numeric: tabular-nums; color: var(--amber-ink); font-weight: 600; }
 .badge-back { font-size: 12px; font-weight: 700; color: var(--orange-ink); }
-.call-link {
-  margin-left: auto; display: inline-grid; place-items: center; width: 32px; height: 32px; margin-top: -4px; margin-bottom: -4px;
-  border-radius: 50%; background: var(--green-soft); color: var(--green-ink);
+/* --- кнопки связи на карточке доски --- */
+.card-ways { position: relative; margin-left: auto; display: flex; align-items: center; gap: 6px; margin-top: -4px; margin-bottom: -4px; }
+.way {
+  display: inline-grid; place-items: center; width: 32px; height: 32px; flex: none;
+  border: 0; border-radius: 50%; padding: 0; color: #fff; text-decoration: none;
 }
-.call-link svg { width: 16px; height: 16px; }
+.way svg { width: 16px; height: 16px; }
+.way-wa { background: #25d366; }          /* родные цвета сервисов */
+.way-tg { background: #229ed9; }
+.way-mail { background: #6e7b8b; }        /* спокойный графит, не спорит с зелёным и синим */
+.way-call { background: #34b759; }        /* плотный зелёный в ряд к соседям */
+@media (hover: hover) {
+  .way-wa:hover { background: #1fb457; }
+  .way-tg:hover { background: #1c8cc0; }
+  .way-mail:hover { background: #5d6a79; }
+  .way-call:hover { background: #2d9d4c; }
+}
+/* отклик на касание: короткая вспышка фирменным оранжевым, потом свой цвет */
+.way.is-flash { animation: way-flash .5s ease-out; }
+@keyframes way-flash { 0%, 45% { background-color: var(--orange); color: #fff; } }
+
+/* «Позвонить или скопировать» — коротко и на месте, рядом с кнопкой */
+.way-ask {
+  position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 5;
+  display: flex; align-items: center; gap: 6px; padding: 6px;
+  border: 1px solid var(--line); border-radius: 12px; background: var(--surface);
+  box-shadow: var(--shadow-float); white-space: nowrap;
+}
+.way-ask-num { font-size: 12.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.way-ask-btn {
+  display: inline-flex; align-items: center; min-height: 30px; padding: 0 10px;
+  border: 1px solid var(--line); border-radius: 9px; background: var(--surface);
+  font-size: 13px; font-weight: 600; color: var(--ink); text-decoration: none;
+}
+@media (hover: hover) { .way-ask-btn:hover { background: var(--surface-2); } }
 
 .lost-row {
   display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px;
@@ -736,6 +766,9 @@ dialog::backdrop { background: rgba(20, 20, 19, .42); }
   .cat-row { min-height: 44px; }
   .cat-list { max-height: min(440px, calc(var(--vvh, 100vh) * .45)); }
   .icon-btn, .contact-go a, .link-row .icon-btn, .item-row .icon-btn, .log .icon-btn { width: 44px; height: 44px; }
+  .way { width: 44px; height: 44px; }
+  .way svg { width: 19px; height: 19px; }
+  .way-ask-btn { min-height: 44px; }
   .card .vip, .cs-head .vip, .contact .main-star { width: 44px; height: 44px; }
   .chips button, .seg button, .pill, .deal-tab { min-height: 44px; }
   .btn, .next-actions .btn, .match .btn { min-height: 44px; }
