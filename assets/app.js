@@ -3490,18 +3490,74 @@ window.CrmSupabaseStore = (() => {
       if (foot) dlg.style.setProperty('--foot-h', Math.ceil(foot.getBoundingClientRect().height) + 'px');
     }
   }
-  // Клавиатура выходит уже ПОСЛЕ того, как раскрылся список или встало поле:
-  // лист ужимается, и то, с чем человек работает, оказывается под клавиатурой. Возвращаем в вид.
+  /* ⭐Поле под клавиатурой. Главная ловушка iOS: при открытой клавиатуре layout-высота
+     окна НЕ уменьшается, поэтому scrollIntoView считает поле «видимым», хотя его закрыла
+     клавиатура. Видимую полосу берём у visualViewport: [offsetTop, offsetTop + height].
+
+     ⚠️Поверх клавиатуры iOS рисует свою панель со стрелками и «Готово». Её высоту система
+     не сообщает ни одним свойством, поэтому держим постоянный запас PANEL_IOS. Если
+     visualViewport уже учёл панель, мы просто поднимем поле чуть выше — это безопасная
+     сторона ошибки. Если на живом айфоне поле всё же упрётся в панель, крутить надо
+     именно эту константу, других мест нет.
+
+     ⚠️Прокручиваем ВНУТРЕННИЙ контейнер (.cs-scroll, .sheet-scroll, .log-rows, .cat-list),
+     а не страницу: страница в приложении не прокручивается вовсе, и scrollIntoView на ней
+     сдвигал бы всё окно вместе с шапкой карточки. */
+  const PANEL_IOS = 48;   // панель со стрелками и «Готово»
+  const ZAPAS = 12;       // чтобы поле не липло к краю
+
+  function vidimayaPolosa() {
+    const vv = window.visualViewport;
+    if (!vv) return { verh: 0, niz: window.innerHeight };
+    return { verh: vv.offsetTop, niz: vv.offsetTop + vv.height };
+  }
+  function blizhayshayaProkrutka(el) {
+    for (let p = el.parentElement; p; p = p.parentElement) {
+      const st = getComputedStyle(p);
+      if (/(auto|scroll)/.test(st.overflowY) && p.scrollHeight > p.clientHeight + 1) return p;
+    }
+    return null;
+  }
   function keepFocusVisible() {
     const el = document.activeElement;
     if (!el || !el.matches || !el.matches('input, textarea, select')) return;
     const box = el.closest('.cat-pick') || el.closest('.f') || el;
-    if (box.scrollIntoView) box.scrollIntoView({ block: 'nearest' });
+    const cont = blizhayshayaProkrutka(box);
+    if (!cont) { if (box.scrollIntoView) box.scrollIntoView({ block: 'nearest' }); return; }
+    const r = box.getBoundingClientRect();
+    const c = cont.getBoundingClientRect();
+    const { verh, niz } = vidimayaPolosa();
+    // Нижняя граница — что кончится раньше: видимая полоса или сам контейнер.
+    const nizOk = Math.min(niz - PANEL_IOS, c.bottom) - ZAPAS;
+    const verhOk = Math.max(verh, c.top) + ZAPAS;
+    let sdvig = 0;
+    if (r.bottom > nizOk) sdvig = r.bottom - nizOk;
+    else if (r.top < verhOk) sdvig = r.top - verhOk;
+    if (sdvig) cont.scrollTop += sdvig;
   }
   let fitTimer = null;
-  const fitSoon = () => { clearTimeout(fitTimer); fitTimer = setTimeout(fitSheets, 60); };
-  const onViewportResize = () => { fitSheets(); keepFocusVisible(); };
+  /* ⚠️Возвращаем поле в вид только когда видимая полоса УМЕНЬШИЛАСЬ, то есть клавиатура
+     вылезла. При закрытии полоса растёт — трогать прокрутку нельзя, иначе позиция прыгает. */
+  let poslednyaya = 0;
+  const fitSoon = () => { clearTimeout(fitTimer); fitTimer = setTimeout(() => { fitSheets(); keepFocusVisible(); }, 60); };
+  const onViewportResize = () => {
+    fitSheets();
+    const h = vidimayaPolosa().niz - vidimayaPolosa().verh;
+    if (!poslednyaya || h <= poslednyaya + 1) keepFocusVisible();
+    poslednyaya = h;
+  };
+  /* ⭐Щипок и двойной тап не должны масштабировать приложение.
+     Метатега viewport для этого мало: Safari на iOS с некоторых версий разрешает
+     масштабирование даже при user-scalable=no. Поэтому глушим жест напрямую.
+     touch-action:manipulation на body (см. app.css) убирает двойной тап. */
+  function zapretMasshtaba() {
+    for (const zhest of ['gesturestart', 'gesturechange', 'gestureend']) {
+      document.addEventListener(zhest, (e) => { e.preventDefault(); }, { passive: false });
+    }
+  }
+
   function bindViewport() {
+    zapretMasshtaba();
     fitSheets();
     window.addEventListener('resize', onViewportResize);
     window.addEventListener('orientationchange', fitSoon);
