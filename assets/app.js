@@ -6640,7 +6640,31 @@ ${badge}
     }
   }
 
-  function init() { applyBrand(); registerSW(); boot(); }
+  /* Загрузочная шторка. Уезжает, когда приложение готово, но не раньше 1000 мс:
+     400 мс знак проявляется + 600 мс держится. Потолок 3 секунды.
+     ⭐Это только ускорение: сам уезд продублирован чистым CSS с задержкой 2300 мс
+     (см. #boot в app.css), поэтому шторка уйдёт даже если этот код не выполнится. */
+  const BOOT_MIN = 1000;
+  const BOOT_MAX = 3000;
+  let bootUbrana = false;
+  function hideBoot() {
+    if (bootUbrana) return;
+    bootUbrana = true;
+    const el = document.getElementById('boot');
+    if (!el) return;
+    el.classList.add('boot-go');
+    // Убираем из разметки сами: иначе CSS-страховка на 2300 мс проиграла бы уезд заново.
+    setTimeout(() => { el.remove(); }, 750);
+  }
+
+  function init() {
+    applyBrand();
+    registerSW();
+    setTimeout(hideBoot, Math.max(0, BOOT_MAX - performance.now()));
+    Promise.resolve(boot()).finally(() => {
+      setTimeout(hideBoot, Math.max(0, BOOT_MIN - performance.now()));
+    });
+  }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 })();

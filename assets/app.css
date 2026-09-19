@@ -955,3 +955,44 @@ input:not([type=file]), select, textarea {
   .tabs button { padding: 0 8px; font-size: 13.5px; }
   .tabs button b { margin-left: 2px; }
 }
+
+/* ===== Загрузочная шторка =====
+   Белый экран со знаком уезжает вверх и открывает приложение.
+   Движение взято с образца (вариант 9): translateY(-102%), кривая cubic-bezier(.65,0,.35,1).
+
+   Тайминг: знак проявляется 400 мс, держится 600 мс, шторка уезжает 700 мс — около 1,7 с.
+   Шторку снимает app.js, когда приложение готово, но не раньше 1000 мс: заставку
+   должно быть видно целиком, а не мелькнуть.
+
+   ⭐СТРАХОВКА БЕЗ JS. Уезд продублирован чистой CSS-анимацией с задержкой 2300 мс:
+   даже если скрипт не выполнится вовсе, к 3 секундам шторки на экране нет.
+   Поэтому уезд по готовности сделан transition-ом, а не второй анимацией —
+   две анимации на одном свойстве дрались бы за него. */
+#boot {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  transform: translateY(0);
+  transition: transform 700ms cubic-bezier(.65, 0, .35, 1);
+  animation: boot-strahovka 700ms cubic-bezier(.65, 0, .35, 1) 2300ms forwards;
+}
+#boot.boot-go { transform: translateY(-102%); }
+#boot svg {
+  width: clamp(96px, 26vw, 128px);
+  height: auto;
+  opacity: 0;
+  animation: boot-znak 400ms ease-out forwards;
+}
+@keyframes boot-znak { to { opacity: 1; } }
+@keyframes boot-strahovka { to { transform: translateY(-102%); } }
+
+/* Тише движение — знак показываем сразу и убираем шторку без уезда. */
+@media (prefers-reduced-motion: reduce) {
+  #boot { transition: opacity 200ms linear; animation: boot-strahovka-tihaya 1ms linear 2300ms forwards; }
+  #boot.boot-go { transform: none; opacity: 0; }
+  #boot svg { animation: none; opacity: 1; }
+  @keyframes boot-strahovka-tihaya { to { opacity: 0; visibility: hidden; } }
+}
