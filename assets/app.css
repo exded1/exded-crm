@@ -582,7 +582,11 @@ input:not([type=file]), select, textarea {
 .cs-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 10px; }
 /* Справка о выпущенных документах: вторым рядом сетки, ровно под полем «Счёт №» */
 .cs-bill { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.cs-bill .doc-nos { margin: 0; font-size: 12px; overflow-wrap: anywhere; }
+.cs-bill .doc-nos { margin: 0; padding: 0; list-style: none; font-size: 12px;
+  display: flex; flex-direction: column; gap: 2px; }
+.cs-bill .doc-nos li { overflow-wrap: anywhere; }
+.cs-bill .doc-nos b { font-weight: 700; color: var(--ink-2); }
+.cs-bill .doc-nos-sep { color: var(--line-2); }
 .cs-lost { padding: 12px; border-radius: 12px; background: var(--red-soft); }
 .cs-lost .hint { color: var(--red-ink); }
 .money input { font-variant-numeric: tabular-nums; }
