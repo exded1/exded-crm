@@ -2700,30 +2700,67 @@ window.ExdedDocs = (() => {
     unitHead: 477.1, sumHead: 534.4,  // правый край подписей шапки
   };
 
-  const BRAND_Y = 56.3;           // общая опорная линия: низ букв EXDED
+  const BRAND_Y = 56.3;           // базовая линия слова EXDED
   const BRAND_SIZE = 24;          // кегль слова EXDED
   const CAP = 0.718;              // высота заглавной Helvetica-Bold в долях кегля
-  const BRAND_GAP = 10;           // видимый зазор между словом и знаком
 
-  /* Знак встаёт справа от слова EXDED: ростом с буквы, на одной с ними линии.
-     Слово, отступы и вся остальная шапка остаются ровно там, где были в образцах. */
-  function brandOp() {
+  /* ⭐Знак СЛЕВА, слово справа — как в шапке сайта и на значке приложения.
+     До 19.09.2026 знак стоял справа от слова, это была ошибка.
+
+     Пропорции не подобраны на глаз: сняты с живой шапки exded.com по ЧЕРНИЛАМ,
+     а не по коробкам элементов (снимок в 4× и разбор по пикселям, 19.09.2026):
+       высота знака = 1,312 × высоты заглавных букв
+       зазор        = 0,594 × высоты заглавных
+       центр знака ниже центра букв на 0,039 высоты заглавных
+
+     ⚠️Знак НЕ стоит на базовой линии. На сайте он свисает ниже неё на 3,5 px
+     и поднимается выше линии заглавных на 2,25 px — то есть выровнен по центру
+     букв, а не по низу. Прежний код сажал его на базовую линию ростом ровно
+     с заглавную: от этого знак казался мелким и приподнятым. */
+  const MARK_H = 1.312;           // высота знака в долях высоты заглавных
+  /* ⚠️Зазор задан ПО ЧЕРНИЛАМ, а текст ставится по началу строки, не по краю буквы.
+     У «E» в Helvetica-Bold есть левый боковой вынос — на 0,101 высоты заглавных.
+     Замерено на готовом PDF в 4000 px: при MARK_GAP 0,594 чернильный зазор выходил
+     0,695 вместо 0,594. Поэтому здесь вынос уже вычтен. */
+  const MARK_GAP = 0.493;         // 0,594 эталона − 0,101 бокового выноса «E»
+  const MARK_DY = 0.048;          // насколько центр знака ниже центра букв
+
+  /* Геометрия знака. Ink — доли картинки, занятые самим знаком: [x, y, ширина, высота].
+     Картинка квадратная, поэтому рамку считаем от нужной высоты чернил. */
+  function brandGeom() {
     const b = brandMark();
     if (!b) return null;
     const ink = Array.isArray(b.ink) ? b.ink : [0, 0, 1, 1];
-    const capTop = BRAND_Y - BRAND_SIZE * CAP;
-    const box = (BRAND_Y - capTop) / (ink[3] || 1);        // рамка картинки вокруг самого знака
-    const wordW = textWidth(SELLER.brand, BRAND_SIZE, true) + 1.05 * (SELLER.brand.length - 1);
+    const cap = BRAND_SIZE * CAP;
+    const inkH = cap * MARK_H;
+    const box = inkH / (ink[3] || 1);
     return {
-      t: 'img', color: C.head, w: box, h: box,
-      x: M.left + wordW + BRAND_GAP - ink[0] * box,
-      y: capTop - ink[1] * box,
+      ink, box,
+      inkW: (ink[2] || 1) * box,
+      gap: cap * MARK_GAP,
+      top: (BRAND_Y - cap / 2 + cap * MARK_DY) - inkH / 2,   // от оптического центра букв
     };
+  }
+
+  function brandOp() {
+    const g = brandGeom();
+    if (!g) return null;
+    return {
+      t: 'img', color: C.head, w: g.box, h: g.box,
+      x: M.left - g.ink[0] * g.box,
+      y: g.top - g.ink[1] * g.box,
+    };
+  }
+
+  // Слово уезжает вправо на ширину знака с зазором. Без знака остаётся у левого поля.
+  function brandWordX() {
+    const g = brandGeom();
+    return g ? M.left + g.inkW + g.gap : M.left;
   }
 
   function headerOps(client) {
     const ops = [];
-    ops.push({ t: 'text', x: M.left, y: BRAND_Y, size: BRAND_SIZE, bold: true, color: C.ink, text: SELLER.brand, spacing: 1.05 });
+    ops.push({ t: 'text', x: brandWordX(), y: BRAND_Y, size: BRAND_SIZE, bold: true, color: C.ink, text: SELLER.brand, spacing: 1.05 });
     ops.push(brandOp());
     const right = [
       { y: 40.0, text: SELLER.name, bold: true, color: C.ink },
