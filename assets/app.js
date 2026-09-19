@@ -2337,7 +2337,7 @@ window.ExdedDocs = (() => {
     street: 'Rayskistraße 11',
     zip: '01219',
     city: 'Dresden',
-    phone: 'Tel. +49 151 50101658',
+    phone: 'Tel. +49 1525 3038072',
     email: 'info@exded.com',
     site: 'exded.com',
     ceo: 'Geschäftsführer: Borys Khomenko',
@@ -4915,8 +4915,19 @@ ${badge}
   // Справка под полем «Счёт №»: какие документы по этой сделке уже выпущены.
   // Руками не правится, порядок — как выпускали (в d.docs они дописываются в конец).
   function dealDocNosHTML(d) {
-    const nos = dealDocNos(d);
-    return nos.length ? `<p class="hint doc-nos">Документы: ${esc(nos.join(' \u00b7 '))}</p>` : '';
+    const docs = (d.docs || []).filter((x) => x && x.no);
+    if (!docs.length) return '';
+    const sep = ' <span class="doc-nos-sep">\u00b7</span> ';
+    const rows = docs.map((r) => {
+      const chasti = [
+        `<b>${esc(r.no)}</b>`,
+        esc((DOC_KIND[r.kind] || {}).label || r.kind),
+        esc(r.date ? fmtLongDate(r.date) : ''),
+        esc(docMoney(r.total)),
+      ].filter(Boolean);
+      return `<li>${chasti.join(sep)}</li>`;
+    }).join('');
+    return `<ul class="hint doc-nos">${rows}</ul>`;
   }
 
   function dealDelHTML(c, d, on) {
@@ -6614,10 +6625,18 @@ ${badge}
     const logo = (window.EXDED_BRAND || {}).logo;
     if (!logo) return;
     $$('[data-logo]').forEach((el) => { el.src = logo; });
-    for (const rel of ['icon', 'apple-touch-icon']) {
-      let link = document.querySelector(`link[rel="${rel}"]`);
-      if (!link) { link = document.createElement('link'); link.rel = rel; document.head.appendChild(link); }
-      link.href = logo;
+    // Значок вкладки всегда берём из константы: он одинаков в обеих сборках.
+    let icon = document.querySelector('link[rel="icon"]');
+    if (!icon) { icon = document.createElement('link'); icon.rel = 'icon'; document.head.appendChild(icon); }
+    icon.href = logo;
+    /* Значок «На экран «Домой»» трогаем, только если разметка его не дала.
+       ⚠️ В сборке для GitHub он прописан файлами на белом фоне: iOS не понимает
+       прозрачность и из знака на прозрачном сделала бы чёрный квадрат. */
+    if (!document.querySelector('link[rel="apple-touch-icon"]')) {
+      const apple = document.createElement('link');
+      apple.rel = 'apple-touch-icon';
+      apple.href = logo;
+      document.head.appendChild(apple);
     }
   }
 

@@ -1,5 +1,5 @@
 // Кэширует только файлы приложения. Запросы к базе с клиентами не кэшируются.
-const VERSION = 'exded-crm-v7';
+const VERSION = 'exded-crm-v8';
 const SHELL = [
   "./",
   "./index.html",
@@ -22,6 +22,9 @@ const SHELL = [
   "./fonts/onest-latin-ext-400-normal.woff2",
   "./fonts/onest-latin-ext-500-normal.woff2",
   "./fonts/onest-latin-ext-700-normal.woff2",
+  "./icons/apple-touch-icon-120.png",
+  "./icons/apple-touch-icon-152.png",
+  "./icons/apple-touch-icon-167.png",
   "./icons/apple-touch-icon.png",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
