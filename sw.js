@@ -1,5 +1,5 @@
 // Кэширует только файлы приложения. Запросы к базе с клиентами не кэшируются.
-const VERSION = 'exded-crm-v6';
+const VERSION = 'exded-crm-v7';
 const SHELL = [
   "./",
   "./index.html",
@@ -8,6 +8,8 @@ const SHELL = [
   "./config.js",
   "./vendor/supabase.js",
   "./manifest.webmanifest",
+  "./exded-logo-512.png",
+  "./og.jpg",
   "./fonts/onest-cyrillic-400-normal.woff2",
   "./fonts/onest-cyrillic-500-normal.woff2",
   "./fonts/onest-cyrillic-700-normal.woff2",

@@ -108,7 +108,13 @@
   --line: #e3dfd8;
   --line-2: #cdc8be;
   --card-line: transparent;
-  --orange: #ff8234;
+  /* Фирменная палитра EXDED. Значения одни на всё приложение;
+     акцент подставлен только туда, где акцентный цвет и так использовался. */
+  --brand-dark: #262626;
+  --brand-accent: #ff8134;
+  --brand-bg: #f3f2ee;
+  --brand-mark-filter: none;   /* знак тёмный — на светлом фоне виден как есть */
+  --orange: var(--brand-accent);
   --orange-ink: #a8490f;
   --orange-soft: #ffeadd;
   --amber: #cf9418;
@@ -120,7 +126,7 @@
   --red: #c2452f;
   --red-ink: #9b301b;
   --red-soft: #f9e2dc;
-  --focus: #ff8234;
+  --focus: var(--brand-accent);
   --shadow-card: 0 1px 2px rgba(38, 38, 38, .05), 0 10px 22px -16px rgba(38, 38, 38, .5);
   --shadow-float: 0 18px 50px -20px rgba(20, 20, 20, .45);
   --r-card: 14px;
@@ -170,6 +176,7 @@
     --red-ink: #f08a74;
     --red-soft: #3a2420;
     --shadow-card: 0 1px 0 rgba(0, 0, 0, .3), 0 8px 20px -14px rgba(0, 0, 0, .9);
+    --brand-mark-filter: invert(1);
     color-scheme: dark;
   }
 }
@@ -195,6 +202,7 @@
   --red-ink: #f08a74;
   --red-soft: #3a2420;
   --shadow-card: 0 1px 0 rgba(0, 0, 0, .3), 0 8px 20px -14px rgba(0, 0, 0, .9);
+  --brand-mark-filter: invert(1);
   color-scheme: dark;
 }
 
@@ -295,10 +303,14 @@ input::placeholder, textarea::placeholder { color: var(--ink-3); }
 .gate { padding: calc(24px + var(--sat)) max(24px, var(--sar)) calc(24px + var(--sab)) max(24px, var(--sal)); }
 .gate-box { width: min(380px, 100%); display: flex; flex-direction: column; gap: 18px; }
 .gate-msg { color: var(--ink-2); }
-.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; white-space: nowrap; }
-.brand-mark { width: 24px; height: 24px; color: var(--ink); flex: none; }
+.brand { display: flex; align-items: center; gap: 8px; font-size: 16px; white-space: nowrap; }
+.brand-mark { width: 28px; height: 28px; flex: none; filter: var(--brand-mark-filter); }
+.brand-name { display: inline-flex; align-items: center; gap: 8px; font-weight: 400; color: var(--ink); }
+.brand-word { font-weight: 700; letter-spacing: .08em; }
+.brand-sep { width: 1px; height: 14px; background: var(--line-2); flex: none; }
 .brand-lg { font-size: 22px; }
 .brand-lg .brand-mark { width: 32px; height: 32px; }
+.brand-lg .brand-sep { height: 18px; }
 
 /* ---------- Каркас ---------- */
 .app {
@@ -804,7 +816,8 @@ input:not([type=file]), select, textarea {
 
 /* ---------- Планшет и телефон ---------- */
 @media (max-width: 1023px) {
-  .brand-name { display: none; }
+  .top .brand-name { display: none; }
+  .brand-mark { width: 24px; height: 24px; }
   .search { margin-left: 4px; max-width: none; }
   .tabs {
     display: flex; gap: 6px; padding: 0 12px 10px;
