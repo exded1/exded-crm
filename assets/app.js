@@ -4823,6 +4823,12 @@ ${badge}
   // Крестик показываем только у открытой сделки и только если она не единственная:
   // клиент без сделок теряет смысл, а промахнуться по соседней таблетке нельзя.
   const dealDocNos = (d) => (d.docs || []).map((x) => x.no).filter(Boolean);
+  // Справка под полем «Счёт №»: какие документы по этой сделке уже выпущены.
+  // Руками не правится, порядок — как выпускали (в d.docs они дописываются в конец).
+  function dealDocNosHTML(d) {
+    const nos = dealDocNos(d);
+    return nos.length ? `<p class="hint doc-nos">Документы: ${esc(nos.join(' \u00b7 '))}</p>` : '';
+  }
 
   function dealDelHTML(c, d, on) {
     if (!on || c.deals.length < 2) return '';
@@ -4866,7 +4872,10 @@ ${badge}
   <label class="f"><span>Название сделки</span><input data-dbind="title" value="${esc(cur.title)}" placeholder="${esc(dealTitle(cur))}"></label>
   <label class="f"><span>Что хочет купить</span><textarea data-dbind="product" rows="2">${esc(cur.product)}</textarea></label>
   <div class="cs-grid">
-    <label class="f"><span>Счёт №</span><input data-dbind="invoice_no" value="${esc(cur.invoice_no)}"></label>
+    <div class="cs-bill">
+      <label class="f"><span>Счёт № (Rechnung, вручную)</span><input data-dbind="invoice_no" value="${esc(cur.invoice_no)}" title="Номер настоящего счёта — Rechnung. Его выписывают вручную после отгрузки. Номера Angebot и Proforma сюда не подставляются."></label>
+      ${dealDocNosHTML(cur)}
+    </div>
     <label class="f money"><span class="f-amount">Сумма, €${amountFromItemsHTML(cur)}</span><input data-dbind="amount" inputmode="decimal" value="${esc(amountInput(cur.amount))}"></label>
   </div>
   <div class="items">

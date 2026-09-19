@@ -566,6 +566,9 @@ input:not([type=file]), select, textarea {
 .cs-sec-head h3 { font-size: 15px; font-weight: 700; }
 .cs-sec-head .saved { margin-left: auto; font-size: 12.5px; color: var(--ink-3); }
 .cs-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 10px; }
+/* Справка о выпущенных документах: вторым рядом сетки, ровно под полем «Счёт №» */
+.cs-bill { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.cs-bill .doc-nos { margin: 0; font-size: 12px; overflow-wrap: anywhere; }
 .cs-lost { padding: 12px; border-radius: 12px; background: var(--red-soft); }
 .cs-lost .hint { color: var(--red-ink); }
 .money input { font-variant-numeric: tabular-nums; }
