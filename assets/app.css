@@ -921,9 +921,14 @@ input:not([type=file]), select, textarea {
 
 @keyframes sheet-up { from { transform: translateY(40px); opacity: .6; } to { transform: none; opacity: 1; } }
 
-/* iPhone и iPad не увеличивают страницу при вводе, если шрифт полей от 16px */
+/* iPhone и iPad не увеличивают страницу при вводе, если шрифт полей от 16px.
+   ⚠️19.09.2026: правило было написано через :where() — у него нулевая специфичность,
+   и его перебивало любое правило с классом. Замерено на стенде: 35 полей из 57 считались
+   15px, и Safari честно приближал страницу при фокусе. Теперь без :where() и с !important. */
 @media (pointer: coarse) {
-  :where(input:not([type=checkbox]):not([type=radio]), select, textarea) { font-size: 16px; }
+  input:not([type=checkbox]):not([type=radio]):not([type=hidden]),
+  select,
+  textarea { font-size: 16px !important; }
   .search input[type=search], .contact-fields input, .item-row input, .link-row input, .cat-fields input { font-size: 16px !important; }
 
   /* пальцем попадать в цель 44px: только на сенсорных экранах, вид на ноутбуке не меняется */
@@ -996,3 +1001,10 @@ input:not([type=file]), select, textarea {
   #boot svg { animation: none; opacity: 1; }
   @keyframes boot-strahovka-tihaya { to { opacity: 0; visibility: hidden; } }
 }
+
+/* ⭐Никакого масштабирования щипком и двойным тапом: это приложение, а не страница.
+   manipulation отключает двойной тап, но оставляет обычную прокрутку и нажатия.
+   Щипок глушится отдельно, в app.js (gesturestart) — одного CSS для Safari мало.
+   ⚠️Побочное: пальцами приблизить экран нельзя. Для внутреннего инструмента это
+   осознанный размен; если понадобится вернуть — снять это правило и обработчик в app.js. */
+body { touch-action: manipulation; }
