@@ -4415,6 +4415,35 @@ window.CrmSupabaseStore = (() => {
 <button type="button" class="way-ask-btn" data-act="way" data-way="copy" data-value="${esc(phone)}">Копировать</button>`;
     btn.parentNode.appendChild(box);
     askEl = box;
+    placeAsk(box, btn);
+  }
+
+  /* Подсказка по умолчанию раскрывается вверх, но у верхней карточки места сверху нет:
+     колонка прокручиваемая и просто срезает подсказку вместе с номером. Поэтому смотрим,
+     где места больше, и при нужде открываем вниз. Ширину держим по карточке, чтобы
+     подсказка не вылезала влево за её край. */
+  function placeAsk(box, btn) {
+    const card = btn.closest('.card');
+    if (card) {
+      const limit = Math.min(260, Math.round(card.getBoundingClientRect().width) - 8, window.innerWidth - 24);
+      box.style.maxWidth = `${Math.max(150, limit)}px`;
+    }
+    const clip = btn.closest('.col-list');
+    if (!clip) return;
+    const c = clip.getBoundingClientRect();
+    const b = btn.getBoundingClientRect();
+    const need = box.getBoundingClientRect().height + 6;
+    const up = b.top - c.top;
+    const down = c.bottom - b.bottom;
+    if (up < need && down > up) box.classList.add('is-below');
+    // карточка может быть наполовину за краем прокрутки — тогда подгоняем колонку,
+    // чтобы подсказка была видна целиком, а не куском
+    const fit = box.getBoundingClientRect();
+    if (fit.height + 8 > c.height) return;
+    const over = fit.bottom - (c.bottom - 4);
+    const under = (c.top + 4) - fit.top;
+    if (over > 0) clip.scrollTop += over;
+    else if (under > 0) clip.scrollTop -= under;
   }
 
   function onWay(btn, e) {
