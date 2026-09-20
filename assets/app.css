@@ -750,6 +750,19 @@ input:not([type=file]), select, textarea {
 .card.is-multi { border-left: 3px solid var(--line-2); padding-left: 9px; }
 .lost-row.is-multi { border-left: 3px solid var(--line-2); padding-left: 8px; }
 
+/* Клиент без сделок: та же геометрия, что у строки «Минус», но спокойный серый текст —
+   это не отказ, просто человек, с которым пока нет сделки (например, пришёл возврат). */
+.nodeal-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px;
+  padding: 9px 11px; border-radius: 11px; background: var(--surface);
+  border: 1px solid var(--line); cursor: pointer; user-select: none; -webkit-user-select: none;
+}
+.nodeal-row b { font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nodeal-row time { font-size: 12.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.nodeal-row span { grid-column: 1 / -1; font-size: 13px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nodeal-row.is-enter { animation: card-in 180ms ease-out; }
+.nodeal-row.is-leave { animation: card-out 140ms ease-out forwards; pointer-events: none; }
+
 .log-add { display: flex; flex-direction: column; gap: 8px; }
 .log-add .btn { align-self: flex-end; }
 .log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
