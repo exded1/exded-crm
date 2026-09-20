@@ -3776,7 +3776,7 @@ window.CrmSupabaseStore = (() => {
   function normalizeDeal(d, fallbackCreated) {
     const born = (d && d.created_at) || fallbackCreated || nowIso();
     const x = {
-      id: uid(), title: '', product: '', invoice_no: '', amount: null,
+      id: uid(), title: '', product: '', invoice_no: '', amount: null, auto: false,
       status: 'work', status_at: null, agreed: '', next: null,
       lost_reason: '', lost_at: null, returned_at: null,
       items: [], docs: [], doc_note: '', created_at: born, closed_at: null,
@@ -3867,7 +3867,13 @@ window.CrmSupabaseStore = (() => {
     } else {
       c.deals = src.deals.filter(Boolean).map((x) => normalizeDeal(x, c.created_at));
     }
-    if (!c.deals.length) c.deals = [normalizeDeal({ id: c.id || uid() }, c.created_at)];
+    /* ⭐Клиенту без сделок нормализация дорисовывает одну пустую: на неё опирается
+       половина приложения (activeDeal, карточка, переключатель сделок), убрать нельзя.
+       Но на доске это была бы пустая карточка в «В работе» — а у возвратов с сайта
+       сделки нет по смыслу. Метим её auto:true, и доска покажет такого человека
+       отдельной строкой. Как только в сделку что-то впишут, метка перестаёт работать
+       (см. sdelkaPustaya) и карточка появляется обычным порядком. */
+    if (!c.deals.length) c.deals = [normalizeDeal({ id: c.id || uid(), auto: true }, c.created_at)];
     // поля первой схемы на клиенте больше не нужны — они уже внутри сделки
     for (const k of LEGACY_DEAL_KEYS) delete c[k];
     c.schema = 2;
@@ -4166,7 +4172,16 @@ window.CrmSupabaseStore = (() => {
   // а старые закрытые сделки доску не засоряют — они видны в карточке, в «Покупках».
   // Минус показываем, только если у клиента больше ничего нет: ни открытой сделки, ни покупки.
   // Иначе одна компания висела бы сразу в «Минусе» и в «В работе».
+  /* Дорисованная сделка, в которую никто ничего не вписал. Проверяем не только метку:
+     стоит владельцу заполнить хоть что-то — и это уже обычная сделка, ей место на доске. */
+  function sdelkaPustaya(d) {
+    return !!d && d.auto === true && d.status === 'work'
+      && !str(d.title) && !str(d.product) && !str(d.agreed) && !str(d.invoice_no)
+      && !Number.isFinite(d.amount) && !(d.items || []).length && !(d.docs || []).length && !d.next;
+  }
+
   function boardDeals(c) {
+    if (c.deals.length === 1 && sdelkaPustaya(c.deals[0])) return [];
     const open = openDeals(c);
     const bought = c.deals.filter((d) => d.status === 'client').sort((a, b) => dealTime(a) - dealTime(b)).slice(-1);
     if (open.length || bought.length) return [...open, ...bought];
@@ -4324,10 +4339,29 @@ window.CrmSupabaseStore = (() => {
 </article>`;
   }
 
+  /* ⭐Клиент без единой сделки. Раньше его на доске не было вовсе: колонки строятся
+     из сделок, и поиск в шапке фильтрует внутри той же отрисовки — такого человека
+     нельзя было ни увидеть, ни найти. Появились они с возвратами: форма Rücksendung
+     заводит карточку с записью в историю, но сделку не создаёт, это не лид.
+     Показываем отдельной строкой в «Клиентах». Вид намеренно другой, не карточка
+     сделки: тут нечего двигать между колонками, и Sortable её не берёт —
+     он ограничен селектором '.card, .lost-row'. */
+  function noDealRowHTML({ c }) {
+    const main = mainContact(c);
+    const kogda = c.last_contact_at ? shortDate(new Date(c.last_contact_at)) : '';
+    const kontakt = str(main && (main.phone || main.email)).trim();
+    return `<article class="nodeal-row" data-id="${esc(c.id)}" tabindex="0">
+  <b>${esc(clientName(c))}</b>
+  <time>${esc(kogda)}</time>
+  <span>Без сделок${kontakt ? ` \u00b7 ${esc(kontakt)}` : ''}</span>
+</article>`;
+  }
+
   /* Доска обновляется без мигания: карточки не пересоздаются, а переиспользуются.
      Новая появляется мягко, исчезающая уходит и только потом убирается из разметки.
      Пересборка innerHTML целиком заодно рвала бы перетаскивание и сбивала прокрутку. */
-  const cardKey = (x) => `${x.c.id}:${x.d.id}`;
+  // ⚠️У строки клиента без сделок нет d — ключ всё равно обязан быть своим и постоянным.
+  const cardKey = (x) => `${x.c.id}:${x.d ? x.d.id : 'bez-sdelki'}`;
   const partsBox = document.createElement('div');
   // системная настройка «уменьшить движение»: тогда анимаций нет вовсе,
   // и событие animationend не придёт — везде есть запасной таймер
@@ -4391,18 +4425,20 @@ window.CrmSupabaseStore = (() => {
     for (const c of state.clients.values()) {
       if (q && !matches(c, q)) continue;
       const rows = boardDeals(c);
+      if (!rows.length) { groups.client.push({ c, d: null }); continue; }
       const multi = rows.length > 1;
       for (const d of rows) groups[d.status].push({ c, d, multi, no: c.deals.indexOf(d) + 1, of: c.deals.length });
     }
     for (const s of STATUS_KEYS) {
       groups[s].sort(sortFor(s));
       const list = $(`.col-list[data-status="${s}"]`);
-      patchList(list, groups[s], s === 'lost' ? lostRowHTML : cardHTML);
+      patchList(list, groups[s], s === 'lost' ? lostRowHTML : (row) => (row.d ? cardHTML(row) : noDealRowHTML(row)));
       list.dataset.empty = q ? 'Ничего не найдено' : list.dataset.emptyDefault;
       $$(`[data-count="${s}"]`).forEach((el) => { el.textContent = groups[s].length; });
       const sumEl = $(`[data-sum="${s}"]`);
       if (sumEl) {
-        const sum = groups[s].reduce((acc, x) => acc + dealMoney(x.d), 0);
+        // ⚠️У строки клиента без сделок d нет — в сумму колонки ей нечего дать.
+        const sum = groups[s].reduce((acc, x) => acc + (x.d ? dealMoney(x.d) : 0), 0);
         sumEl.textContent = sum ? fmtMoney(Math.round(sum)) : '';
       }
     }
