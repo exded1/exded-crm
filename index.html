@@ -52,6 +52,13 @@
         <button class="btn primary wide" type="submit">Войти</button>
       </form>
 
+      <!-- Вход сохранён, но сейчас не открылся (обычно — нет связи в момент запуска).
+           Пароль тут ни при чём, поэтому главная кнопка — «Повторить». -->
+      <div id="gate-retry" class="stack" hidden>
+        <button class="btn primary wide" type="button" id="gate-retry-go">Повторить</button>
+        <button class="btn wide" type="button" id="gate-retry-login">Войти по паролю</button>
+      </div>
+
       <form id="form-setup" class="stack" hidden>
         <p class="hint">Supabase → Project Settings. Чтобы не вводить это на каждом устройстве, впишите значения в config.js на GitHub.</p>
         <label class="f"><span>Project URL</span><input type="url" name="url" inputmode="url" required></label>
