@@ -3151,6 +3151,53 @@ window.CrmSupabaseStore = (() => {
         return data.user;
       },
       async logout() { if (channel) sb.removeChannel(channel); channel = null; await sb.auth.signOut(); },
+      /* ⭐Вход, сохранённый на ЭТОМ устройстве. Библиотека Supabase кладёт его
+         в localStorage под именем sb-<проект>-auth-token. Имя со временем может поменяться,
+         поэтому ищем по образцу, а не по точной строке. Наружу ничего не отдаётся:
+         ответ нужен только чтобы отличить «входа нет» от «вход есть, но сейчас не открылся». */
+      storedSession() {
+        try {
+          for (let i = 0; i < localStorage.length; i += 1) {
+            const k = localStorage.key(i);
+            if (!k || !/^sb-.+-auth-token$/.test(k)) continue;
+            const v = JSON.parse(localStorage.getItem(k) || 'null');
+            const s = v && (v.refresh_token ? v : (v.currentSession || v.session));
+            if (s && s.refresh_token) return s;
+          }
+        } catch {}
+        return null;
+      },
+      /* ⭐Одна попытка вернуть вход без пароля.
+         Ключ доступа живёт час, ключ продления — месяцами. При запуске с экрана
+         «Домой» первый почти всегда просрочен, и приложение идёт за новым.
+         ⚠️Почему не sb.auth.getSession(): после одной неудачи библиотека запоминает отказ
+         на 60 секунд (lastRefreshFailure в vendor/supabase.js) и повторные вызовы в это окно
+         в сеть вообще не идут — повтор был бы бесполезен. Поэтому обмен делаем сами,
+         а готовый ответ отдаём библиотеке через setSession — она сохранит его как обычно.
+         ⚠️Адрес и ключ — те же, что у библиотеки; никаких новых прав это не даёт.
+         Возврат: retry=true — виновата связь, вход трогать нельзя;
+                  retry=false и user=null — сервер сказал, что этот вход больше не годится. */
+      async resume() {
+        const st = this.storedSession();
+        if (!st) return { user: null, retry: false };
+        let r = null;
+        try {
+          r = await fetch(config.supabaseUrl + '/auth/v1/token?grant_type=refresh_token', {
+            method: 'POST',
+            headers: { apikey: config.supabaseKey, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: st.refresh_token }),
+          });
+        } catch { return { user: null, retry: true }; }
+        if (r.status === 429 || r.status >= 500) return { user: null, retry: true };
+        let j = null;
+        try { j = await r.json(); } catch {}
+        if (!r.ok || !j || !j.access_token || !j.refresh_token) return { user: null, retry: false };
+        let out = null;
+        try { out = await sb.auth.setSession({ access_token: j.access_token, refresh_token: j.refresh_token }); } catch { return { user: null, retry: true }; }
+        if (out && out.error) return { user: null, retry: true };
+        const u = (out && out.data && out.data.session && out.data.session.user) || j.user || null;
+        return { user: u, retry: !u };
+      },
       async allowed() {
         const { data, error } = await sb.rpc('is_team');
         if (error) throw new Error(error.message);
@@ -3548,35 +3595,64 @@ window.CrmSupabaseStore = (() => {
     if (!vv) return { verh: 0, niz: window.innerHeight };
     return { verh: vv.offsetTop, niz: vv.offsetTop + vv.height };
   }
-  function blizhayshayaProkrutka(el) {
+  /* ⭐Запас под панель «↑ ↓ Готово» держим ТОЛЬКО при открытой клавиатуре.
+     До 21.09.2026 он вычитался всегда, и при простом клике по полю без клавиатуры
+     содержимое без причины уезжало на 48 px — это и читалось как «панель скачет».
+     Порог 120 px: меньше — это панель браузера, а не клавиатура. */
+  function klaviaturaOtkryta() {
+    const vv = window.visualViewport;
+    if (!vv) return false;
+    return window.innerHeight - vv.height - vv.offsetTop > 120;
+  }
+  /* ⭐Собираем ВСЕ вложенные прокрутки, а не одну ближайшую: в карточке
+     клиента их две (список каталога внутри .cs-scroll). Если ближайшая уже докрутилась
+     до края, поле поднимает следующая — раньше в этом случае поле так и оставалось под клавиатурой. */
+  function prokrutkiVverh(el) {
+    const out = [];
     for (let p = el.parentElement; p; p = p.parentElement) {
       const st = getComputedStyle(p);
-      if (/(auto|scroll)/.test(st.overflowY) && p.scrollHeight > p.clientHeight + 1) return p;
+      if (/(auto|scroll)/.test(st.overflowY) && p.scrollHeight > p.clientHeight + 1) out.push(p);
+      if (p.tagName === 'DIALOG') break;
     }
-    return null;
+    return out;
   }
   function keepFocusVisible() {
     const el = document.activeElement;
     if (!el || !el.matches || !el.matches('input, textarea, select')) return;
     const box = el.closest('.cat-pick') || el.closest('.f') || el;
-    const cont = blizhayshayaProkrutka(box);
-    if (!cont) { if (box.scrollIntoView) box.scrollIntoView({ block: 'nearest' }); return; }
-    const r = box.getBoundingClientRect();
-    const c = cont.getBoundingClientRect();
-    const { verh, niz } = vidimayaPolosa();
-    // Нижняя граница — что кончится раньше: видимая полоса или сам контейнер.
-    const nizOk = Math.min(niz - PANEL_IOS, c.bottom) - ZAPAS;
-    const verhOk = Math.max(verh, c.top) + ZAPAS;
-    let sdvig = 0;
-    if (r.bottom > nizOk) sdvig = r.bottom - nizOk;
-    else if (r.top < verhOk) sdvig = r.top - verhOk;
-    if (sdvig) cont.scrollTop += sdvig;
+    const spisok = prokrutkiVverh(box);
+    if (!spisok.length) { if (box.scrollIntoView) box.scrollIntoView({ block: 'nearest' }); return; }
+    const zapasPaneli = klaviaturaOtkryta() ? PANEL_IOS : 0;
+    for (const cont of spisok) {
+      const r = box.getBoundingClientRect();
+      const c = cont.getBoundingClientRect();
+      const { verh, niz } = vidimayaPolosa();
+      // Нижняя граница — что кончится раньше: видимая полоса или сам контейнер.
+      const nizOk = Math.min(niz - zapasPaneli, c.bottom) - ZAPAS;
+      const verhOk = Math.max(verh, c.top) + ZAPAS;
+      let sdvig = 0;
+      if (r.bottom > nizOk) sdvig = r.bottom - nizOk;
+      else if (r.top < verhOk) sdvig = r.top - verhOk;
+      if (!sdvig) return;                                  // поле уже целиком на виду
+      const bylo = cont.scrollTop;
+      cont.scrollTop = bylo + sdvig;
+      // Докрутили сколько надо — выше лезть незачем.
+      if (Math.abs(cont.scrollTop - bylo) >= Math.abs(sdvig) - 1) return;
+    }
   }
-  let fitTimer = null;
   /* ⚠️Возвращаем поле в вид только когда видимая полоса УМЕНЬШИЛАСЬ, то есть клавиатура
      вылезла. При закрытии полоса растёт — трогать прокрутку нельзя, иначе позиция прыгает. */
   let poslednyaya = 0;
-  const fitSoon = () => { clearTimeout(fitTimer); fitTimer = setTimeout(() => { fitSheets(); keepFocusVisible(); }, 60); };
+  /* ⚠️Клавиатура на iOS выезжает примерно 300 мс. Одной проверки через 60 мс мало:
+     в этот момент экран ещё полный, поле считается видимым, мы ничего не двигаем —
+     а потом клавиатура его закрывает. Поэтому проверяем несколько раз за полсекунды.
+     Это же держит поле на виду при переходе стрелками ↑ ↓ на самой клавиатуре. */
+  const SROKI_PODGONKI = [60, 180, 320, 500];
+  let fitTimers = [];
+  const fitSoon = () => {
+    fitTimers.forEach(clearTimeout);
+    fitTimers = SROKI_PODGONKI.map((ms) => setTimeout(() => { fitSheets(); keepFocusVisible(); }, ms));
+  };
   const onViewportResize = () => {
     fitSheets();
     const h = vidimayaPolosa().niz - vidimayaPolosa().verh;
@@ -4203,6 +4279,37 @@ window.CrmSupabaseStore = (() => {
     return '';
   }
   const itemsTotal = (d) => d.items.reduce((sum, it) => { const p = itemPrice(it); return sum + (Number.isFinite(p) ? p * (it.qty || 1) : 0); }, 0);
+
+  /* ⭐ЧАСТЬ 3. Пометка «брутто / нетто» у позиции решает ровно одно:
+     как понимать вписанную цену — в ней уже есть НДС 19 % или его надо начислить сверху.
+     Ставка всегда 19 %, сделки без НДС переключатель не делает и никогда не делал.
+
+     До 21.09.2026 в карточке сделки не было НИ ОДНОЙ цифры, которая от этой пометки
+     меняется: «Итого» было простой суммой вписанных цен. Менялась только надпись
+     на самой таблетке и слово «брутто/нетто» после итога — оттого на телефоне и казалось,
+     что переключатель не работает. В документах он работал всегда.
+
+     ⚠️Шаги счёта повторяют docs.js (totals) слово в слово: цена позиции округляется
+     до центов, строка = цена × количество (тоже до центов), НДС берётся от СУММЫ нетто.
+     Другой порядок округлений дал бы в карточке и в Angebot разные центы. */
+  const VAT_STAVKA = 0.19;
+  function itemsVat(d) {
+    const r2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+    let net = 0;
+    let est = false;
+    for (const it of d.items) {
+      const p = itemPrice(it);
+      if (!Number.isFinite(p)) continue;
+      est = true;
+      const qty = Number(it.qty) > 0 ? Number(it.qty) : 1;
+      const unit = it.gross === false ? r2(p) : r2(p / (1 + VAT_STAVKA));
+      net += r2(unit * qty);
+    }
+    if (!est) return null;
+    net = r2(net);
+    const vat = r2(net * VAT_STAVKA);
+    return { net, vat, total: r2(net + vat) };
+  }
 
   /* ===================================================================
      Поиск и сортировка
@@ -5069,6 +5176,18 @@ ${badge}
   }
 
   // Кнопка показывается, только когда есть что подставить и это не то же самое
+  /* Три строки под позициями — те же цифры, что уйдут в Angebot и Proforma. */
+  function itemsSumsHTML(d) {
+    const t = itemsVat(d);
+    if (!t) return '';
+    const podskazka = 'Так же считают Angebot и Proforma: цена позиции округляется до центов, НДС 19 % берётся от суммы нетто.';
+    return `<div class="items-sums" title="${esc(podskazka)}">
+  <span>Нетто</span><b>${esc(fmtMoney(t.net))}</b>
+  <span>НДС 19 %</span><b>${esc(fmtMoney(t.vat))}</b>
+  <span class="is-total">Брутто</span><b class="is-total">${esc(fmtMoney(t.total))}</b>
+</div>`;
+  }
+
   function amountFromItemsHTML(d) {
     const s = itemsSum(d);
     if (!s || s === d.amount) return '';
@@ -5087,7 +5206,6 @@ ${badge}
 </span>`;
     }).join('');
     if (!cur) return `<div class="cs-sec-head"><h3>Сделки</h3></div><div class="deal-tabs">${tabs}</div>`;
-    const total = itemsTotal(cur);
     const items = cur.items.map((it) => `<div class="item-row${it.gross ? ' is-gross' : ''}" data-item="${esc(it.id)}">
   <input data-ibind="name" value="${esc(it.name)}" placeholder="Наименование" aria-label="Наименование">
   <input data-ibind="qty" value="${esc(qtyInput(it.qty))}" inputmode="decimal" aria-label="Количество">
@@ -5113,7 +5231,7 @@ ${badge}
     ${items}
     <div class="items-foot">
       <button type="button" class="link-btn" data-act="item-add">+ Добавить позицию</button>
-      ${total ? `<span class="items-total">Итого ${esc(fmtMoney(Math.round(total * 100) / 100))}${itemsKind(cur.items)}</span>` : ''}
+      ${itemsSumsHTML(cur)}
     </div>
   </div>
   <p class="hint deal-dates">Сделка создана ${esc(fmtLongDate(cur.created_at))}${cur.closed_at ? ` · закрыта ${esc(fmtLongDate(cur.closed_at))}` : ''}</p>
@@ -6628,6 +6746,22 @@ ${badge}
     $('#gate-msg').textContent = message;
     $('#form-login').hidden = form !== 'login';
     $('#form-setup').hidden = form !== 'setup';
+    const povtor = $('#gate-retry');
+    if (povtor) povtor.hidden = form !== 'retry';
+  }
+
+  /* ⭐Экран «не вышло, но пароль тут ни при чём».
+     До 21.09.2026 любая осечка связи при запуске выводила форму входа, и это выглядело
+     как «приложение выкинуло из аккаунта». Теперь предлагаем повторить то же самое
+     действие, а форма с паролем остаётся второй кнопкой — на случай, если вход и правда истёк. */
+  let povtorFn = null;
+  function showRetry(message, again) {
+    povtorFn = again;
+    gate(message, 'retry');
+    const go = $('#gate-retry-go');
+    const pwd = $('#gate-retry-login');
+    if (go) go.onclick = () => { povtorFn = null; again(); };
+    if (pwd) pwd.onclick = () => { showLogin(); };
   }
 
   function readConfig() {
@@ -6679,15 +6813,16 @@ ${badge}
   async function afterLogin(user) {
     gate('Проверяю доступ…');
     let ok = false;
-    try { ok = await store.allowed(); } catch (err) { showLogin('Нет связи с базой: ' + err.message); return; }
+    try { ok = await store.allowed(); } catch (err) { showRetry('Нет связи с базой. Вход сохранён, пароль вводить не нужно. — ' + err.message, () => afterLogin(user)); return; }
     if (!ok) { await store.logout(); showLogin('У этого аккаунта нет доступа к CRM. Запустите файл базы в Supabase ещё раз.'); return; }
     store.user = user;
     gate('Загружаю клиентов…');
-    try { await store.start({ onData, onStatus }); } catch (err) { showLogin('Клиенты не загрузились: ' + err.message); return; }
+    try { await store.start({ onData, onStatus }); } catch (err) { showRetry('Клиенты не загрузились. Вход сохранён, пароль вводить не нужно. — ' + err.message, () => afterLogin(user)); return; }
     startApp();
   }
 
   function showLogin(message = '') {
+    povtorFn = null;
     gate('Вход в CRM', 'login');
     $('#login-error').textContent = message;
     const f = $('#form-login');
@@ -6734,8 +6869,39 @@ ${badge}
     if (!store) { showSetup(); return; }
     let user = null;
     try { user = await store.session(); } catch {}
-    if (!user) { showLogin(); return; }
-    afterLogin(user);
+    if (user) { afterLogin(user); return; }
+    // Вход на устройстве есть, просто сейчас не открылся — пароль спрашивать не за что.
+    if (typeof store.storedSession === 'function' && store.storedSession()) { vosstanovitVhod(0); return; }
+    showLogin();
+  }
+
+  /* ⭐ГЛАВНОЕ ПО ЧАСТИ 1. Ключ доступа Supabase живёт час. При запуске с экрана
+     «Домой» он почти всегда уже просрочен, и библиотека идёт за новым ключом по сети.
+     Если в эту секунду сети нет (типично для холодного запуска на iPhone), getSession()
+     возвращает «сессии нет» — хотя сам вход лежит в localStorage и цел. Раньше мы принимали
+     это за выход из аккаунта и показывали форму с email и паролем. Теперь — повторяем обмен.
+     ⚠️Защита не ослаблена: срок жизни ключей задаёт Supabase, его мы не трогали;
+     ключи как лежали только на этом телефоне, так и лежат. */
+  async function vosstanovitVhod(popytka) {
+    gate('Восстанавливаю вход…');
+    let r = { user: null, retry: true };
+    try { r = await store.resume(); } catch {}
+    if (r && r.user) { afterLogin(r.user); return; }
+    if (r && !r.retry) { showLogin('Срок входа истёк, войдите ещё раз.'); return; }
+    if (popytka < 2) { setTimeout(() => vosstanovitVhod(popytka + 1), 1200 * (popytka + 1)); return; }
+    showRetry('Нет связи. Вход на этом устройстве сохранён — пароль вводить не нужно.', () => vosstanovitVhod(0));
+  }
+
+  /* ⭐Браузер вправе стереть данные сайта, чтобы освободить место, — вместе с ними
+     ушёл бы и сохранённый вход. Установленному приложению разрешение обычно выдаётся молча.
+     ⚠️Safari на iPhone этого свойства пока не знает — там строка ничего не делает, но и не мешает.
+     Наружу ничего не открывает: данные как лежали на устройстве, так и лежат. */
+  async function zakrepitHranilishche() {
+    try {
+      if (!navigator.storage || !navigator.storage.persist) return;
+      if (await navigator.storage.persisted()) return;
+      await navigator.storage.persist();
+    } catch {}
   }
 
   function registerSW() {
@@ -6745,7 +6911,7 @@ ${badge}
 
   // для проверок: чистые функции схемы, без данных
   Object.defineProperty(window, 'EXDED_CRM_TEST_STORE', { get: () => store, configurable: true });
-  window.EXDED_CRM_TEST = { normalize, legacyToClients, boardDeals, activeDeal, dealTitle, normalizeDeal, loadCatalog, catalog, catalogFind, catalogBlocked, keepFocusVisible, fitSheets, renderBoardNow: renderBoard, dealDocNos, bornShort, refreshAll, changeLines, logSeen, readTheme, applyTheme, setTheme, docPayload, docSubject, docItemsOf, normalizeDocRec };
+  window.EXDED_CRM_TEST = { normalize, legacyToClients, boardDeals, activeDeal, dealTitle, normalizeDeal, loadCatalog, catalog, catalogFind, catalogBlocked, keepFocusVisible, fitSheets, renderBoardNow: renderBoard, dealDocNos, bornShort, itemsVat, refreshAll, changeLines, logSeen, readTheme, applyTheme, setTheme, docPayload, docSubject, docItemsOf, normalizeDocRec };
 
   /* Фирменный знак. Источник один — window.EXDED_BRAND.logo (его кладёт сборка).
      Отсюда он расходится по интерфейсу, значку вкладки и значку «На экран «Домой»»:
@@ -6789,6 +6955,9 @@ ${badge}
   function init() {
     applyBrand();
     registerSW();
+    zakrepitHranilishche();
+    // Сеть появилась — сами повторяем то, на чём остановились, без нажатий.
+    window.addEventListener('online', () => { if (povtorFn) { const f = povtorFn; povtorFn = null; f(); } });
     setTimeout(hideBoot, Math.max(0, BOOT_MAX - performance.now()));
     Promise.resolve(boot()).finally(() => {
       setTimeout(hideBoot, Math.max(0, BOOT_MIN - performance.now()));

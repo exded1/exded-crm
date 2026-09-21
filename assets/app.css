@@ -703,6 +703,16 @@ input:not([type=file]), select, textarea {
 .item-warn { font-size: 11.5px; font-weight: 600; color: var(--red-ink); }
 .items-foot { display: flex; align-items: center; gap: 10px; }
 .items-total { margin-left: auto; font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+/* Итоги позиций: нетто, НДС 19 %, брутто — те же цифры, что в Angebot и Proforma.
+   Две колонки: подпись слева, деньги справа, цифры одной ширины — столбик ровный. */
+.items-sums {
+  margin-left: auto; display: grid; grid-template-columns: auto auto; gap: 2px 12px;
+  align-items: baseline; justify-items: end; text-align: right;
+  font-size: 13px; font-variant-numeric: tabular-nums;
+}
+.items-sums span { color: var(--ink-3); }
+.items-sums b { font-weight: 600; }
+.items-sums .is-total { font-size: 14.5px; font-weight: 700; color: var(--ink); }
 
 /* --- ссылки, о клиенте, реквизиты, покупки --- */
 .links { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
