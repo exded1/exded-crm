@@ -3747,17 +3747,20 @@ window.CrmSupabaseStore = (() => {
      прямоугольник, относительно которого браузер ставит position:fixed. */
   function fitSheets() {
     const root = document.documentElement;
+    zamokStranicy();
+    vernutStranicu();
     const vv = window.visualViewport;
     if (vv) {
-      const okno = document.documentElement.clientHeight || window.innerHeight;
       root.style.setProperty('--vvh', Math.round(vv.height) + 'px');
       root.style.setProperty('--vvt', Math.max(0, Math.round(vv.offsetTop)) + 'px');
-      root.style.setProperty('--vvb', Math.max(0, Math.round(okno - vv.height - vv.offsetTop)) + 'px');
+      root.style.setProperty('--vvp', Math.max(0, Math.round(stranicaSverhu())) + 'px');
+      zapomnitPolosu();
     } else {
       root.style.removeProperty('--vvh');
       root.style.removeProperty('--vvt');
-      root.style.removeProperty('--vvb');
+      root.style.removeProperty('--vvp');
     }
+    root.style.setProperty('--kzap', zapasPodPolem() + 'px');
     for (const dlg of document.querySelectorAll('dialog[open]')) {
       const foot = dlg.querySelector('.sheet-foot, .cs-foot, .modal-foot');
       if (foot) dlg.style.setProperty('--foot-h', Math.ceil(foot.getBoundingClientRect().height) + 'px');
@@ -3779,9 +3782,58 @@ window.CrmSupabaseStore = (() => {
      ⚠️Прокручиваем ВНУТРЕННИЙ контейнер (.cs-scroll, .sheet-scroll, .log-rows, .cat-list),
      а не страницу: страница в приложении не прокручивается вовсе, и scrollIntoView на ней
      сдвигал бы всё окно вместе с шапкой карточки. */
-  const PANEL_IOS = 48;   // панель со стрелками и «Готово»
-  const ZAPAS = 12;       // чтобы поле не липло к краю
-  const ZAPAS_KLAV = 24;  // над клавиатурой держим больше: поле не должно липнуть к ней
+  const PANEL_IOS = 50;    // серая панель iOS со стрелками и галочкой над клавиатурой
+  const ZAPAS = 12;        // чтобы поле не липло к краю
+  const ZAPAS_KLAV = 80;   // над клавиатурой держим 80 px, чтобы поле было видно с запасом
+
+  /* ⭐23.09.2026. Серую панель iOS (стрелки ↑ ↓ и «Готово») система не показывает
+     ни одним свойством, и в `visualViewport.height` она попадает не всегда. Поэтому
+     запас под неё держим ВСЕГДА, пока курсор стоит в поле на сенсорном экране —
+     в том числе с внешней клавиатурой, когда экранной клавиатуры нет, а панель есть. */
+  const sensornyi = () => { try { return window.matchMedia('(pointer: coarse)').matches; } catch { return false; } };
+  const poleVFokuse = () => { const el = document.activeElement; return Boolean(el && el.matches && el.matches('input, textarea, select')); };
+  const zapasPodPolem = () => (poleVFokuse() && sensornyi() ? PANEL_IOS + ZAPAS_KLAV : 0);
+
+  /* ⭐23.09.2026. Высоту клавиатуры считаем от полосы БЕЗ клавиатуры, а не от
+     window.innerHeight: в приложении с домашнего экрана iOS это число меняет вместе
+     с клавиатурой, и прежняя проверка `innerHeight - vv.height > 120` давала «клавиатуры
+     нет» ровно тогда, когда она есть. Из-за этого запас под серую панель не держался,
+     и поле оказывалось прямо под ней. */
+  let polnayaPolosa = 0;
+  function zapomnitPolosu() {
+    const vv = window.visualViewport;
+    if (!vv || poleVFokuse()) return;
+    polnayaPolosa = Math.max(polnayaPolosa, Math.round(vv.height));
+  }
+
+  /* ⭐23.09.2026. Пока открыто окно, страница под ним не прокручивается вовсе.
+     iOS при появлении клавиатуры сам прокручивает страницу, чтобы показать поле, —
+     и утаскивает за собой всё окно. Замок снимает саму возможность, а `vernutStranicu()`
+     возвращает на ноль, если система всё-таки прокрутила. */
+  function zamokStranicy() {
+    document.documentElement.classList.toggle('is-locked', Boolean(document.querySelector('dialog[open]')));
+  }
+  function vernutStranicu() {
+    const se = document.scrollingElement || document.documentElement;
+    if (window.scrollY || se.scrollTop) {
+      try { window.scrollTo(0, 0); } catch {}
+      se.scrollTop = 0;
+    }
+  }
+  /* Верх видимой полосы В КООРДИНАТАХ СТРАНИЦЫ.
+     ⭐23.09.2026. Окно ставится именно по этому числу, а не по `offsetTop`, и само окно
+     больше не `position: fixed`, а `absolute`. Почему: как iOS рисует `fixed`, когда
+     видимая полоса сдвинута, — вопрос без надёжного ответа (в одних случаях элемент
+     едет вместе с полосой, в других остаётся на месте), и compensация то не срабатывает,
+     то срабатывает дважды. У `absolute` этой неопределённости нет вовсе: `pageTop` —
+     это по определению та строка страницы, с которой начинается видимая часть экрана,
+     и элемент, поставленный на неё, окажется вверху экрана при любом поведении системы. */
+  function stranicaSverhu() {
+    const vv = window.visualViewport;
+    if (!vv) return 0;
+    if (typeof vv.pageTop === 'number' && Number.isFinite(vv.pageTop)) return vv.pageTop;
+    return (window.scrollY || 0) + (vv.offsetTop || 0);
+  }
 
   function vidimayaPolosa() {
     const vv = window.visualViewport;
@@ -3794,8 +3846,8 @@ window.CrmSupabaseStore = (() => {
      Порог 120 px: меньше — это панель браузера, а не клавиатура. */
   function klaviaturaOtkryta() {
     const vv = window.visualViewport;
-    if (!vv) return false;
-    return window.innerHeight - vv.height - vv.offsetTop > 120;
+    if (!vv || !polnayaPolosa) return false;
+    return polnayaPolosa - vv.height > 120;
   }
   /* ⭐Собираем ВСЕ вложенные прокрутки, а не одну ближайшую: в карточке
      клиента их две (список каталога внутри .cs-scroll). Если ближайшая уже докрутилась
@@ -3886,15 +3938,19 @@ window.CrmSupabaseStore = (() => {
     const box = el.closest('.cat-pick') || el.closest('.f') || el;
     const spisok = prokrutkiVverh(box);
     if (!spisok.length) { if (box.scrollIntoView) box.scrollIntoView({ block: 'nearest' }); return; }
-    const klava = klaviaturaOtkryta();
-    const zapasPaneli = klava ? PANEL_IOS : 0;
-    const zapas = klava ? ZAPAS_KLAV : ZAPAS;
+    // запас под серую панель iOS и 80 px сверх неё держим, пока курсор в поле
+    const hochem = poleVFokuse() && sensornyi() ? PANEL_IOS + ZAPAS_KLAV : ZAPAS;
     for (const cont of spisok) {
       const r = celFokusa(el, box);
       const c = cont.getBoundingClientRect();
       const { verh, niz } = vidimayaPolosa();
+      /* ⚠️На узкой полосе полного запаса просто нет: телефон боком с клавиатурой
+         оставляет 214 px, а поле «О клиенте» занимает 90 из них. Тогда держим
+         столько запаса, сколько остаётся, — но поле обязано быть видно целиком,
+         иначе «подняли над клавиатурой» превращается в «увели за верхний край». */
+      const zapas = Math.max(ZAPAS, Math.min(hochem, niz - verh - r.height - ZAPAS));
       // Нижняя граница — что кончится раньше: видимая полоса или сам контейнер.
-      const nizOk = Math.min(niz - zapasPaneli, c.bottom) - zapas;
+      const nizOk = Math.min(niz - zapas, c.bottom - ZAPAS);
       const verhOk = Math.max(verh, c.top) + ZAPAS;
       let sdvig = 0;
       if (r.bottom > nizOk) sdvig = r.bottom - nizOk;
@@ -3917,10 +3973,11 @@ window.CrmSupabaseStore = (() => {
   let fitTimers = [];
   const fitSoon = () => {
     fitTimers.forEach(clearTimeout);
-    fitTimers = SROKI_PODGONKI.map((ms) => setTimeout(() => { fitSheets(); keepFocusVisible(); }, ms));
+    fitTimers = SROKI_PODGONKI.map((ms) => setTimeout(() => { fitSheets(); keepFocusVisible(); diagObnovit(); }, ms));
   };
   const onViewportResize = () => {
     fitSheets();
+    diagObnovit();
     const h = vidimayaPolosa().niz - vidimayaPolosa().verh;
     if (!poslednyaya || h <= poslednyaya + 1) keepFocusVisible();
     poslednyaya = h;
@@ -3935,15 +3992,30 @@ window.CrmSupabaseStore = (() => {
     }
   }
 
+  /* ⭐23.09.2026. Диалоги открываются и закрываются из десятка мест, а замок страницы,
+     пересчёт полосы и панель диагностики нужны при каждом таком случае. Вместо того
+     чтобы дописывать вызов в каждое место, следим за атрибутом `open` у диалогов. */
+  function sleditZaOknami() {
+    if (!window.MutationObserver) return;
+    const nabl = new MutationObserver(() => {
+      zamokStranicy();
+      fitSheets();
+      diagNaverh();
+    });
+    nabl.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['open'] });
+  }
+
   function bindViewport() {
     zapretMasshtaba();
+    sleditZaOknami();
     fitSheets();
     window.addEventListener('resize', onViewportResize);
     window.addEventListener('orientationchange', fitSoon);
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', onViewportResize);
-      window.visualViewport.addEventListener('scroll', fitSheets);
+      window.visualViewport.addEventListener('scroll', () => { fitSheets(); diagObnovit(); });
     }
+    diagStart();
     // клавиатура открывается после фокуса, размеры приходят с задержкой
     document.addEventListener('focusin', fitSoon);
     document.addEventListener('focusout', fitSoon);
@@ -3956,6 +4028,98 @@ window.CrmSupabaseStore = (() => {
         keepFocusVisible();
       }
     }, true);
+  }
+
+  /* ===================================================================
+     ⭐23.09.2026. Диагностика клавиатуры (часть 1 задания от владельца).
+     Включается в Настройках, по умолчанию выключена, состояние лежит только
+     на этом устройстве (localStorage), в базу не пишется и никуда не уходит.
+
+     Зачем: подделанная клавиатура на стенде не ловит того, что происходит
+     на настоящем айфоне. Панель показывает живые числа, по которым видно,
+     какое именно число врёт: высоту окна, видимую полосу, её сдвиг, прокрутку
+     страницы и положение самого окна и поля с курсором.
+
+     ⚠️Панель должна быть видна поверх открытого окна. Ни `z-index`, ни `popover`
+     этого не дают: окно, открытое через `showModal()`, живёт в верхнем слое и рисуется
+     поверх и того, и другого (проверено на стенде: панель-popover оказывалась ПОД
+     карточкой). Единственный надёжный способ — положить панель ВНУТРЬ самого окна;
+     когда окон нет, она живёт в body. Этим занимается `diagNaverh()`, его зовёт
+     наблюдатель за атрибутом `open` у диалогов. */
+  const DIAG_KEY = 'exded-crm-diag-klaviatura';
+  const DIAG_MESTO = 'exded-crm-diag-mesto';
+  let diagEl = null;
+  const diagVkl = () => { try { return localStorage.getItem(DIAG_KEY) === '1'; } catch { return false; } };
+  const standalone = () => {
+    try {
+      return Boolean(window.navigator.standalone) || window.matchMedia('(display-mode: standalone)').matches;
+    } catch { return false; }
+  };
+  function diagPostroit() {
+    if (diagEl) return diagEl;
+    const el = document.createElement('div');
+    el.id = 'diag-kb';
+    el.setAttribute('aria-hidden', 'true');
+    el.innerHTML = '<b>Диагностика клавиатуры</b><pre></pre><i>потяните, чтобы сдвинуть</i>';
+    document.body.appendChild(el);
+    diagEl = el;
+    diagTashchit(el);
+    try {
+      const mesto = localStorage.getItem(DIAG_MESTO);
+      if (mesto === 'niz') el.classList.add('is-niz');
+    } catch {}
+    return el;
+  }
+  // перетаскивание пальцем: запоминаем только «вверху» или «внизу»
+  function diagTashchit(el) {
+    let start = null;
+    el.addEventListener('pointerdown', (e) => { start = e.clientY; el.setPointerCapture(e.pointerId); });
+    el.addEventListener('pointerup', (e) => {
+      if (start === null) return;
+      const put = e.clientY - start;
+      start = null;
+      if (Math.abs(put) < 24) return;
+      const niz = put > 0;
+      el.classList.toggle('is-niz', niz);
+      try { localStorage.setItem(DIAG_MESTO, niz ? 'niz' : 'verh'); } catch {}
+    });
+  }
+  function diagNaverh() {
+    if (!diagVkl() || !diagEl) return;
+    const dlg = Array.from(document.querySelectorAll('dialog[open]')).pop() || document.body;
+    if (diagEl.parentElement !== dlg) dlg.appendChild(diagEl);
+  }
+  function diagPokazat(on) {
+    const el = on ? diagPostroit() : diagEl;
+    if (!el) return;
+    el.classList.toggle('is-on', Boolean(on));
+    if (on) { diagNaverh(); diagObnovit(); }
+  }
+  const diagChislo = (v) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v * 10) / 10 : '—');
+  function diagObnovit() {
+    if (!diagVkl() || !diagEl) return;
+    const vv = window.visualViewport;
+    const se = document.scrollingElement || document.documentElement;
+    const okno = document.querySelector('dialog[open]');
+    const or = okno ? okno.getBoundingClientRect() : null;
+    const el = document.activeElement;
+    const pr = el && el.matches && el.matches('input, textarea, select') ? el.getBoundingClientRect() : null;
+    const stroki = [
+      `innerHeight   ${diagChislo(window.innerHeight)}   clientH ${diagChislo(document.documentElement.clientHeight)}`,
+      `vv.height     ${diagChislo(vv && vv.height)}   offsetTop ${diagChislo(vv && vv.offsetTop)}`,
+      `vv.pageTop    ${diagChislo(vv && vv.pageTop)}   scale ${diagChislo(vv && vv.scale)}`,
+      `scrollY       ${diagChislo(window.scrollY)}   scrollTop ${diagChislo(se && se.scrollTop)}`,
+      `окно   верх ${or ? diagChislo(or.top) : '—'}  низ ${or ? diagChislo(or.bottom) : '—'}`,
+      `поле   верх ${pr ? diagChislo(pr.top) : '—'}  низ ${pr ? diagChislo(pr.bottom) : '—'}`,
+      `standalone ${standalone() ? 'да' : 'нет'}   клавиатура ${klaviaturaOtkryta() ? diagChislo(polnayaPolosa - (vv ? vv.height : 0)) : 'нет'}`,
+    ];
+    const pre = diagEl.querySelector('pre');
+    if (pre) pre.textContent = stroki.join('\n');
+  }
+  function diagStart() {
+    if (!diagVkl()) return;
+    diagPokazat(true);
+    diagNaverh();
   }
 
   let toastTimer = null;
@@ -7022,8 +7186,28 @@ ${badge}
         if (b) setTheme(b.dataset.theme);
       });
     }
+    /* Диагностика клавиатуры. Только на этом устройстве: в базу ничего не пишется. */
+    const diagBtn = $('#btn-diag');
+    const diagPodpis = () => {
+      if (!diagBtn) return;
+      const on = diagVkl();
+      diagBtn.textContent = on ? 'Выключить' : 'Включить';
+      diagBtn.setAttribute('aria-pressed', String(on));
+    };
+    if (diagBtn) {
+      diagPodpis();
+      diagBtn.addEventListener('click', () => {
+        const on = !diagVkl();
+        try { localStorage.setItem(DIAG_KEY, on ? '1' : '0'); } catch {}
+        diagPodpis();
+        diagPokazat(on);
+        diagNaverh();
+      });
+    }
+
     $('#btn-settings').addEventListener('click', () => {
       refreshPwdButton();
+      diagPodpis();
       $('#set-where').textContent = store.kind === 'claude'
         ? 'Клиенты хранятся в вашем аккаунте Claude и синхронизируются на всех устройствах, где вы вошли. Видите их только вы и те, кому вы дадите право редактирования.'
         : `Вы вошли как ${store.user && store.user.email ? store.user.email : ''}. Клиенты хранятся в вашей базе Supabase.`;
@@ -7111,6 +7295,38 @@ ${badge}
   /* ===================================================================
      Запуск
      =================================================================== */
+  /* Загрузочная шторка. Знак проявляется 400 мс, поэтому раньше 700 мс её убирать
+     некрасиво — моргнёт. Потолок 3 секунды.
+     ⭐Это только ускорение: сам уезд продублирован чистым CSS с задержкой 2300 мс
+     (см. #boot в app.css), поэтому шторка уйдёт даже если этот код не выполнится. */
+  const BOOT_MIN = 700;
+  const BOOT_MAX = 3000;
+  let bootUbrana = false;
+  function hideBoot() {
+    if (bootUbrana) return;
+    const ostalos = BOOT_MIN - performance.now();
+    if (ostalos > 0) { setTimeout(hideBoot, ostalos); return; }
+    bootUbrana = true;
+    const el = document.getElementById('boot');
+    if (!el) return;
+    el.classList.add('boot-go');
+    // Убираем из разметки сами: иначе CSS-страховка на 2300 мс проиграла бы уезд заново.
+    setTimeout(() => { el.remove(); }, 750);
+  }
+
+  /* ⭐23.09.2026. Экранов ожидания при запуске должно быть РОВНО ОДИН — заставка.
+     Было так: шторка `#boot` уезжала по таймеру (через секунду), а приложение к этому
+     времени ещё догружалось, и из-под шторки выезжал `#gate` — знак, надпись
+     «Загружаю клиентов…» на другом фоне. Получалось: белая заставка → ещё один экран
+     загрузки → приложение.
+
+     Теперь:
+     • шторку убирает не таймер, а первый экран, с которым человеку и правда надо
+       что-то сделать: приложение, форма входа, «Повторить» или подключение базы
+       (`hideBoot()` зовётся из `startApp()`, `showLogin()`, `showRetry()`, `showSetup()`);
+     • пока идёт ожидание (`form === null`), `#gate` притворяется продолжением заставки:
+       тот же белый фон, ни знака, ни надписи, ни крутилки — см. `.gate.is-wait` в app.css.
+       Это видно только если ожидание затянулось дольше страховочных трёх секунд. */
   function gate(message, form = null) {
     $('#app').hidden = true;
     $('#gate').hidden = false;
@@ -7119,6 +7335,8 @@ ${badge}
     $('#form-setup').hidden = form !== 'setup';
     const povtor = $('#gate-retry');
     if (povtor) povtor.hidden = form !== 'retry';
+    $('#gate').classList.toggle('is-wait', !form);
+    if (form) hideBoot();
   }
 
   /* ⭐Экран «не вышло, но пароль тут ни при чём».
@@ -7163,7 +7381,9 @@ ${badge}
 
   function startApp() {
     $('#gate').hidden = true;
+    $('#gate').classList.remove('is-wait');
     $('#app').hidden = false;
+    hideBoot();
     zagruzitRekvizity();
     if (!appStarted) {
       appStarted = true;
@@ -7248,9 +7468,9 @@ ${badge}
       gate('Загружаю клиентов…');
       const s = await window.CrmClaudeStore.open({ onData, onStatus, legacyToClients });
       if (s) { store = s; startApp(); return; }
-      if (!window.CrmSupabaseStore) { gate('База не подключилась. Откройте CRM по её ссылке на claude.ai и обновите страницу.'); return; }
+      if (!window.CrmSupabaseStore) { gate('База не подключилась. Откройте CRM по её ссылке на claude.ai и обновите страницу.', 'msg'); return; }
     }
-    if (!window.CrmSupabaseStore || !window.supabase) { gate('Не загрузились файлы приложения. Обновите страницу.'); return; }
+    if (!window.CrmSupabaseStore || !window.supabase) { gate('Не загрузились файлы приложения. Обновите страницу.', 'msg'); return; }
     const cfg = readConfig();
     if (!cfg) { showSetup(); return; }
     store = window.CrmSupabaseStore.create(cfg);
@@ -7323,22 +7543,6 @@ ${badge}
     }
   }
 
-  /* Загрузочная шторка. Уезжает, когда приложение готово, но не раньше 1000 мс:
-     400 мс знак проявляется + 600 мс держится. Потолок 3 секунды.
-     ⭐Это только ускорение: сам уезд продублирован чистым CSS с задержкой 2300 мс
-     (см. #boot в app.css), поэтому шторка уйдёт даже если этот код не выполнится. */
-  const BOOT_MIN = 1000;
-  const BOOT_MAX = 3000;
-  let bootUbrana = false;
-  function hideBoot() {
-    if (bootUbrana) return;
-    bootUbrana = true;
-    const el = document.getElementById('boot');
-    if (!el) return;
-    el.classList.add('boot-go');
-    // Убираем из разметки сами: иначе CSS-страховка на 2300 мс проиграла бы уезд заново.
-    setTimeout(() => { el.remove(); }, 750);
-  }
 
   function init() {
     applyBrand();
@@ -7346,10 +7550,13 @@ ${badge}
     zakrepitHranilishche();
     // Сеть появилась — сами повторяем то, на чём остановились, без нажатий.
     window.addEventListener('online', () => { if (povtorFn) { const f = povtorFn; povtorFn = null; f(); } });
+    /* ⭐23.09.2026. Шторку больше не убирает таймер готовности `boot()`:
+       `boot()` возвращается раньше, чем приложение готово (вход и первая загрузка
+       клиентов идут дальше сами), и из-под шторки выезжал промежуточный экран.
+       Теперь шторку убирает тот экран, который человек увидит (см. `gate()` и `startApp()`),
+       а таймер остался только страховкой на случай, если не сработало ничего. */
     setTimeout(hideBoot, Math.max(0, BOOT_MAX - performance.now()));
-    Promise.resolve(boot()).finally(() => {
-      setTimeout(hideBoot, Math.max(0, BOOT_MIN - performance.now()));
-    });
+    boot();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
