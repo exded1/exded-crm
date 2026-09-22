@@ -2343,11 +2343,31 @@ window.ExdedDocs = (() => {
     ceo: 'Geschäftsführer: Borys Khomenko',
     register: 'HRB 43057 · Amtsgericht Dresden',
     ustId: 'USt-IdNr. DE355793465',
-    taxNo: 'Steuernummer 203/106/15146',
-    bankName: 'Ostsächsische Sparkasse Dresden',
-    iban: 'DE28 8505 0300 0221 2480 64',
-    bic: 'OSDDDE81XXX',
+    /* ⭐22.09.2026. Банковские реквизиты и Steuernummer здесь больше НЕ лежат.
+       Репозиторий на GitHub открытый — всё, что попало в assets/app.js, читает кто угодно.
+       Теперь их приносит база после входа: таблица crm_settings, ключ seller_bank,
+       функция seller_bank() (файл 6_rekvizity-dokumentov.sql). Кладёт их сюда
+       setSellerBank(), зовёт app.js сразу после входа.
+       ⛔ Не вписывать значения обратно в код: ни сюда, ни в проверки. */
+    taxNo: '',
+    bankName: '',
+    iban: '',
+    bic: '',
   };
+  const BANK_POLYA = ['bankName', 'iban', 'bic', 'taxNo'];
+  const BANK_NET = 'Реквизиты для документов не пришли из базы. Обновите страницу или войдите заново: без банковских данных документ печатать нельзя.';
+  /* Возвращает true, когда все четыре поля на месте. */
+  function setSellerBank(v) {
+    if (!v || typeof v !== 'object') return false;
+    for (const k of BANK_POLYA) {
+      const x = v[k];
+      SELLER[k] = (x === null || x === undefined) ? '' : String(x).trim();
+    }
+    return bankOk();
+  }
+  function bankOk() {
+    return BANK_POLYA.every((k) => String(SELLER[k] || '').trim() !== '');
+  }
   const ibanPlain = () => SELLER.iban.replace(/\s+/g, '');
 
   /* Фирменный знак в шапке. Источник тот же, что у интерфейса и значков —
@@ -3069,6 +3089,14 @@ window.ExdedDocs = (() => {
   }
 
   function build(kind, data) {
+    /* ⛔Без реквизитов документ не собираем: пустые «IBAN» и «Steuernummer»
+       в Angebot клиенту уйти не должны. */
+    if (!bankOk()) {
+      const e = new Error(BANK_NET);
+      e.code = 'net-rekvizitov';
+      throw e;
+    }
+
     badChars = new Set();
     let doc;
     try {
@@ -3086,6 +3114,7 @@ window.ExdedDocs = (() => {
 
   return {
     SELLER, VAT, PLANS, PAGE_H, FOOT_TOP, FOOT_H, build, angebot, proforma, toPdf, lowestY, unsupported,
+    setSellerBank, bankOk, BANK_NET,
     totals, netFromGross, moneyDE, dateDE, planParts, planAmounts, giroPayload, qrMatrix, textWidth, wrap,
   };
 })();
@@ -3282,6 +3311,17 @@ window.CrmSupabaseStore = (() => {
           ? 'В базе нет таблицы истории. Запустите файл 3_istoriya-izmeneniy.sql.'
           : error.message);
         return data || [];
+      },
+      /* ⭐22.09.2026. Реквизиты для документов (банк, IBAN, BIC, Steuernummer)
+         лежат в базе за входом, а не в коде: репозиторий на GitHub открытый.
+         Таблица crm_settings закрыта наглухо, наружу их отдаёт только функция
+         seller_bank(), и та проверяет is_team(). Без входа — 401. */
+      async sellerBank() {
+        const { data, error } = await sb.rpc('seller_bank');
+        if (error) throw new Error(error.message.includes('seller_bank')
+          ? 'В базе нет реквизитов для документов. Запустите файл 6_rekvizity-dokumentov.sql.'
+          : error.message);
+        return data || null;
       },
       // Номер документа выдаёт база: с двух устройств одинаковый номер выйти не может
       async nextDocNo(kind) {
@@ -5573,6 +5613,9 @@ ${badge}
     if (!items.length) { toast('В сделке нет позиций с ценой', 'err'); return; }
     if (!window.ExdedDocs) { toast('Модуль документов не загрузился, обновите страницу', 'err'); return; }
     if (!store || typeof store.nextDocNo !== 'function') { toast('Номера документов выдаёт база — эта версия CRM их не умеет', 'err'); return; }
+    // ⛔Реквизиты не пришли — документ не делаем и номер не тратим: пустые IBAN
+    // и Steuernummer в Angebot клиенту уйти не должны.
+    if (!ExdedDocs.bankOk() && !(await zagruzitRekvizity())) { toast(ExdedDocs.BANK_NET, 'err'); return; }
 
     // Проверяем ДО того, как взять номер: с непечатаемыми знаками документ не собираем,
     // иначе клиенту уедет строка из вопросительных знаков, а номер сгорит зря.
@@ -6864,9 +6907,26 @@ ${badge}
     return null;
   }
 
+  /* ⭐22.09.2026. Банковские реквизиты и Steuernummer для документов больше не лежат
+     в коде — репозиторий на GitHub открытый. Их отдаёт база и только вошедшему
+     (crm_settings, ключ seller_bank). Тянем сразу после входа и кладём в docs.js.
+     ⚠️Тихо: не вышло — приложение работает как обычно, а про реквизиты скажем
+     в тот момент, когда человек нажмёт «Angebot» или «Proforma». */
+  async function zagruzitRekvizity() {
+    if (!window.ExdedDocs || typeof ExdedDocs.setSellerBank !== 'function') return false;
+    if (ExdedDocs.bankOk()) return true;
+    if (!store || typeof store.sellerBank !== 'function') return false;
+    try {
+      return ExdedDocs.setSellerBank(await store.sellerBank());
+    } catch {
+      return false;
+    }
+  }
+
   function startApp() {
     $('#gate').hidden = true;
     $('#app').hidden = false;
+    zagruzitRekvizity();
     if (!appStarted) {
       appStarted = true;
       bindBoard();
