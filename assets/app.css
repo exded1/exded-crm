@@ -268,7 +268,13 @@ h1, h2, h3, p { margin: 0; }
   background: var(--surface); color: var(--ink);
   font-size: 15px; line-height: 1.35;
 }
-:where(textarea) { resize: vertical; min-height: 64px; }
+/* ⭐22.09.2026. Поля с текстом растут по содержимому, прокрутки внутри поля нет:
+   высоту в пикселях ставит app.js (rostPolya) по scrollHeight.
+   ⚠️ overflow-y: hidden обязателен — иначе Safari оставляет полосу прокрутки и
+   scrollHeight считается по старой высоте, поле перестаёт расти.
+   ⚠️ resize убран намеренно: ручная растяжка спорила бы с автоматической —
+   стоило уменьшить поле мышью, и текст снова прятался. */
+:where(textarea) { resize: none; min-height: 64px; overflow-y: hidden; }
 input:focus, select:focus, textarea:focus { outline: none; border-color: var(--orange); box-shadow: 0 0 0 3px color-mix(in srgb, var(--orange) 22%, transparent); }
 input::placeholder, textarea::placeholder { color: var(--ink-3); }
 
@@ -702,7 +708,8 @@ input:not([type=file]), select, textarea {
 .item-row input.is-bad { border-color: var(--red) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 18%, transparent) !important; }
 .item-warn { font-size: 11.5px; font-weight: 600; color: var(--red-ink); }
 .items-foot { display: flex; align-items: center; gap: 10px; }
-.items-total { margin-left: auto; font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+/* ⚠️22.09.2026: правило .items-total убрано вместе с самой строкой «Итого …» —
+   под позициями теперь стоят «Нетто / НДС 19 % / Брутто» (.items-sums ниже). */
 /* Итоги позиций: нетто, НДС 19 %, брутто — те же цифры, что в Angebot и Proforma.
    Две колонки: подпись слева, деньги справа, цифры одной ширины — столбик ровный. */
 .items-sums {
@@ -965,8 +972,16 @@ input:not([type=file]), select, textarea {
   .way-ask-btn { min-height: 44px; }
   .card .vip, .cs-head .vip, .contact .main-star { width: 44px; height: 44px; }
   .chips button, .seg button, .pill, .deal-tab { min-height: 44px; }
-  .deal-del { width: 34px; height: 34px; right: 3px; }
-  .deal-box.has-del .deal-tab { padding-right: 40px; }
+  /* ⭐22.09.2026: крестик удаления сделки был 34px — пальцем мимо.
+     Значок остался 13px, выросла только область нажатия. */
+  .deal-del { width: 44px; height: 44px; right: 0; }
+  .deal-box.has-del .deal-tab { padding-right: 46px; }
+  /* ⭐22.09.2026: остальные мелкие цели по итогам обхода 22.09 */
+  .task { min-height: 44px; }                       /* чипы «Перезвонить» были 34px */
+  .f-amount { align-items: center; }
+  .from-items { min-height: 44px; display: inline-flex; align-items: center; }
+  .order-link { min-height: 44px; display: flex; align-items: center; }
+  .set-row .btn.small { min-height: 44px; }
   .btn, .next-actions .btn, .match .btn { min-height: 44px; }
   .docs .btn.small { min-height: 44px; }
   .docs .icon-btn { width: 44px; height: 44px; }

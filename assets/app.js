@@ -3573,6 +3573,9 @@ window.CrmSupabaseStore = (() => {
       const foot = dlg.querySelector('.sheet-foot, .cs-foot, .modal-foot');
       if (foot) dlg.style.setProperty('--foot-h', Math.ceil(foot.getBoundingClientRect().height) + 'px');
     }
+    // ⭐Поля с текстом подгоняем здесь же: fitSheets зовут и при открытии листа,
+    // и при смене видимой высоты — ровно тогда, когда высоту надо пересчитать.
+    rostPoley(document);
   }
   /* ⭐Поле под клавиатурой. Главная ловушка iOS: при открытой клавиатуре layout-высота
      окна НЕ уменьшается, поэтому scrollIntoView считает поле «видимым», хотя его закрыла
@@ -3616,6 +3619,77 @@ window.CrmSupabaseStore = (() => {
     }
     return out;
   }
+  /* ⭐22.09.2026. Поля с текстом растут по содержимому.
+     Раньше «О чём говорили», «О чём договорились», «Что хочет купить», «О клиенте»
+     и «Примечание» были фиксированными (rows=2/3) и прокручивались внутри: длинную
+     запись приходилось листать в окошке высотой три строки, а уже сохранённый текст
+     при открытии карточки был виден только началом.
+     ⚠️ Сначала height:auto, потом по scrollHeight — иначе поле умеет только расти
+     и никогда не уменьшается. Рамки добавляем отдельно: при box-sizing:border-box
+     scrollHeight их не учитывает.
+     ⚠️ Невидимое (закрытый диалог) не меряем: там scrollHeight = 0 и поле схлопнулось бы. */
+  const rostPamyat = new WeakMap();
+  function rostPolya(el) {
+    if (!el || el.tagName !== 'TEXTAREA' || !el.isConnected) return;
+    if (!el.getClientRects().length) return;
+    /* ⚠️ Мерить высоту — это принудительный пересчёт раскладки, а зовут нас часто
+       (четыре раза на каждый фокус). Если с прошлого раза не изменились ни текст,
+       ни ширина поля — выходим, ничего не трогая: иначе лишняя работа в этот момент
+       успевает сдвинуть отправку правки и проиграть гонку второму устройству. */
+    const otpechatok = `${el.clientWidth}|${el.value.length}|${el.value.slice(-32)}`;
+    if (rostPamyat.get(el) === otpechatok) return;
+    rostPamyat.set(el, otpechatok);
+    const ramki = el.offsetHeight - el.clientHeight;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight + ramki}px`;
+  }
+  function rostPoley(root) {
+    const gde = root && root.querySelectorAll ? root : document;
+    gde.querySelectorAll('textarea').forEach(rostPolya);
+  }
+
+  /* ⭐Где сейчас курсор внутри поля. Нужно только когда поле выросло выше экрана:
+     тогда на виду держим строку с курсором, а не всё поле целиком.
+     Считаем зеркалом: копия текста до курсора в невидимом блоке с теми же шрифтом,
+     шириной и отступами — offsetTop метки и есть строка курсора. */
+  let zerkalo = null;
+  const ZERKALO_SVOYSTVA = ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'letterSpacing',
+    'lineHeight', 'textTransform', 'textIndent', 'paddingTop', 'paddingRight', 'paddingBottom',
+    'paddingLeft', 'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth', 'boxSizing'];
+  function karetka(el) {
+    try {
+      const st = getComputedStyle(el);
+      if (!zerkalo) {
+        zerkalo = document.createElement('div');
+        zerkalo.setAttribute('aria-hidden', 'true');
+        zerkalo.style.cssText = 'position:absolute;top:-9999px;left:-9999px;visibility:hidden;white-space:pre-wrap;overflow-wrap:anywhere;';
+        document.body.appendChild(zerkalo);
+      }
+      for (const k of ZERKALO_SVOYSTVA) zerkalo.style[k] = st[k];
+      zerkalo.style.width = `${el.clientWidth}px`;
+      const doKursora = el.value.slice(0, el.selectionEnd == null ? el.value.length : el.selectionEnd);
+      zerkalo.textContent = doKursora;
+      const metka = document.createElement('span');
+      metka.textContent = '\u200b';
+      zerkalo.appendChild(metka);
+      const stroka = parseFloat(st.lineHeight) || parseFloat(st.fontSize) * 1.35 || 20;
+      return { y: metka.offsetTop, stroka };
+    } catch { return null; }
+  }
+  /* Что именно держим на виду: обычно всю обёртку поля, а если поле переросло экран —
+     три строки вокруг курсора. */
+  function celFokusa(el, box) {
+    const r = box.getBoundingClientRect();
+    const { verh, niz } = vidimayaPolosa();
+    const polosa = niz - verh;
+    if (el.tagName !== 'TEXTAREA' || r.height <= polosa - 60) return r;
+    const k = karetka(el);
+    if (!k) return r;
+    const er = el.getBoundingClientRect();
+    const top = er.top + k.y - k.stroka;
+    return { top, bottom: top + k.stroka * 3, height: k.stroka * 3 };
+  }
+
   function keepFocusVisible() {
     const el = document.activeElement;
     if (!el || !el.matches || !el.matches('input, textarea, select')) return;
@@ -3624,7 +3698,7 @@ window.CrmSupabaseStore = (() => {
     if (!spisok.length) { if (box.scrollIntoView) box.scrollIntoView({ block: 'nearest' }); return; }
     const zapasPaneli = klaviaturaOtkryta() ? PANEL_IOS : 0;
     for (const cont of spisok) {
-      const r = box.getBoundingClientRect();
+      const r = celFokusa(el, box);
       const c = cont.getBoundingClientRect();
       const { verh, niz } = vidimayaPolosa();
       // Нижняя граница — что кончится раньше: видимая полоса или сам контейнер.
@@ -3681,6 +3755,15 @@ window.CrmSupabaseStore = (() => {
     // клавиатура открывается после фокуса, размеры приходят с задержкой
     document.addEventListener('focusin', fitSoon);
     document.addEventListener('focusout', fitSoon);
+    /* ⭐Поле растёт прямо во время набора и вставки.
+       Слушаем на всём документе с перехватом: поля перерисовываются вместе с карточкой,
+       вешать обработчик на каждое — значит потерять его при первой же перерисовке. */
+    document.addEventListener('input', (e) => {
+      if (e.target && e.target.tagName === 'TEXTAREA') {
+        rostPolya(e.target);
+        keepFocusVisible();
+      }
+    }, true);
   }
 
   let toastTimer = null;
@@ -4270,14 +4353,9 @@ window.CrmSupabaseStore = (() => {
     return lastClosed(c) || c.deals[0] || null;
   }
   const purchases = (c) => c.deals.filter((d) => d.status === 'client').sort((a, b) => dealTime(b) - dealTime(a));
-  // подпись под суммой позиций: всё брутто, всё нетто или вперемешку
-  function itemsKind(items) {
-    const priced = items.filter((it) => Number.isFinite(itemPrice(it)));
-    if (!priced.length) return '';
-    if (priced.every((it) => it.gross)) return ' брутто';
-    if (priced.every((it) => !it.gross)) return ' нетто';
-    return '';
-  }
+  /* ⚠️22.09.2026: itemsKind() (подпись «брутто/нетто» к строке «Итого …») убрана.
+     Самой строки «Итого …» под позициями больше нет — с 21.09 там стоят
+     «Нетто / НДС 19 % / Брутто», и вид налога виден из них. */
   const itemsTotal = (d) => d.items.reduce((sum, it) => { const p = itemPrice(it); return sum + (Number.isFinite(p) ? p * (it.qty || 1) : 0); }, 0);
 
   /* ⭐ЧАСТЬ 3. Пометка «брутто / нетто» у позиции решает ровно одно:
@@ -5592,7 +5670,7 @@ ${badge}
       const wrap = document.createElement('div');
       wrap.innerHTML = next;
       const fresh = wrap.firstElementChild;
-      if (fresh && fresh.innerHTML !== box.innerHTML) box.innerHTML = fresh.innerHTML;
+      if (fresh && fresh.innerHTML !== box.innerHTML) { box.innerHTML = fresh.innerHTML; rostPoley(box); }
     }
   }
 
@@ -5821,12 +5899,24 @@ ${badge}
           cardRenderedJSON = JSON.stringify(state.clients.get(c.id));
           const meta = el.closest('[data-item]').querySelector('.item-meta');
           if (meta) meta.innerHTML = itemMetaHTML(it);
+          /* ⚠️22.09.2026. Здесь дописывалась строка «Итого …» в .items-total, хотя
+             21.09 её место заняли три строки «Нетто / НДС 19 % / Брутто» (.items-sums).
+             Из-за этого при вводе цены под позициями появлялись сразу два разных итога,
+             а новый блок при этом не пересчитывался. Теперь обновляем именно его. */
           const foot = $('.items-foot', body);
-          const sum = itemsTotal(state.clients.get(c.id).deals.find((x) => x.id === d.id) || d);
+          const svezhaya = state.clients.get(c.id).deals.find((x) => x.id === d.id) || d;
           if (foot) {
-            let out = $('.items-total', foot);
-            if (sum && !out) { out = document.createElement('span'); out.className = 'items-total'; foot.appendChild(out); }
-            if (out) out.textContent = sum ? `Итого ${fmtMoney(Math.round(sum * 100) / 100)}${itemsKind(items)}` : '';
+            const staryi = $('.items-total', foot);
+            if (staryi) staryi.remove();
+            const razmetka = itemsSumsHTML(svezhaya);
+            const est = $('.items-sums', foot);
+            if (!razmetka) { if (est) est.remove(); }
+            else {
+              const obertka = document.createElement('div');
+              obertka.innerHTML = razmetka;
+              const novyi = obertka.firstElementChild;
+              if (est) est.replaceWith(novyi); else foot.appendChild(novyi);
+            }
           }
           refreshDocsUI();
         }
