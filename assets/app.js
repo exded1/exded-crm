@@ -7004,11 +7004,22 @@ ${badge}
 
   /* Жест: тянем вниз по доске, прокрученной в самый верх */
   const PULL_GO = 70;
+  /* ⭐24.09.2026. Жест «потянуть вниз» ловится на ВСЁМ главном экране.
+     Было: обработчик висел на `#board`, да ещё и требовал, чтобы палец начал
+     движение внутри `.col-list` (`e.target.closest('.col-list')`). Шапка, вкладки,
+     строка с суммой и пустое поле доски мимо него проходили — потянуть можно было
+     только за карточки, то есть за нижнюю часть экрана. А сверху вместо обновления
+     страницу просто оттягивала система и возвращала назад.
+     Теперь слушаем `#app`, а список для проверки «в самом верху ли» ищем сами:
+     это те `.col-list`, что сейчас на экране (на телефоне один, на планшете два). */
   function bindPull() {
-    const board = $('#board');
+    const app = $('#app');
     const dot = $('#pull');
-    if (!board || !dot) return;
-    let y0 = 0; let x0 = 0; let list = null; let on = false; let dist = 0;
+    if (!app || !dot) return;
+    let y0 = 0; let x0 = 0; let gotov = false; let on = false; let dist = 0; let spiski = [];
+    // списки, которые сейчас видно; жест возможен, только если ВСЕ они в самом верху
+    const vidnye = () => $$('.col-list').filter((el) => el.getClientRects().length);
+    const vsePoVerhu = () => spiski.length > 0 && spiski.every((el) => el.scrollTop <= 0);
 
     const place = (d) => {
       if (MQ_CALM.matches) return;                 // «уменьшить движение»: кружок не показываем
@@ -7024,35 +7035,47 @@ ${badge}
       dot.style.opacity = '0';
     };
 
-    board.addEventListener('touchstart', (e) => {
-      on = false; dist = 0;
-      if (!MQ_PHONE.matches && !MQ_TABLET.matches) return;
-      if (document.querySelector('dialog[open]')) return;      // в карточке и окнах жеста нет
-      const t = e.touches[0];
-      y0 = t.clientY; x0 = t.clientX;
-      list = e.target.closest('.col-list');
-      if (!list || list.scrollTop > 0) list = null;            // доска не в самом верху — обычная прокрутка
-    }, { passive: true });
-
-    board.addEventListener('touchmove', (e) => {
-      if (!list || refreshing) return;
+    /* ⚠️Обработчик движения вешаем только на время самого жеста и снимаем сразу после.
+       Постоянный неленивый (`passive: false`) слушатель на всём `#app` заставлял бы
+       браузер ждать наш код перед каждой прокруткой списка — на телефоне это заметно. */
+    const naDvizhenie = (e) => {
+      if (!gotov || refreshing) return;
       const t = e.touches[0];
       const dy = t.clientY - y0;
       const dx = Math.abs(t.clientX - x0);
       if (!on) {
-        if (dy < 8 || dx > Math.abs(dy)) { if (dy < 0 || dx > 12) list = null; return; }
+        // ⚠️ вбок — это перелистывание вкладок и перетаскивание карточек, не мешаем
+        if (dy < 8 || dx > Math.abs(dy)) { if (dy < 0 || dx > 12) gotov = false; return; }
         on = true;
       }
-      if (list.scrollTop > 0) { on = false; list = null; hide(); return; }
+      if (!vsePoVerhu()) { on = false; gotov = false; hide(); return; }
       dist = dy;
       // ⚠️ гасим системное «оттянуть страницу» в Safari: без этого сработают оба
       if (e.cancelable) e.preventDefault();
       place(dist);
-    }, { passive: false });
+    };
+    const otpustit = () => app.removeEventListener('touchmove', naDvizhenie, { passive: false });
 
-    board.addEventListener('touchend', async () => {
-      if (!on) { list = null; return; }
-      on = false; list = null;
+    app.addEventListener('touchstart', (e) => {
+      otpustit();
+      gotov = false; on = false; dist = 0;
+      if (!MQ_PHONE.matches && !MQ_TABLET.matches) return;
+      if (document.querySelector('dialog[open]')) return;      // в карточке и окнах жеста нет
+      if (refreshing || e.touches.length > 1) return;
+      spiski = vidnye();
+      if (!vsePoVerhu()) return;                               // доска не в самом верху — обычная прокрутка
+      const t = e.touches[0];
+      y0 = t.clientY; x0 = t.clientX;
+      gotov = true;
+      app.addEventListener('touchmove', naDvizhenie, { passive: false });
+    }, { passive: true });
+
+    app.addEventListener('touchcancel', () => { otpustit(); gotov = false; on = false; hide(); }, { passive: true });
+
+    app.addEventListener('touchend', async () => {
+      otpustit();
+      if (!on) { gotov = false; return; }
+      on = false; gotov = false;
       if (dist < PULL_GO) { hide(); return; }
       if (!MQ_CALM.matches) { dot.classList.add('is-run'); dot.style.opacity = '1'; dot.style.transform = 'translateY(10px)'; }
       await refreshAll();
@@ -7301,6 +7324,7 @@ ${badge}
      (см. #boot в app.css), поэтому шторка уйдёт даже если этот код не выполнится. */
   const BOOT_MIN = 700;
   const BOOT_MAX = 3000;
+  const BOOT_UHOD = 520;          // столько длится сам уход, см. #boot в app.css
   let bootUbrana = false;
   function hideBoot() {
     if (bootUbrana) return;
@@ -7309,9 +7333,18 @@ ${badge}
     bootUbrana = true;
     const el = document.getElementById('boot');
     if (!el) return;
-    el.classList.add('boot-go');
-    // Убираем из разметки сами: иначе CSS-страховка на 2300 мс проиграла бы уезд заново.
-    setTimeout(() => { el.remove(); }, 750);
+    /* ⭐24.09.2026. Два кадра перед уходом: первый отдаём браузеру, чтобы он успел
+       нарисовать приложение под шторкой, во втором запускаем подъём. Без этого первые
+       кадры ухода показывали ещё не отрисованную доску — это и читалось как рывок. */
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      el.classList.add('boot-go');
+      /* ⚠️Из разметки убираем только ПОСЛЕ конца ухода: раньше — оборвали бы анимацию
+         на полпути, позже — CSS-страховка на 2300 мс проиграла бы уход заново. */
+      let ubrali = false;
+      const ubrat = () => { if (ubrali) return; ubrali = true; el.remove(); };
+      el.addEventListener('transitionend', ubrat, { once: true });
+      setTimeout(ubrat, BOOT_UHOD + 120);
+    }));
   }
 
   /* ⭐23.09.2026. Экранов ожидания при запуске должно быть РОВНО ОДИН — заставка.
@@ -7383,7 +7416,6 @@ ${badge}
     $('#gate').hidden = true;
     $('#gate').classList.remove('is-wait');
     $('#app').hidden = false;
-    hideBoot();
     zagruzitRekvizity();
     if (!appStarted) {
       appStarted = true;
@@ -7415,6 +7447,8 @@ ${badge}
     }
     renderBoard();
     renderAgenda();
+    // ⭐Шторку убираем последней: под ней уже нарисована доска, а не пустой экран
+    hideBoot();
     setTimeout(checkReturns, 1500);
   }
 
