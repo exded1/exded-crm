@@ -528,8 +528,14 @@ dialog::backdrop { background: rgba(20, 20, 19, .42); }
   animation: drawer-in 200ms cubic-bezier(.2, .8, .2, 1);
 }
 
+/* ⭐22.09.2026. У маленьких окон верх и низ прибиты к ВИДИМОЙ полосе, и margin:auto
+   ставит коробку по её центру. Раньше отступы были нулевые, то есть от всего экрана:
+   с открытой клавиатурой окно оказывалось по центру экрана — то есть наполовину
+   под клавиатурой. Без JS отступы равны нулю, и всё как было. */
 .modal[open] {
   width: min(460px, calc(100vw - 32px)); margin: auto;
+  inset: var(--vvt, 0px) 0 var(--vvb, 0px) 0;
+  max-height: calc(min(var(--vvh, 100dvh), 100dvh) - 24px); overflow-y: auto;
   border-radius: var(--r-sheet); background: var(--surface); box-shadow: var(--shadow-float);
   animation: sheet-in 160ms cubic-bezier(.2, .8, .2, 1);
 }
@@ -911,14 +917,21 @@ input:not([type=file]), select, textarea {
   .fab svg { width: 26px; height: 26px; }
   .fab:active { transform: scale(.94); }
 
-  /* Лист занимает ровно видимую часть экрана и стоит над клавиатурой:
-     --vvh и --vvb ставит fitSheets() по visualViewport. Без JS работает как раньше, по svh. */
+  /* Лист занимает ровно видимую часть экрана и стоит над клавиатурой.
+     ⭐22.09.2026: лист прибит к ВЕРХУ видимой полосы, а не к низу. Верх окна задан
+     числом (--vvt + отступ) и при открытии клавиатуры не двигается вовсе; вниз лист
+     доходит ровно до границы клавиатуры, потому что высота = видимая полоса − отступ.
+     Раньше было наоборот (bottom + высота), и верх получался вычитанием из
+     window.innerHeight — числа, которое iOS при открытой клавиатуре считает по-своему.
+     Вся ошибка этого числа уходила в верх листа: окно съезжало вниз на треть экрана.
+     ⚠️Без JS (--vvh и --vvt не заданы) выходит ровно прежняя картинка: 100svh − отступ. */
   .sheet[open], .drawer[open] {
+    --sheet-top: 12px;
+    --sheet-top: calc(12px + var(--sat));
     width: 100vw; max-width: 100vw;
-    height: min(var(--vvh, 100svh), calc(100svh - 12px));
-    height: min(var(--vvh, 100svh), calc(100svh - 12px - var(--sat)));
+    height: calc(min(var(--vvh, 100svh), 100svh) - var(--sheet-top));
     max-height: none;
-    margin: 0; inset: auto 0 var(--vvb, 0px) 0;
+    margin: 0; inset: calc(var(--vvt, 0px) + var(--sheet-top)) 0 auto 0;
     border-radius: var(--r-sheet) var(--r-sheet) 0 0;
     animation: sheet-up 220ms cubic-bezier(.2, .8, .2, 1);
   }

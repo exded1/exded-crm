@@ -2411,7 +2411,11 @@ window.ExdedDocs = (() => {
   const addDays = (d, n) => new Date(d.getTime() + n * 86400000);
 
   /* ---------- Итоги ---------- */
-  // Каждая позиция округляется до 2 знаков, НДС считается от суммы нетто.
+  /* Каждая позиция округляется до 2 знаков.
+     ⭐22.09.2026. НДС строки может прийти готовым числом (поле vat): CRM считает его
+     от БРУТТО, как магазин, и тогда брутто документа в точности равно цене магазина.
+     ⚠️Если ни у одной строки поля vat нет — это документ, выпущенный до 22.09.2026:
+     считаем по-старому, от суммы нетто, иначе он пересобрался бы другим. */
   function totals(items) {
     const rows = items.map((it) => {
       const qty = Number(it.qty) > 0 ? Number(it.qty) : 1;
@@ -2424,10 +2428,13 @@ window.ExdedDocs = (() => {
       const unit = toNet(raw);
       // зачёркнутая каталожная — только когда договорная действительно ниже
       const was = own !== null && list !== null && own < list ? toNet(list) : null;
-      return { name: String(it.name || ''), note: String(it.note || ''), qty, unit, was, sum: r2(unit * qty) };
+      return { name: String(it.name || ''), note: String(it.note || ''), qty, unit, was, sum: r2(unit * qty), vat: fin(it.vat) ? r2(it.vat) : null };
     });
     const net = r2(rows.reduce((a, x) => a + x.sum, 0));
-    const vat = r2(net * VAT);
+    const postrochno = rows.some((x) => x.vat !== null);
+    const vat = postrochno
+      ? r2(rows.reduce((a, x) => a + (x.vat === null ? r2(x.sum * VAT) : x.vat), 0))
+      : r2(net * VAT);
     return { rows, net, vat, total: r2(net + vat) };
   }
 
@@ -2648,20 +2655,33 @@ window.ExdedDocs = (() => {
     return out.join('\n');
   }
 
+  /* ⭐22.09.2026. Листов может быть несколько.
+     Раньше объектов в файле было ровно восемь и лист ровно один: длинная таблица
+     просто уезжала на подвал. Теперь номера объектов считаются от числа листов —
+     сначала листы, потом их потоки, потом шрифты. ⚠️При ОДНОМ листе номера выходят
+     те же самые (3 лист, 4 поток, 5 и 6 шрифты, 7 сведения, 8 знак), поэтому
+     документы на один лист собираются байт в байт как прежде. */
   function toPdf(ops, title) {
-    const content = render(ops);
-    // Знак добавляет восьмой объект — картинку-маску. Без знака документ прежний.
-    const mark = ops.some((op) => op && op.t === 'img') ? brandMark() : null;
-    const last = mark ? 8 : 7;
+    const listy = Array.isArray(ops[0]) ? ops : [ops];
+    const N = listy.length;
+    const mark = listy.some((p) => p.some((op) => op && op.t === 'img')) ? brandMark() : null;
+    const PAGE1 = 3;                  // первый объект-лист
+    const CONT1 = PAGE1 + N;          // первый объект-поток
+    const F1 = CONT1 + N; const F2 = F1 + 1; const INFO = F2 + 1;
+    const MASK = mark ? INFO + 1 : 0;
+    const last = mark ? MASK : INFO;
     const objs = [];
     objs[1] = '<< /Type /Catalog /Pages 2 0 R >>';
-    objs[2] = '<< /Type /Pages /Kids [3 0 R] /Count 1 >>';
-    objs[3] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${f3(PAGE.w)} ${f3(PAGE.h)}] `
-      + `/Resources << /Font << /F1 5 0 R /F2 6 0 R >>${mark ? ' /XObject << /Im0 8 0 R >>' : ''} >> /Contents 4 0 R >>`;
-    objs[4] = null;   // поток собирается ниже
-    objs[5] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
-    objs[6] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
-    objs[7] = `<< /Title (${escapePdf(title || 'EXDED')}) /Producer (EXDED CRM) >>`;
+    objs[2] = `<< /Type /Pages /Kids [${listy.map((_, i) => `${PAGE1 + i} 0 R`).join(' ')}] /Count ${N} >>`;
+    listy.forEach((p, i) => {
+      const znak = mark && p.some((op) => op && op.t === 'img');
+      objs[PAGE1 + i] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${f3(PAGE.w)} ${f3(PAGE.h)}] `
+        + `/Resources << /Font << /F1 ${F1} 0 R /F2 ${F2} 0 R >>${znak ? ` /XObject << /Im0 ${MASK} 0 R >>` : ''} >> /Contents ${CONT1 + i} 0 R >>`;
+      objs[CONT1 + i] = null;         // поток собирается ниже
+    });
+    objs[F1] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
+    objs[F2] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
+    objs[INFO] = `<< /Title (${escapePdf(title || 'EXDED')}) /Producer (EXDED CRM) >>`;
 
     const enc = new TextEncoder();
     const parts = [];
@@ -2672,14 +2692,14 @@ window.ExdedDocs = (() => {
     push('%PDF-1.4\n%âãÏÓ\n');
     for (let i = 1; i <= last; i += 1) {
       offsets[i] = pos;
-      if (i === 4) {
-        const body = enc.encode(content);
-        push(`4 0 obj\n<< /Length ${body.length} >>\nstream\n`);
+      if (i >= CONT1 && i < CONT1 + N) {
+        const body = enc.encode(render(listy[i - CONT1]));
+        push(`${i} 0 obj\n<< /Length ${body.length} >>\nstream\n`);
         push(body);
         push('\nendstream\nendobj\n');
-      } else if (i === 8) {
+      } else if (mark && i === MASK) {
         const bin = maskBytes(mark.mask);
-        push(`8 0 obj\n<< /Type /XObject /Subtype /Image /Width ${mark.w} /Height ${mark.h} `
+        push(`${i} 0 obj\n<< /Type /XObject /Subtype /Image /Width ${mark.w} /Height ${mark.h} `
           + `/ImageMask true /Decode [0 1] /Filter /FlateDecode /Length ${bin.length} >>\nstream\n`);
         push(bin);
         push('\nendstream\nendobj\n');
@@ -2691,7 +2711,7 @@ window.ExdedDocs = (() => {
     let table = `xref\n0 ${last + 1}\n0000000000 65535 f \n`;
     for (let i = 1; i <= last; i += 1) table += String(offsets[i]).padStart(10, '0') + ' 00000 n \n';
     push(table);
-    push(`trailer\n<< /Size ${last + 1} /Root 1 0 R /Info 7 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+    push(`trailer\n<< /Size ${last + 1} /Root 1 0 R /Info ${INFO} 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
 
     let total = 0;
     for (const p of parts) total += p.length;
@@ -2821,8 +2841,13 @@ window.ExdedDocs = (() => {
     return ops;
   }
 
-  function tableOps(rows, top) {
+  /* Таблица позиций. Останавливается, не доходя до подвала, и отдаёт остаток —
+     его печатает следующий лист. Позиция целиком уходит на новый лист: половина
+     строки на одном листе, половина на другом — так документы не делают.
+     ⚠️`predel` не задан — старое поведение: печатаем всё подряд. */
+  function tableOps(rows, top, predel, nachalo) {
     const ops = [];
+    const nomer0 = nachalo || 0;
     ops.push({ t: 'rect', x: M.left, y: top, w: M.right - M.left, h: 20.8, fill: C.head });
     const hy = top + 14.1;
     ops.push({ t: 'text', x: COL.pos, y: hy, size: 7, bold: true, color: C.light, text: 'POS.' });
@@ -2832,34 +2857,39 @@ window.ExdedDocs = (() => {
     ops.push({ t: 'text', x: COL.sumHead, y: hy, size: 7, bold: true, color: C.white, text: 'GESAMT', align: 'right' });
 
     let y = top + 20.8;
-    rows.forEach((row, i) => {
+    let vlezlo = 0;
+    for (let i = 0; i < rows.length; i += 1) {
+      const row = rows[i];
       const notes = row.note ? wrap(row.note, 8, false, COL.nameW) : [];
       const names = wrap(row.name, 10, true, COL.nameW);
-      ops.push({ t: 'text', x: COL.pos, y: y + 15.2, size: 9, color: C.ink, text: String(i + 1) });
-      names.forEach((line, k) => ops.push({ t: 'text', x: COL.name, y: y + 15.2 + k * 12.6, size: 10, bold: true, color: C.ink, text: line }));
       const afterName = y + 15.2 + (names.length - 1) * 12.6;
+      const priceBottom = row.was ? y + 15.2 + 11.4 : y + 15.2;
+      const bottom = Math.max((notes.length ? afterName + 12.6 + (notes.length - 1) * 11 : afterName), priceBottom) + 10;
+      const konec = Math.max(bottom, y + 24.2);
+      // высоту строки считаем ДО того, как её рисовать: не влезла — весь остаток на новый лист
+      if (predel && konec > predel && vlezlo > 0) break;
+      ops.push({ t: 'text', x: COL.pos, y: y + 15.2, size: 9, color: C.ink, text: String(nomer0 + i + 1) });
+      names.forEach((line, k) => ops.push({ t: 'text', x: COL.name, y: y + 15.2 + k * 12.6, size: 10, bold: true, color: C.ink, text: line }));
       notes.forEach((line, k) => ops.push({ t: 'text', x: COL.name, y: afterName + 12.6 + k * 11, size: 8, color: C.mute, text: line }));
       ops.push({ t: 'text', x: COL.qty, y: y + 15.2, size: 9, color: C.ink, text: String(row.qty), align: 'center' });
       // цена: обычно одна строка. Если по сделке договорились дешевле — каталожная
       // сверху мелким и зачёркнутая, договорная под ней
-      let priceBottom = y + 15.2;
       if (row.was) {
         const was = moneyDE(row.was);
         const w = textWidth(was, 7.5, false);
         ops.push({ t: 'text', x: COL.unit, y: y + 15.2, size: 7.5, color: C.light, text: was, align: 'right' });
         ops.push({ t: 'line', x: COL.unit - w, y: y + 15.2 - 2.4, len: w, color: C.light, w: 0.5 });
-        priceBottom = y + 15.2 + 11.4;
         ops.push({ t: 'text', x: COL.unit, y: priceBottom, size: 9, color: C.ink, text: moneyDE(row.unit), align: 'right' });
       } else {
         ops.push({ t: 'text', x: COL.unit, y: y + 15.2, size: 9, color: C.ink, text: moneyDE(row.unit), align: 'right' });
       }
       // сумма стоит на одной строке с ценой, по которой она посчитана
       ops.push({ t: 'text', x: COL.sum, y: priceBottom, size: 9, color: C.ink, text: moneyDE(row.sum), align: 'right' });
-      const bottom = Math.max((notes.length ? afterName + 12.6 + (notes.length - 1) * 11 : afterName), priceBottom) + 10;
-      y = Math.max(bottom, y + 24.2);
+      y = konec;
       ops.push({ t: 'line', x: M.left, y, len: M.right - M.left, color: C.hair, w: 0.38 });
-    });
-    return { ops, y };
+      vlezlo += 1;
+    }
+    return { ops, y, rest: rows.slice(vlezlo) };
   }
 
   function totalsOps(t, top) {
@@ -2898,6 +2928,39 @@ window.ExdedDocs = (() => {
     return { ops, y: top + h };
   }
 
+  /* ⭐22.09.2026. Обращение и вступление стоят ПЕРЕД таблицей — как в обычном
+     деловом письме: сначала «Sehr geehrte Damen und Herren», потом за чем письмо,
+     и только после этого цифры. Раньше весь этот текст стоял в самом низу, после
+     итога, и читался как приписка. Внизу осталась одна строка про вопросы.
+     Шрифт, размер и цвет — те же, что были у нижнего абзаца. */
+  function introOps(top, paragraphs, size) {
+    const ops = [];
+    const sz = size || 9;
+    let y = top;
+    paragraphs.forEach((p, i) => {
+      if (i) y += 4.6;                       // пустая строка после обращения
+      for (const line of wrap(p, sz, false, M.right - M.left)) {
+        ops.push({ t: 'text', x: M.left, y, size: sz, color: C.ink2, text: line });
+        y += 12.9;
+      }
+    });
+    return { ops, y: y - 12.9 };
+  }
+
+  /* Шапка второго и следующих листов: коротко, о каком документе речь. */
+  const CONT_TOP = 70;
+  function prodolzhenieOps(zagolovok, no) {
+    return [{ t: 'text', x: M.left, y: CONT_TOP, size: 10.5, color: C.ink3, text: `${zagolovok} ${no} · Fortsetzung` }];
+  }
+  /* Ниже PREDEL таблица не печатается: там начинается подвал, и он стоит на месте.
+     ⚠️Хвосту (итоги, условия, подпись) позволено опуститься ниже — ровно настолько,
+     насколько подвал может съехать вниз, не свалившись с листа. Так было и раньше,
+     до листов: подвал сдвигался следом за текстом. Иначе документы, которые всегда
+     помещались на один лист, вдруг стали бы двухстраничными. */
+  const PREDEL = FOOT_TOP - FOOT_GAP;
+  const PREDEL_HVOST = PAGE.h - 20 - FOOT_H - FOOT_GAP;
+  const CONT_TABLE = CONT_TOP + 22;
+
   function closingOps(top, paragraphs, size) {
     const ops = [];
     const sz = size || 9;
@@ -2926,6 +2989,57 @@ window.ExdedDocs = (() => {
     return ops;
   }
 
+  /* ⭐22.09.2026. Сборка листов — одна на Angebot и на Proforma.
+     Раньше лист был один и длинная таблица просто налезала на подвал: приложение
+     отказывалось выдать документ с пятнадцатью позициями. Теперь:
+     • таблица печатается, пока не упрётся в подвал, остаток уходит на новый лист;
+     • хвост (итоги, условия, строка про вопросы) не разрывается: не поместился
+       под таблицей — весь целиком едет на следующий лист;
+     • подвал с реквизитами стоит на каждом листе, «Seite 1 von 2» — только когда
+       листов больше одного, чтобы одностраничные документы не менялись. */
+  function sobrat(pervyi, rows, tableTop, hvostOps, zagolovok, no, t, name, title) {
+    const listy = [];
+    let ops = pervyi;
+    let ostatok = rows;
+    let sdelano = 0;
+    let top = tableTop;
+    let tb = null;
+    for (;;) {
+      tb = tableOps(ostatok, top, PREDEL, sdelano);
+      ops.push(...tb.ops);
+      sdelano += ostatok.length - tb.rest.length;
+      if (!tb.rest.length) break;
+      listy.push(ops);
+      ostatok = tb.rest;
+      ops = prodolzhenieOps(zagolovok, no);
+      top = CONT_TABLE;
+    }
+    let hvost = hvostOps(tb.y);
+    // ⚠️tb.y > CONT_TABLE: если хвост не влезает даже на пустой лист, новый лист
+    // заводить бесполезно — печатаем как есть, а build() отметит переполнение
+    if (hvost.niz > PREDEL_HVOST && tb.y > CONT_TABLE) {
+      // хвост не влез под таблицей — целиком на новый лист
+      listy.push(ops);
+      ops = prodolzhenieOps(zagolovok, no);
+      hvost = hvostOps(CONT_TABLE);
+    }
+    ops.push(...hvost.ops);
+    listy.push(ops);
+
+    const contentY = lowestY(ops);
+    const footTop = Math.max(FOOT_TOP, contentY + FOOT_GAP);
+    listy.forEach((list, i) => {
+      const niz = i === listy.length - 1 ? footTop : FOOT_TOP;
+      if (listy.length > 1) {
+        list.push({ t: 'text', x: M.right, y: niz - 8, size: 7, color: C.light, align: 'right', text: `Seite ${i + 1} von ${listy.length}` });
+      }
+      list.push(...footerOps(niz));
+    });
+    // ops — все указания документа подряд (так их читают проверки и разбор),
+    // listy — те же указания, разложенные по листам: из них собирается PDF
+    return { ops: listy.flat(), listy, stranic: listy.length, contentY, footTop, totals: t, name, title };
+  }
+
   /* ---------- Angebot ---------- */
   function angebot(data) {
     const date = data.date ? new Date(data.date) : new Date();
@@ -2949,31 +3063,36 @@ window.ExdedDocs = (() => {
       ops.push({ t: 'text', x: M.left, y: lastLine, size: 10.5, color: C.ink3, text: data.subject });
     }
 
-    const table = tableOps(t.rows, lastLine + 14.3);
-    ops.push(...table.ops);
-    const tot = totalsOps(t, table.y);
-    ops.push(...tot.ops);
-
-    let y = tot.y + 11.9;
-    if (data.note) {
-      const b = paperBlock(y, data.noteTitle || 'Wichtiger technischer Hinweis', [data.note]);
-      ops.push(...b.ops);
-      y = b.y + 3.1;
-    }
-    const ob = orangeBlock(y, 'Zahlbar sofort rein netto', [
-      'Lieferung nach Zahlungseingang · Versand innerhalb Deutschlands',
-      `Dieses Preisangebot ist gültig bis ${dateDE(until)}.`,
+    // вступление перед таблицей: обращение и за чем письмо
+    const intro = introOps(lastLine + 22.3, [
+      `${data.salutation || 'Sehr geehrte Damen und Herren'},`,
+      'vielen Dank für Ihre Anfrage. Gerne unterbreiten wir Ihnen folgendes Angebot. Alle Preise verstehen sich in Euro.',
     ]);
-    ops.push(...ob.ops);
+    ops.push(...intro.ops);
 
-    const cl = closingOps(ob.y + 17.6, [
-      `${data.salutation || 'Sehr geehrte Damen und Herren'}, vielen Dank für Ihre Anfrage. Gerne unterbreiten wir Ihnen das oben aufgeführte Angebot. Alle Preise verstehen sich in Euro. Für Rückfragen stehen wir Ihnen gerne zur Verfügung.`,
-    ]);
-    ops.push(...cl.ops);
-    const contentY = lowestY(ops);
-    const footTop = Math.max(FOOT_TOP, contentY + FOOT_GAP);
-    ops.push(...footerOps(footTop));
-    return { ops, contentY, footTop, totals: t, name: `EXDED-Angebot-${data.no}.pdf`, title: `Angebot ${data.no}` };
+    // хвост документа: итоги, примечание, условия, строка про вопросы
+    const hvostOps = (top) => {
+      const out = [];
+      const tot = totalsOps(t, top);
+      out.push(...tot.ops);
+      let y = tot.y + 11.9;
+      if (data.note) {
+        const b = paperBlock(y, data.noteTitle || 'Wichtiger technischer Hinweis', [data.note]);
+        out.push(...b.ops);
+        y = b.y + 3.1;
+      }
+      const ob = orangeBlock(y, 'Zahlbar sofort rein netto', [
+        'Lieferung nach Zahlungseingang · Versand innerhalb Deutschlands',
+        `Dieses Preisangebot ist gültig bis ${dateDE(until)}.`,
+      ]);
+      out.push(...ob.ops);
+      const cl = closingOps(ob.y + 17.6, ['Für Rückfragen stehen wir Ihnen gerne zur Verfügung.']);
+      out.push(...cl.ops);
+      return { ops: out, niz: cl.y };
+    };
+
+    return sobrat(ops, t.rows, intro.y + 14.3, hvostOps, 'Angebot', data.no, t,
+      `EXDED-Angebot-${data.no}.pdf`, `Angebot ${data.no}`);
   }
 
   /* ---------- Proforma-Rechnung ---------- */
@@ -2999,10 +3118,12 @@ window.ExdedDocs = (() => {
       ops.push({ t: 'text', x: M.left, y: lastLine, size: 10.5, color: C.ink3, text: data.subject });
     }
 
-    const table = tableOps(t.rows, lastLine + 14.3);
-    ops.push(...table.ops);
-    const tot = totalsOps(t, table.y);
-    ops.push(...tot.ops);
+    // вступление перед таблицей: обращение и за чем письмо
+    const intro = introOps(lastLine + 22.3, [
+      `${data.salutation || 'Sehr geehrte Damen und Herren'},`,
+      'vielen Dank für Ihren Auftrag. Zur Abwicklung erhalten Sie diese Proforma-Rechnung. Alle Preise verstehen sich in Euro.',
+    ], 8.6);
+    ops.push(...intro.ops);
 
     /* Отдельного блока «Zahlungsplan» больше нет: он слово в слово повторял
        платёжный блок ниже (там и «Zahlung 1 von 2 · Anzahlung 50 %», и сумма,
@@ -3010,71 +3131,79 @@ window.ExdedDocs = (() => {
        Решение владельца от 18.09.2026. Платёжный блок поднялся на его место:
        под итогами он стоит с тем же зазором 7 pt, с каким всегда стоял под планом. */
 
-    /* Girocode на первый платёж */
-    const first = amounts[0];
-    const purpose = `${data.no} ${amounts.length === 1 ? 'Zahlung' : 'Anzahlung'}`;
-    const rows = qrMatrix(giroPayload(first.amount, purpose));
-    const boxTop = tot.y + 7;
-    const boxH = amounts.length === 1 ? 136 : 154;
-    // Рамки вокруг платёжного блока нет (решение владельца 18.09.2026).
-    // boxH по-прежнему задаёт высоту блока: от неё считается всё, что ниже.
-    if (rows) ops.push({ t: 'qr', x: 66.5, y: boxTop + 8.5, size: 82, rows });
-    ops.push({ t: 'text', x: 107.5, y: boxTop + 101.8, size: 6.6, color: C.light, text: 'Girocode', align: 'center' });
-    ops.push({ t: 'text', x: 107.5, y: boxTop + 110.1, size: 6.6, color: C.light, text: 'Banking-App scannen', align: 'center' });
+    // хвост документа: итоги, Girocode, условия, строка про вопросы
+    const hvostOps = (top) => {
+      const out = [];
+      const tot = totalsOps(t, top);
+      out.push(...tot.ops);
 
-    const lx = 165.5; const vx = 253.5;
-    const headText = amounts.length === 1
-      ? 'Zahlung · 100 %'
-      : `Zahlung 1 von ${amounts.length} · Anzahlung ${first.percent} %`;
-    ops.push({ t: 'text', x: lx, y: boxTop + 15.4, size: 9.5, bold: true, color: C.ink2, text: headText });
-    ops.push({ t: 'text', x: lx, y: boxTop + 33, size: 8.6, color: C.grey, text: 'Betrag' });
-    ops.push({ t: 'text', x: vx, y: boxTop + 34.4, size: 12, bold: true, color: C.ink, text: moneyDE(first.amount) });
-    const fields = [
-      ['Empfänger', SELLER.name, 1],
-      ['Bank', SELLER.bankName, 0],
-      ['IBAN', SELLER.iban, 1],
-      ['BIC', SELLER.bic, 0],
-      ['Verwendungszweck', purpose, 1],
-    ];
-    fields.forEach((f, i) => {
-      const y = boxTop + 52.5 + i * 14.4;
-      ops.push({ t: 'text', x: lx, y, size: 8.6, color: C.grey, text: f[0] });
-      ops.push({ t: 'text', x: vx, y, size: 8.6, bold: Boolean(f[2]), color: f[2] ? C.ink : C.ink2, text: f[1] });
-    });
-    if (amounts.length > 1) {
-      const rest = amounts.slice(1).map((a) => `${moneyDE(a.amount)}`).join(' + ');
-      const tailRuns = [
-        { text: `Restzahlung ${rest} nach Versandbereitschaft, Verwendungszweck `, bold: false },
-        { text: `${data.no} Restzahlung`, bold: true },
-        { text: ' (gleiche Bankverbindung).', bold: false },
+      /* Girocode на первый платёж */
+      const first = amounts[0];
+      const purpose = `${data.no} ${amounts.length === 1 ? 'Zahlung' : 'Anzahlung'}`;
+      const rows = qrMatrix(giroPayload(first.amount, purpose));
+      const boxTop = tot.y + 7;
+      const boxH = amounts.length === 1 ? 136 : 154;
+      // Рамки вокруг платёжного блока нет (решение владельца 18.09.2026).
+      // boxH по-прежнему задаёт высоту блока: от неё считается всё, что ниже.
+      if (rows) out.push({ t: 'qr', x: 66.5, y: boxTop + 8.5, size: 82, rows });
+      out.push({ t: 'text', x: 107.5, y: boxTop + 101.8, size: 6.6, color: C.light, text: 'Girocode', align: 'center' });
+      out.push({ t: 'text', x: 107.5, y: boxTop + 110.1, size: 6.6, color: C.light, text: 'Banking-App scannen', align: 'center' });
+
+      const lx = 165.5; const vx = 253.5;
+      const headText = amounts.length === 1
+        ? 'Zahlung · 100 %'
+        : `Zahlung 1 von ${amounts.length} · Anzahlung ${first.percent} %`;
+      out.push({ t: 'text', x: lx, y: boxTop + 15.4, size: 9.5, bold: true, color: C.ink2, text: headText });
+      out.push({ t: 'text', x: lx, y: boxTop + 33, size: 8.6, color: C.grey, text: 'Betrag' });
+      out.push({ t: 'text', x: vx, y: boxTop + 34.4, size: 12, bold: true, color: C.ink, text: moneyDE(first.amount) });
+      const fields = [
+        ['Empfänger', SELLER.name, 1],
+        ['Bank', SELLER.bankName, 0],
+        ['IBAN', SELLER.iban, 1],
+        ['BIC', SELLER.bic, 0],
+        ['Verwendungszweck', purpose, 1],
       ];
-      wrapRuns(tailRuns, 8.2, M.right - lx - 12).forEach((line, i) => {
-        ops.push(...runLineOps(line, lx, boxTop + 129.5 + i * 12.3, 8.2, C.mute));
+      fields.forEach((f, i) => {
+        const y = boxTop + 52.5 + i * 14.4;
+        out.push({ t: 'text', x: lx, y, size: 8.6, color: C.grey, text: f[0] });
+        out.push({ t: 'text', x: vx, y, size: 8.6, bold: Boolean(f[2]), color: f[2] ? C.ink : C.ink2, text: f[1] });
       });
-    }
+      if (amounts.length > 1) {
+        const rest = amounts.slice(1).map((a) => `${moneyDE(a.amount)}`).join(' + ');
+        const tailRuns = [
+          { text: `Restzahlung ${rest} nach Versandbereitschaft, Verwendungszweck `, bold: false },
+          { text: `${data.no} Restzahlung`, bold: true },
+          { text: ' (gleiche Bankverbindung).', bold: false },
+        ];
+        wrapRuns(tailRuns, 8.2, M.right - lx - 12).forEach((line, i) => {
+          out.push(...runLineOps(line, lx, boxTop + 129.5 + i * 12.3, 8.2, C.mute));
+        });
+      }
 
-    /* Оранжевый блок и подпись */
-    // ⚠️ При 100 % «Lieferung nach Zahlungseingang» стоит только здесь: раньше эта фраза
-    // жила в блоке «Zahlungsplan», а его убрали. В схемах с двумя платежами смысл несёт
-    // строка «… vor Versand» и текст под реквизитами, там повтор не нужен.
-    const strong = amounts.length === 1
-      ? 'Zahlung vollständig im Voraus: 100 % · Lieferung nach Zahlungseingang'
-      : `Zahlung in ${amounts.length === 2 ? 'zwei' : 'mehreren'} Raten: ${first.percent} % Anzahlung, ${amounts.slice(1).map((a) => a.percent + ' %').join(' + ')} vor Versand`;
-    const ob = orangeBlock(boxTop + boxH + 10.8, strong, [
-      'Versand innerhalb Deutschlands · Neuware mit Herstellergarantie',
-      'Diese Proforma-Rechnung ist keine Rechnung im Sinne des §14 UStG. Die Rechnung erhalten Sie mit der Lieferung.',
-    ]);
-    ops.push(...ob.ops);
+      /* Оранжевый блок и подпись */
+      // ⚠️ При 100 % «Lieferung nach Zahlungseingang» стоит только здесь: раньше эта фраза
+      // жила в блоке «Zahlungsplan», а его убрали. В схемах с двумя платежами смысл несёт
+      // строка «… vor Versand» и текст под реквизитами, там повтор не нужен.
+      const strong = amounts.length === 1
+        ? 'Zahlung vollständig im Voraus: 100 % · Lieferung nach Zahlungseingang'
+        : `Zahlung in ${amounts.length === 2 ? 'zwei' : 'mehreren'} Raten: ${first.percent} % Anzahlung, ${amounts.slice(1).map((a) => a.percent + ' %').join(' + ')} vor Versand`;
+      const ob = orangeBlock(boxTop + boxH + 10.8, strong, [
+        'Versand innerhalb Deutschlands · Neuware mit Herstellergarantie',
+        'Diese Proforma-Rechnung ist keine Rechnung im Sinne des §14 UStG. Die Rechnung erhalten Sie mit der Lieferung.',
+      ]);
+      out.push(...ob.ops);
 
-    const cl = closingOps(ob.y + 17.6, [
-      `${data.salutation || 'Sehr geehrte Damen und Herren'}, vielen Dank für Ihren Auftrag. Zur Abwicklung erhalten Sie diese Proforma-Rechnung. Alle Preise verstehen sich in Euro. Für Rückfragen stehen wir Ihnen gerne zur Verfügung.`,
-    ], 8.6);
-    ops.push(...cl.ops);
-    const contentY = lowestY(ops);
-    const footTop = Math.max(FOOT_TOP, contentY + FOOT_GAP);
-    ops.push(...footerOps(footTop));
-    return { ops, contentY, footTop, totals: t, plan: amounts, name: `EXDED-Proforma-${data.no}.pdf`, title: `Proforma ${data.no}` };
+      const cl = closingOps(ob.y + 17.6, ['Für Rückfragen stehen wir Ihnen gerne zur Verfügung.'], 8.6);
+      out.push(...cl.ops);
+      return { ops: out, niz: cl.y };
+    };
+
+    const doc = sobrat(ops, t.rows, intro.y + 14.3, hvostOps, 'Proforma-Rechnung', data.no, t,
+      `EXDED-Proforma-${data.no}.pdf`, `Proforma ${data.no}`);
+    doc.plan = amounts;
+    return doc;
   }
+
 
   // Лист один. Если содержимое доросло до подвала, приложение об этом скажет,
   // а не выдаст молча документ с наездом на реквизиты.
@@ -3101,12 +3230,12 @@ window.ExdedDocs = (() => {
     let doc;
     try {
       doc = kind === 'proforma' ? proforma(data) : angebot(data);
-      doc.bytes = toPdf(doc.ops, doc.title);
+      doc.bytes = toPdf(doc.listy, doc.title);
       doc.unsupported = Array.from(badChars);
     } finally {
       badChars = null;
     }
-    doc.lowestY = lowestY(doc.ops);
+    doc.lowestY = lowestY(doc.listy[doc.listy.length - 1]);
     doc.pinned = doc.footTop === FOOT_TOP;         // подвал на своём месте
     doc.overflow = doc.footTop + FOOT_H > PAGE_H - 20;   // подвал уехал за край листа
     return doc;
@@ -3598,15 +3727,35 @@ window.CrmSupabaseStore = (() => {
   /* Листы на телефоне. Высоту берём по ВИДИМОЙ части экрана: когда открыта клавиатура,
      iOS оставляет layout-высоту прежней, и низ листа с кнопками уезжает под клавиатуру.
      visualViewport даёт настоящую видимую высоту и величину, на которую снизу «съедено».
-     Ещё меряем панель кнопок, чтобы контент над ней прокручивался с запасом и не залезал под неё. */
+     Ещё меряем панель кнопок, чтобы контент над ней прокручивался с запасом и не залезал под неё.
+
+     ⭐22.09.2026. Почему окно сделки уезжало вниз на айфоне.
+     Лист был прибит к НИЗУ: `bottom: --vvb`, высота `--vvh`. Верх при этом не задан вовсе,
+     он получается вычитанием: верх = высота окна − отступ снизу − высота листа. В этой
+     формуле три числа, и одно из них — `window.innerHeight` — на iOS при открытой
+     клавиатуре неточно и по-разному врёт в Safari и в приложении с домашнего экрана.
+     Ошибка в нём целиком уходила в ВЕРХ листа: окно съезжало вниз, сверху открывалась
+     доска, а поле оказывалось впритык к клавиатуре.
+
+     Теперь лист прибит к ВЕРХУ: `top = --vvt + отступ`, высота `--vvh − отступ`.
+     Верх окна больше не вычисляется — он задан, и сдвинуться ему не от чего; низ сам
+     встаёт ровно на границу клавиатуры. В расчёте участвуют только два числа
+     visualViewport — высота видимой полосы и её смещение сверху.
+     ⚠️`--vvb` остался для маленьких окон (.modal): им нужен и верхний, и нижний отступ,
+     чтобы `margin:auto` поставил коробку по центру ВИДИМОЙ полосы, а не всего экрана.
+     Высоту окна для него берём у documentElement.clientHeight — это ровно тот
+     прямоугольник, относительно которого браузер ставит position:fixed. */
   function fitSheets() {
     const root = document.documentElement;
     const vv = window.visualViewport;
     if (vv) {
+      const okno = document.documentElement.clientHeight || window.innerHeight;
       root.style.setProperty('--vvh', Math.round(vv.height) + 'px');
-      root.style.setProperty('--vvb', Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)) + 'px');
+      root.style.setProperty('--vvt', Math.max(0, Math.round(vv.offsetTop)) + 'px');
+      root.style.setProperty('--vvb', Math.max(0, Math.round(okno - vv.height - vv.offsetTop)) + 'px');
     } else {
       root.style.removeProperty('--vvh');
+      root.style.removeProperty('--vvt');
       root.style.removeProperty('--vvb');
     }
     for (const dlg of document.querySelectorAll('dialog[open]')) {
@@ -3632,6 +3781,7 @@ window.CrmSupabaseStore = (() => {
      сдвигал бы всё окно вместе с шапкой карточки. */
   const PANEL_IOS = 48;   // панель со стрелками и «Готово»
   const ZAPAS = 12;       // чтобы поле не липло к краю
+  const ZAPAS_KLAV = 24;  // над клавиатурой держим больше: поле не должно липнуть к ней
 
   function vidimayaPolosa() {
     const vv = window.visualViewport;
@@ -3736,13 +3886,15 @@ window.CrmSupabaseStore = (() => {
     const box = el.closest('.cat-pick') || el.closest('.f') || el;
     const spisok = prokrutkiVverh(box);
     if (!spisok.length) { if (box.scrollIntoView) box.scrollIntoView({ block: 'nearest' }); return; }
-    const zapasPaneli = klaviaturaOtkryta() ? PANEL_IOS : 0;
+    const klava = klaviaturaOtkryta();
+    const zapasPaneli = klava ? PANEL_IOS : 0;
+    const zapas = klava ? ZAPAS_KLAV : ZAPAS;
     for (const cont of spisok) {
       const r = celFokusa(el, box);
       const c = cont.getBoundingClientRect();
       const { verh, niz } = vidimayaPolosa();
       // Нижняя граница — что кончится раньше: видимая полоса или сам контейнер.
-      const nizOk = Math.min(niz - zapasPaneli, c.bottom) - ZAPAS;
+      const nizOk = Math.min(niz - zapasPaneli, c.bottom) - zapas;
       const verhOk = Math.max(verh, c.top) + ZAPAS;
       let sdvig = 0;
       if (r.bottom > nizOk) sdvig = r.bottom - nizOk;
@@ -3761,7 +3913,7 @@ window.CrmSupabaseStore = (() => {
      в этот момент экран ещё полный, поле считается видимым, мы ничего не двигаем —
      а потом клавиатура его закрывает. Поэтому проверяем несколько раз за полсекунды.
      Это же держит поле на виду при переходе стрелками ↑ ↓ на самой клавиатуре. */
-  const SROKI_PODGONKI = [60, 180, 320, 500];
+  const SROKI_PODGONKI = [0, 60, 180, 320, 500];
   let fitTimers = [];
   const fitSoon = () => {
     fitTimers.forEach(clearTimeout);
@@ -3957,15 +4109,45 @@ window.CrmSupabaseStore = (() => {
   // застывает в момент добавления), price — договорная по этой сделке.
   // В расчёт идёт договорная, если она вписана, иначе каталожная.
   const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : parseAmount(v));
-  const itemPrice = (it) => (Number.isFinite(it.price) ? it.price : (Number.isFinite(it.list_price) ? it.list_price : null));
+
+  /* ⭐22.09.2026. НДС считался дважды. Разбор:
+     цены магазина exded.com — БРУТТО, с НДС 19 %. Пометка `gross` у позиции говорит
+     только одно: вписанное в поле число — это уже с НДС или ещё без него.
+     Беда была в том, что переключатель менял ПОМЕТКУ, не трогая само число: товар брался
+     из каталога за 21 099 € брутто, человек переключал на «нетто» — и те же 21 099
+     начинали считаться суммой без НДС, к которой CRM добавляла НДС ещё раз (25 049,50).
+     Каталожная цена при этом всегда сравнивалась как брутто, поэтому подсказка
+     «Каталог 21 099 € −49 €» выглядела правдоподобно и ничего не выдавала.
+
+     Теперь:
+     • list_price ВСЕГДА хранится так, как отдал магазин, — брутто. На экран и в сравнение
+       он идёт через listPokaz(), то есть в том же виде, что и цена позиции;
+     • переключатель пересчитывает само число (21 099 брутто ↔ 17 730,25 нетто),
+       поэтому Нетто / НДС / Брутто от него не меняются вовсе;
+     • ⚠️пометка у СТАРЫХ, уже сохранённых позиций не трогается: их суммы остаются
+       такими, какими владелец их видел. Подозрительные перечислены в выгрузке. */
+  const VAT_STAVKA = 0.19;
+  const r2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+  const netIzBrutto = (v) => r2(Number(v) / (1 + VAT_STAVKA));
+  const bruttoIzNet = (v) => r2(Number(v) * (1 + VAT_STAVKA));
+  // каталожная цена в том виде, в каком показана цена позиции
+  const listPokaz = (it) => (Number.isFinite(it.list_price) ? (it.gross ? r2(it.list_price) : netIzBrutto(it.list_price)) : null);
+  const itemPrice = (it) => (Number.isFinite(it.price) ? it.price : listPokaz(it));
 
   function normalizeItem(it) {
-    const x = { id: uid(), name: '', qty: 1, price: null, list_price: null, gross: false, product_id: null, sku: '', ...it };
+    const x = { id: uid(), name: '', qty: 1, price: null, list_price: null, base: null, gross: false, product_id: null, sku: '', ...it };
     x.id = x.id || uid();
     x.name = str(x.name);
     x.qty = parseQty(x.qty);
     x.price = num(x.price);
     x.list_price = num(x.list_price);
+    /* ⭐22.09.2026. base — опорная цена позиции, ВСЕГДА в брутто.
+       Пометка брутто/нетто после этого решает только одно: каким числом цену
+       показать в поле. Без опоры переключатель терял копейку: 12 480,50 брутто
+       переводятся в 10 487,82 нетто, а обратно из них выходит 12 480,51 — ни одно
+       нетто с двумя знаками не даёт ровно 12 480,50. С опорой итог не меняется вовсе.
+       ⚠️У позиций, сохранённых раньше, её нет — они считаются по-прежнему. */
+    x.base = num(x.base);
     x.gross = Boolean(x.gross);           // цена из магазина — с НДС 19%; пересчёт в нетто будет в документах
     x.product_id = Number.isFinite(x.product_id) ? x.product_id : null;
     x.sku = str(x.sku);
@@ -4396,7 +4578,6 @@ window.CrmSupabaseStore = (() => {
   /* ⚠️22.09.2026: itemsKind() (подпись «брутто/нетто» к строке «Итого …») убрана.
      Самой строки «Итого …» под позициями больше нет — с 21.09 там стоят
      «Нетто / НДС 19 % / Брутто», и вид налога виден из них. */
-  const itemsTotal = (d) => d.items.reduce((sum, it) => { const p = itemPrice(it); return sum + (Number.isFinite(p) ? p * (it.qty || 1) : 0); }, 0);
 
   /* ⭐ЧАСТЬ 3. Пометка «брутто / нетто» у позиции решает ровно одно:
      как понимать вписанную цену — в ней уже есть НДС 19 % или его надо начислить сверху.
@@ -4410,22 +4591,46 @@ window.CrmSupabaseStore = (() => {
      ⚠️Шаги счёта повторяют docs.js (totals) слово в слово: цена позиции округляется
      до центов, строка = цена × количество (тоже до центов), НДС берётся от СУММЫ нетто.
      Другой порядок округлений дал бы в карточке и в Angebot разные центы. */
-  const VAT_STAVKA = 0.19;
+  /* Одна строка позиции: нетто и НДС.
+     ⭐22.09.2026. НДС у позиции с пометкой «брутто» берётся ОТ БРУТТО, а не от нетто —
+     так же, как его считает магазин. Иначе 12 480,50 € из каталога превращались бы
+     в 10 487,82 нетто + 1 992,69 НДС = 12 480,51: лишняя копейка, которой нет ни в
+     магазине, ни в оплате. Обратно из нетто эта цена не собирается вовсе — ни одно
+     нетто с двумя знаками не даёт ровно 12 480,50. */
+  function strokaVat(it) {
+    const qty = Number(it.qty) > 0 ? Number(it.qty) : 1;
+    // опорная цена (брутто): своя вписанная, иначе каталожная из магазина
+    const baza = Number.isFinite(it.price)
+      ? (Number.isFinite(it.base) ? it.base : (it.gross ? r2(it.price) : null))
+      : (Number.isFinite(it.list_price) ? it.list_price : null);
+    if (baza !== null) {
+      const brutto = r2(r2(baza) * qty);
+      const net = r2(netIzBrutto(baza) * qty);
+      return { net, vat: r2(brutto - net) };
+    }
+    // позиция в нетто, сохранённая до 22.09.2026: НДС начисляется сверху, как и раньше
+    const p = itemPrice(it);
+    if (!Number.isFinite(p)) return null;
+    const net = r2(r2(p) * qty);
+    return { net, vat: r2(net * VAT_STAVKA) };
+  }
+  // опора для позиции, у которой её ещё нет: цена в нынешнем понимании, переведённая в брутто
+  const oporaIz = (it) => (Number.isFinite(it.base) ? it.base
+    : Number.isFinite(it.price) ? (it.gross ? r2(it.price) : bruttoIzNet(it.price)) : null);
   function itemsVat(d) {
-    const r2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
     let net = 0;
+    let vat = 0;
     let est = false;
     for (const it of d.items) {
-      const p = itemPrice(it);
-      if (!Number.isFinite(p)) continue;
+      const r = strokaVat(it);
+      if (!r) continue;
       est = true;
-      const qty = Number(it.qty) > 0 ? Number(it.qty) : 1;
-      const unit = it.gross === false ? r2(p) : r2(p / (1 + VAT_STAVKA));
-      net += r2(unit * qty);
+      net += r.net;
+      vat += r.vat;
     }
     if (!est) return null;
     net = r2(net);
-    const vat = r2(net * VAT_STAVKA);
+    vat = r2(vat);
     return { net, vat, total: r2(net + vat) };
   }
 
@@ -4505,9 +4710,12 @@ window.CrmSupabaseStore = (() => {
     return out.length ? `<div class="card-ways">${out.join('')}</div>` : '';
   }
 
-  // Деньги сделки: вписанная руками сумма главнее, пусто — итог позиций.
-  // Одно правило и для карточки, и для итога колонки, чтобы цифры не расходились.
-  const itemsSum = (d) => Math.round(itemsTotal(d) * 100) / 100;
+  /* Деньги сделки: вписанная руками сумма главнее, пусто — итог позиций.
+     Одно правило и для карточки, и для итога колонки, чтобы цифры не расходились.
+     ⭐22.09.2026: берём брутто из itemsVat, а не голую сумму вписанных чисел. Раньше
+     позиции в разных пометках складывались как есть — нетто с брутто, — и «из позиций»
+     ставило в сделку сумму, которой нет ни в одном документе. */
+  const itemsSum = (d) => { const t = itemsVat(d); return t ? t.total : 0; };
   const dealMoney = (d) => (Number.isFinite(d.amount) ? d.amount : itemsSum(d));
   function cardSum(d) {
     if (Number.isFinite(d.amount)) return fmtMoney(d.amount);
@@ -5248,9 +5456,11 @@ window.CrmSupabaseStore = (() => {
 
   // Подпись под строкой позиции: каталожная цена как справка, скидка и пометка брутто/нетто
   function itemMetaHTML(it) {
-    const list = Number.isFinite(it.list_price) ? it.list_price : null;
+    // ⚠️ в базе каталожная лежит брутто; сравнивать её с договорной можно только
+    // после перевода в тот же вид, иначе «−49 €» покажется там, где на самом деле +19 %
+    const list = listPokaz(it);
     const own = Number.isFinite(it.price) ? it.price : null;
-    const diff = list !== null && own !== null ? Math.round((own - list) * 100) / 100 : null;
+    const diff = list !== null && own !== null ? r2(own - list) : null;
     let badge = '';
     if (diff !== null && diff < 0) {
       const pc = Math.round((-diff / list) * 100);
@@ -5260,7 +5470,7 @@ window.CrmSupabaseStore = (() => {
     }
     return `${list !== null ? `<span class="item-list" title="Цена каталога exded.com на день добавления">Каталог ${esc(fmtMoney(list))}</span>` : ''}
 ${badge}
-<button type="button" class="item-tag" data-act="item-vat" aria-pressed="${it.gross}" title="Нажмите, чтобы переключить. Пометка относится к обеим ценам, НДС считается от той, что пошла в расчёт.">${it.gross ? 'брутто · с НДС 19 %' : 'нетто · без НДС'}</button>`;
+<button type="button" class="item-tag" data-act="item-vat" aria-pressed="${it.gross}" title="Нажмите, чтобы переключить. Меняется только запись цены: 21 099 брутто = 17 730,25 нетто. Нетто, НДС и брутто внизу остаются прежними.">${it.gross ? 'брутто · с НДС 19 %' : 'нетто · без НДС'}</button>`;
   }
 
   // Крестик показываем только у открытой сделки и только если она не единственная:
@@ -5462,6 +5672,10 @@ ${badge}
     // её нет и быть не должно — иначе они пересоберутся иначе
     const list = num(it && it.list_price);
     if (list !== null) x.list_price = list;
+    // то же и с НДС строки: он появился 22.09.2026, у прежних документов его нет,
+    // и они по-прежнему считаются прежним правилом
+    const vat = num(it && it.vat);
+    if (vat !== null) x.vat = vat;
     return x;
   }
   function normalizeDocClient(x) {
@@ -5516,9 +5730,23 @@ ${badge}
     if (printable) return ag ? `${title} · zum Angebot ${ag.no}` : `${title} – Proforma-Rechnung`;
     return ag ? `zum Angebot ${ag.no}` : '';
   }
+  /* ⭐22.09.2026. В документе всё считается от НЕТТО, поэтому в снимок кладём
+     уже переведённые числа и пометку gross:false. Два плюса:
+     • зачёркнутая каталожная печатается в том же виде, что и цена позиции;
+     • документ хранит ровно то, что напечатано, и через год соберётся так же.
+     ⚠️Снимки СТАРЫХ документов не трогаем: они лежат как лежали и пересобираются
+     байт в байт — здесь только то, из чего делается НОВЫЙ документ. */
   const docItemsOf = (d) => d.items
     .filter((it) => str(it.name).trim() && Number.isFinite(itemPrice(it)))
-    .map((it) => normalizeDocItem({ name: it.name, qty: it.qty, price: it.price, list_price: it.list_price, gross: it.gross }));
+    .map((it) => normalizeDocItem({
+      name: it.name,
+      qty: it.qty,
+      price: Number.isFinite(it.price) ? (it.gross ? netIzBrutto(it.price) : r2(it.price)) : null,
+      list_price: Number.isFinite(it.list_price) ? netIzBrutto(it.list_price) : null,
+      gross: false,
+      // НДС строки кладём готовым числом: у позиции из магазина он посчитан от брутто
+      vat: (strokaVat(it) || {}).vat,
+    }));
 
   // Умеет ли это устройство отдавать PDF в системное меню. Спрашиваем про файл,
   // а не про «есть ли share вообще»: на ноутбуке share обычно есть, а файл не берёт.
@@ -5938,6 +6166,8 @@ ${badge}
           if (k === 'qty' && qtyBad(el.value)) { markQty(el, true); return; }
           if (k === 'qty') markQty(el, false);
           it[k] = k === 'price' ? parseAmount(el.value) : k === 'qty' ? parseQty(el.value) : el.value;
+          // вписанная цена становится опорной: в брутто, независимо от пометки
+          if (k === 'price') it.base = Number.isFinite(it.price) ? (it.gross ? r2(it.price) : bruttoIzNet(it.price)) : null;
           patchDeal(c.id, d.id, { items });
           cardRenderedJSON = JSON.stringify(state.clients.get(c.id));
           const meta = el.closest('[data-item]').querySelector('.item-meta');
@@ -6077,7 +6307,15 @@ ${badge}
         const items = clone(d.items);
         const it = items.find((x) => x.id === row.dataset.item);
         if (!it) return;
+        /* ⭐Пометка без пересчёта числа и была двойным НДС: цена с НДС начинала
+           считаться ценой без НДС. Теперь у позиции есть опорная цена в брутто,
+           а пометка выбирает лишь то, каким числом её показать. Итог не двигается. */
+        const opora = oporaIz(it);
         it.gross = !it.gross;
+        if (opora !== null) {
+          it.base = opora;
+          it.price = it.gross ? opora : netIzBrutto(opora);
+        }
         patchDeal(c.id, d.id, { items }, { now: true });
         renderCard();
         return;
