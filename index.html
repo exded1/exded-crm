@@ -222,6 +222,20 @@
     </div>
   </dialog>
 
+  <!-- Один вопрос после первого сообщения в мессенджер -->
+  <dialog id="dlg-mess" class="modal" aria-labelledby="mess-q">
+    <div class="modal-box">
+      <h2 id="mess-q">Написали?</h2>
+      <p class="sub" id="mess-sub"></p>
+      <footer class="modal-foot mess-foot">
+        <button type="button" class="btn ghost" data-mess-ans="potom">Потом</button>
+        <span class="grow"></span>
+        <button type="button" class="btn ghost" data-mess-ans="net">Нет</button>
+        <button type="button" class="btn primary" data-mess-ans="da">Есть</button>
+      </footer>
+    </div>
+  </dialog>
+
   <!-- Удаление сделки -->
   <dialog id="dlg-deal-del" class="modal" aria-labelledby="deal-del-title">
     <div class="modal-box">
