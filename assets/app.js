@@ -3546,6 +3546,9 @@ window.CrmSupabaseStore = (() => {
     mail: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M4 7l8 6 8-6"/></svg>',
     link: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13.5a3.5 3.5 0 0 0 5 0l3-3a3.5 3.5 0 1 0-5-5l-1.2 1.2"/><path d="M14 10.5a3.5 3.5 0 0 0-5 0l-3 3a3.5 3.5 0 1 0 5 5l1.2-1.2"/></svg>',
     plus: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+    // ⭐значок «дополнено из внешнего источника» и «есть подсказка»
+    dop: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5"/><path d="M12 7.6v.9"/></svg>',
+    podskazka: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5a5.5 5.5 0 0 0-3 10.1V17h6v-3.4a5.5 5.5 0 0 0-3-10.1z"/><path d="M10 20h4"/></svg>',
   };
 
   /* ===================================================================
@@ -4400,6 +4403,8 @@ window.CrmSupabaseStore = (() => {
     c.billing = {};
     for (const b of BILLING) c.billing[b.key] = str(bill[b.key]).trim();
 
+    c.istochniki = normalizeIstochniki(c.istochniki);
+
     if (legacy) {
       // первая схема: сделка лежала прямо на клиенте. Ничего не теряем, id сделки = id клиента,
       // чтобы два устройства получили один и тот же результат миграции.
@@ -4424,6 +4429,144 @@ window.CrmSupabaseStore = (() => {
     c.schema = 2;
     Object.defineProperty(c, '__legacy', { value: legacy, enumerable: false, configurable: true });
     return c;
+  }
+
+  /* ===================================================================
+     ⭐26.09.2026 (v20). Откуда взялось значение.
+
+     У каждого значения в карточке три возможных происхождения:
+       • написал клиент       — `{ kto: 'klient' }`, ставит вебхук при приёме заявки;
+       • вписал владелец      — записи НЕТ вовсе. Это и есть «моё значение»;
+       • дополнено из внешнего источника — `{ kto: 'dopolneno', otkuda, kogda }`.
+     Оранжевым в карточке показывается ТОЛЬКО третье.
+
+     ⛔Дополнение никогда не затирает то, что уже стоит в поле. Если значение занято
+     и отличается — оно остаётся, а дополнение ложится рядом подсказкой
+     (`podskazka`), и поставить его вместо своего может только владелец, руками.
+     ⛔Без указанного источника дополнение не принимается вовсе: догадки и «похожие»
+     фирмы в карточку не попадают.
+     ⚠️Как только владелец правит поле руками, запись об источнике стирается —
+     значение становится его собственным и перестаёт быть оранжевым.
+
+     Пути (`put`) — те же имена, что у полей: `company`, `billing.<ключ>`, `links.<ключ>`. */
+  const ISTOCHNIK_PUTI = () => ['company'].concat(BILLING.map((b) => `billing.${b.key}`), LINKS.map((l) => `links.${l.key}`));
+  const ISTOCHNIK_PODPIS = Object.fromEntries([['company', 'Компания']]
+    .concat(BILLING.map((b) => [`billing.${b.key}`, b.label]), LINKS.map((l) => [`links.${l.key}`, l.label])));
+
+  function normalizeIstochnik(x) {
+    const s = x && typeof x === 'object' ? x : {};
+    const kto = s.kto === 'klient' || s.kto === 'dopolneno' ? s.kto : '';
+    const r = {};
+    if (kto) r.kto = kto;
+    if (str(s.otkuda)) r.otkuda = str(s.otkuda);
+    if (str(s.kogda)) r.kogda = str(s.kogda);
+    const p = s.podskazka && typeof s.podskazka === 'object' ? s.podskazka : null;
+    if (p && str(p.znachenie) && str(p.otkuda)) {
+      r.podskazka = { znachenie: str(p.znachenie), otkuda: str(p.otkuda), kogda: str(p.kogda) };
+    }
+    return r.kto || r.podskazka ? r : null;
+  }
+  function normalizeIstochniki(x) {
+    const src = x && typeof x === 'object' ? x : {};
+    const out = {};
+    const mozhno = new Set(ISTOCHNIK_PUTI());
+    for (const put of Object.keys(src)) {
+      if (!mozhno.has(put)) continue;                  // чужие пути не храним
+      const z = normalizeIstochnik(src[put]);
+      if (z) out[put] = z;
+    }
+    return out;
+  }
+  // значение по пути: company | billing.<ключ> | links.<ключ>
+  function znachenieDlya(c, put) {
+    if (put === 'company') return str(c.company);
+    const [gruppa, klyuch] = String(put).split('.');
+    if (gruppa === 'billing') return str((c.billing || {})[klyuch]);
+    if (gruppa === 'links') return str((c.links || {})[klyuch]);
+    return '';
+  }
+  const istochnikDlya = (c, put) => (c && c.istochniki ? c.istochniki[put] || null : null);
+  const dopolneno = (c, put) => { const z = istochnikDlya(c, put); return Boolean(z && z.kto === 'dopolneno'); };
+
+  /** Правка руками стирает запись об источнике: значение стало собственным. */
+  function zabytIstochnik(id, put) {
+    const c = state.clients.get(id);
+    if (!c || !c.istochniki || !c.istochniki[put]) return;
+    const next = { ...c.istochniki };
+    delete next[put];
+    patch(id, { istochniki: next });
+    /* ⚠️Карточку целиком не перерисовываем: человек сейчас печатает в этом поле
+       и потерял бы курсор. Снимаем метку точечно. */
+    if (state.openId === id) snyatMetku(put);
+  }
+  function snyatMetku(put) {
+    const body = $('#card-body');
+    if (!body) return;
+    const znak = body.querySelector(`.istochnik[data-put="${window.CSS && CSS.escape ? CSS.escape(put) : put}"]`);
+    const obertka = znak && znak.closest('.f, .link-row, .cs-company-wrap');
+    if (obertka) obertka.classList.remove('is-dop', 'is-podskazka');
+    if (znak) znak.remove();
+  }
+
+  /** Дополнить карточку данными из внешнего источника.
+      spisok: [{ put, znachenie, otkuda, kogda }]. Возвращает отчёт по каждому пути. */
+  function dopolnit(id, spisok) {
+    const c = state.clients.get(id);
+    if (!c || !Array.isArray(spisok)) return { vstavleno: 0, podskazok: 0, propushcheno: 0, stroki: [] };
+    const mozhno = new Set(ISTOCHNIK_PUTI());
+    const ist = { ...(c.istochniki || {}) };
+    const pole = { company: undefined, billing: { ...c.billing }, links: { ...c.links } };
+    let vstavleno = 0; let podskazok = 0; let propushcheno = 0;
+    const stroki = [];
+    for (const zapis of spisok) {
+      const put = str(zapis && zapis.put);
+      const znachenie = str(zapis && zapis.znachenie).trim();
+      const otkuda = str(zapis && zapis.otkuda).trim();
+      const kogda = str(zapis && zapis.kogda).trim() || nowIso();
+      // ⛔ без источника или без значения — не берём вовсе
+      if (!mozhno.has(put) || !znachenie || !otkuda) { propushcheno += 1; stroki.push({ put, chto: 'пропущено' }); continue; }
+      const bylo = znachenieDlya(c, put);
+      if (bylo && bylo !== znachenie) {
+        // ⛔ занято и расходится: своё оставляем, дополнение кладём подсказкой
+        ist[put] = { ...(ist[put] || {}), podskazka: { znachenie, otkuda, kogda } };
+        podskazok += 1; stroki.push({ put, chto: 'подсказка' });
+        continue;
+      }
+      if (bylo === znachenie) { stroki.push({ put, chto: 'совпало' }); continue; }
+      if (put === 'company') pole.company = znachenie;
+      else {
+        const [gruppa, klyuch] = put.split('.');
+        pole[gruppa][klyuch] = znachenie;
+      }
+      ist[put] = { kto: 'dopolneno', otkuda, kogda };
+      vstavleno += 1; stroki.push({ put, chto: 'вставлено' });
+    }
+    const changes = { istochniki: ist };
+    if (pole.company !== undefined) changes.company = pole.company;
+    changes.billing = pole.billing;
+    changes.links = pole.links;
+    patch(id, changes, { now: true });
+    if (state.openId === id) renderCard();
+    return { vstavleno, podskazok, propushcheno, stroki };
+  }
+
+  /** Поставить подсказку вместо своего значения — только по решению владельца. */
+  function prinyatPodskazku(id, put) {
+    const c = state.clients.get(id);
+    const z = istochnikDlya(c, put);
+    if (!c || !z || !z.podskazka) return false;
+    const { znachenie, otkuda, kogda } = z.podskazka;
+    const ist = { ...(c.istochniki || {}) };
+    ist[put] = { kto: 'dopolneno', otkuda, kogda };
+    const changes = { istochniki: ist };
+    if (put === 'company') changes.company = znachenie;
+    else {
+      const [gruppa, klyuch] = put.split('.');
+      changes[gruppa] = { ...c[gruppa], [klyuch]: znachenie };
+    }
+    patch(id, changes, { now: true });
+    renderCard();
+    return true;
   }
 
   function newDeal(fields = {}) {
@@ -5755,8 +5898,9 @@ ${badge}
     }).join('');
     const links = LINKS.map((l) => {
       const href = linkHref(c.links[l.key]);
-      return `<div class="link-row">
-  <span class="link-label">${esc(l.label)}</span>
+      const put = `links.${l.key}`;
+      return `<div class="link-row${klassPolya(c, put)}">
+  <span class="link-label">${esc(l.label)}${metkaIstochnika(c, put)}</span>
   <input data-lbind="${l.key}" value="${esc(c.links[l.key])}" placeholder="${esc(l.placeholder)}" inputmode="url" aria-label="${esc(l.label)}">
   ${href ? `<a class="icon-btn" href="${esc(href)}" target="_blank" rel="noopener noreferrer" aria-label="Открыть ${esc(l.label)}">${ICON.link}</a>` : '<span class="icon-btn is-off" aria-hidden="true"></span>'}
 </div>`;
@@ -5765,13 +5909,29 @@ ${badge}
 <div class="links">${links}</div>`;
   }
 
+  /* Метка «дополнено» и подсказка у поля. Оранжевым — только дополненное;
+     слова клиента и то, что вписал владелец, обычным цветом. */
+  function metkaIstochnika(c, put) {
+    const z = istochnikDlya(c, put);
+    if (!z) return '';
+    const dop = z.kto === 'dopolneno';
+    const est = Boolean(z.podskazka);
+    if (!dop && !est) return '';
+    const podpis = dop ? `Дополнено из внешнего источника: ${z.otkuda || 'источник не указан'}` : `Есть подсказка из внешнего источника: ${z.podskazka.otkuda}`;
+    return `<button type="button" class="istochnik${dop ? ' is-dop' : ' is-podskazka'}" data-act="istochnik" data-put="${esc(put)}" aria-label="${esc(podpis)}" title="${esc(podpis)}">${dop ? ICON.dop : ICON.podskazka}</button>`;
+  }
+  const klassPolya = (c, put) => (dopolneno(c, put) ? ' is-dop' : (istochnikDlya(c, put) && istochnikDlya(c, put).podskazka ? ' is-podskazka' : ''));
+
   function aboutHTML(c) {
     return `<div class="cs-sec-head"><h3>О клиенте</h3></div>
 <textarea data-bind="about" rows="3" placeholder="Чем занимается, кто принимает решения, о чём помнить при разговоре" aria-label="О клиенте">${esc(c.about)}</textarea>`;
   }
 
   function billingHTML(c) {
-    const fields = BILLING.map((b) => `<label class="f${b.wide ? ' wide' : ''}${b.key === 'customer_no' ? ' money' : ''}"><span>${esc(b.label)}</span><input data-bbind="${b.key}" value="${esc(c.billing[b.key])}" placeholder="${esc(b.placeholder || '')}"${b.key === 'customer_no' ? ' inputmode="numeric"' : ''}></label>`).join('');
+    const fields = BILLING.map((b) => {
+      const put = `billing.${b.key}`;
+      return `<label class="f${b.wide ? ' wide' : ''}${b.key === 'customer_no' ? ' money' : ''}${klassPolya(c, put)}"><span>${esc(b.label)}${metkaIstochnika(c, put)}</span><input data-bbind="${b.key}" value="${esc(c.billing[b.key])}" placeholder="${esc(b.placeholder || '')}"${b.key === 'customer_no' ? ' inputmode="numeric"' : ''}></label>`;
+    }).join('');
     return `<div class="cs-sec-head"><h3>Реквизиты</h3></div>
 <div class="bill-grid">${fields}</div>
 <p class="hint">Отсюда данные пойдут в счета и предложения. Номер клиента присваивается сам при первой сделке, начиная с 10001; менять его без нужды не стоит.</p>`;
@@ -6185,7 +6345,7 @@ ${badge}
     body.innerHTML = `
 <div class="cs-head">
   <button type="button" class="vip${c.vip ? ' on' : ''}" data-act="vip" aria-pressed="${c.vip}" aria-label="VIP клиент">${ICON.star}</button>
-  <input class="cs-company" data-bind="company" value="${esc(c.company)}" placeholder="Название компании" aria-label="Компания">
+  <span class="cs-company-wrap${klassPolya(c, 'company')}"><input class="cs-company" data-bind="company" value="${esc(c.company)}" placeholder="Название компании" aria-label="Компания">${metkaIstochnika(c, 'company')}</span>
   <button type="button" class="icon-btn" data-close aria-label="Закрыть">${ICON.close}</button>
 </div>
 <div class="cs-status">
@@ -6291,6 +6451,8 @@ ${badge}
       if (el.dataset.bind) {
         const key = el.dataset.bind;
         patch(c.id, { [key]: el.value });
+        // ⭐правка руками делает значение собственным: метка «дополнено» снимается
+        if (key === 'company') zabytIstochnik(c.id, 'company');
         cardRenderedJSON = JSON.stringify(c);
       } else if (el.dataset.dbind && d) {
         const key = el.dataset.dbind;
@@ -6315,9 +6477,11 @@ ${badge}
         if (key === 'lost_reason') $$('[data-act="lost-reason"]', body).forEach((b) => b.classList.toggle('on', b.dataset.reason === el.value));
       } else if (el.dataset.lbind) {
         patch(c.id, { links: { ...c.links, [el.dataset.lbind]: el.value } });
+        zabytIstochnik(c.id, `links.${el.dataset.lbind}`);
         cardRenderedJSON = JSON.stringify(c);
       } else if (el.dataset.bbind) {
         patch(c.id, { billing: { ...c.billing, [el.dataset.bbind]: el.value } });
+        zabytIstochnik(c.id, `billing.${el.dataset.bbind}`);
         cardRenderedJSON = JSON.stringify(c);
       } else if (el.dataset.ibind && d) {
         const itemId = el.closest('[data-item]').dataset.item;
@@ -6400,6 +6564,7 @@ ${badge}
       const d = currentDeal(c);
       const act = btn.dataset.act;
 
+      if (act === 'istochnik') { openIstochnik(c.id, btn.dataset.put); return; }
       if (act === 'vip') { patch(c.id, { vip: !c.vip }, { now: true }); renderCard(); return; }
 
       if (act === 'deal-pick') {
@@ -7210,6 +7375,51 @@ ${badge}
   /* ===================================================================
      Настройки, копия
      =================================================================== */
+  /* Окно «Откуда это значение»: источник, дата и — если дополнение не стало
+     значением — кнопка поставить его вместо своего. */
+  let istCtx = null;
+  function openIstochnik(id, put) {
+    const c = state.clients.get(id);
+    const z = istochnikDlya(c, put);
+    if (!c || !z) return;
+    istCtx = { id, put };
+    const dlg = $('#dlg-istochnik');
+    const nazvanie = ISTOCHNIK_PODPIS[put] || put;
+    $('#ist-pole').textContent = `Поле «${nazvanie}»`;
+    const ssylka = (v) => { const h = linkHref(v); return h ? `<a href="${esc(h)}" target="_blank" rel="noopener noreferrer">${esc(v)}</a>` : esc(v); };
+    const kogda = (v) => (v ? fmtDateTime(v) : 'дата не записана');
+    const rows = [];
+    if (z.kto === 'dopolneno') {
+      rows.push(`<dt>Сейчас в поле</dt><dd>${esc(znachenieDlya(c, put)) || '—'}</dd>`);
+      rows.push(`<dt>Откуда</dt><dd>${ssylka(z.otkuda || 'источник не указан')}</dd>`);
+      rows.push(`<dt>Когда</dt><dd>${esc(kogda(z.kogda))}</dd>`);
+      rows.push('<dt>Кто вписал</dt><dd>дополнено из внешнего источника, не клиент и не вы</dd>');
+    } else if (z.kto === 'klient') {
+      rows.push('<dt>Кто вписал</dt><dd>клиент сам, в форме на сайте</dd>');
+    }
+    if (z.podskazka) {
+      rows.push(`<dt>Подсказка</dt><dd>${esc(z.podskazka.znachenie)}</dd>`);
+      rows.push(`<dt>Откуда подсказка</dt><dd>${ssylka(z.podskazka.otkuda)}</dd>`);
+      rows.push(`<dt>Когда</dt><dd>${esc(kogda(z.podskazka.kogda))}</dd>`);
+    }
+    $('#ist-list').innerHTML = rows.join('');
+    $('#ist-take').hidden = !z.podskazka;
+    dlg.showModal();
+    fitSheets();
+  }
+  function bindIstochnik() {
+    const dlg = $('#dlg-istochnik');
+    if (!dlg) return;
+    dlg.addEventListener('click', (e) => { if (e.target === dlg || e.target.closest('[data-close]')) dlg.close(); });
+    const take = $('#ist-take');
+    if (take) take.addEventListener('click', () => {
+      if (!istCtx) return;
+      const { id, put } = istCtx;
+      dlg.close();
+      if (prinyatPodskazku(id, put)) toast('Значение из подсказки поставлено');
+    });
+  }
+
   function bindSettings() {
     const dlg = $('#dlg-settings');
     const logBtn = $('#btn-log');
@@ -7444,6 +7654,7 @@ ${badge}
       bindDealPwd();
       bindPlan();
       bindLogView();
+      bindIstochnik();
       bindSettings();
       bindShortcuts();
       bindViewport();
@@ -7568,7 +7779,7 @@ ${badge}
 
   // для проверок: чистые функции схемы, без данных
   Object.defineProperty(window, 'EXDED_CRM_TEST_STORE', { get: () => store, configurable: true });
-  window.EXDED_CRM_TEST = { normalize, legacyToClients, boardDeals, activeDeal, dealTitle, normalizeDeal, loadCatalog, catalog, catalogFind, catalogBlocked, keepFocusVisible, fitSheets, renderBoardNow: renderBoard, dealDocNos, bornShort, itemsVat, refreshAll, changeLines, logSeen, readTheme, applyTheme, setTheme, docPayload, docSubject, docItemsOf, normalizeDocRec };
+  window.EXDED_CRM_TEST = { dopolnit, prinyatPodskazku, istochnikDlya, znachenieDlya, normalizeIstochniki, normalize, legacyToClients, boardDeals, activeDeal, dealTitle, normalizeDeal, loadCatalog, catalog, catalogFind, catalogBlocked, keepFocusVisible, fitSheets, renderBoardNow: renderBoard, dealDocNos, bornShort, itemsVat, refreshAll, changeLines, logSeen, readTheme, applyTheme, setTheme, docPayload, docSubject, docItemsOf, normalizeDocRec };
 
   /* Фирменный знак. Источник один — window.EXDED_BRAND.logo (его кладёт сборка).
      Отсюда он расходится по интерфейсу, значку вкладки и значку «На экран «Домой»»:

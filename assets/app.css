@@ -884,6 +884,28 @@ input:not([type=file]), select, textarea {
 #diag-kb pre { margin: 0; font: inherit; white-space: pre; }
 #diag-kb i { display: block; margin-top: 3px; font-style: normal; opacity: .55; }
 
+/* ⭐26.09.2026. Дополненное из внешних источников — оранжевым, со значком.
+   Слова клиента и то, что вписал владелец, обычным цветом.
+   ⚠️Цвет текста — `--orange-ink`, а не чистый #ff8134: фирменный оранжевый как ТЕКСТ
+   на светлом фоне не проходит по контрасту (то же решение, что у ссылок на сайте).
+   Сам значок остаётся фирменным `--orange`. В тёмной теме `--orange-ink` уже
+   светлый (#ffa36c) — читается на тёмном. */
+.istochnik {
+  display: inline-grid; place-items: center; vertical-align: middle;
+  width: 18px; height: 18px; margin-left: 5px; padding: 0;
+  border: 0; border-radius: 50%; background: transparent; color: var(--orange);
+}
+.istochnik svg { width: 14px; height: 14px; }
+.istochnik.is-podskazka { color: var(--ink-3); }
+@media (pointer: coarse) { .istochnik { width: 28px; height: 28px; margin-left: 2px; } }
+.f.is-dop > input, .link-row.is-dop > input, .cs-company-wrap.is-dop > .cs-company { color: var(--orange-ink); }
+.f.is-dop > span, .link-row.is-dop .link-label { color: var(--orange-ink); }
+.cs-company-wrap { display: flex; align-items: center; gap: 2px; min-width: 0; flex: 1; }
+.cs-company-wrap > .cs-company { min-width: 0; }
+.ist-list { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 12px; margin: 0; font-size: 14px; }
+.ist-list dt { color: var(--ink-3); }
+.ist-list dd { margin: 0; overflow-wrap: anywhere; }
+
 /* ---------- История изменений ---------- */
 /* ⚠️23.09.2026: ширину теперь задаёт внутренняя коробка — сам диалог растянут
    по видимой полосе экрана и прозрачен */
