@@ -659,12 +659,26 @@ input:not([type=file]), select, textarea {
   font-size: 13px; font-weight: 600; color: var(--ink-3); text-decoration: none;
 }
 .pill.on { color: var(--ink); border-color: var(--ink-3); background: var(--surface-2); }
-.pill[data-ch="whatsapp"].on { color: #127a3a; border-color: #62c08a; background: #e3f5e9; }
-.pill[data-ch="telegram"].on { color: #146e9e; border-color: #6cc2ec; background: #e2f3fb; }
 .pill.dm.on { color: var(--bg); background: var(--ink); border-color: var(--ink); }
-:root[data-theme="dark"] .pill[data-ch="whatsapp"].on, :root[data-theme="dark"] .pill[data-ch="telegram"].on { background: var(--surface-2); color: var(--ink); }
+
+/* ⭐25.09.2026. Пометка о мессенджерах: три кнопки — три ответа, «не знаю» по
+   умолчанию. Значок WhatsApp или Telegram виден только там, где он может быть,
+   а пометка главнее типа номера. */
+.contact-mess { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.mess { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.mess-label { font-size: 13px; font-weight: 700; color: var(--ink-2); }
+.mess-btn {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 30px; padding: 0 11px;
+  border: 1px solid var(--line-2); border-radius: 999px; background: var(--surface);
+  font-size: 13px; font-weight: 600; color: var(--ink-3);
+}
+.mess-btn.on { color: var(--ink); border-color: var(--ink-3); background: var(--surface-2); }
+.mess[data-mess="wa"] .mess-btn.on[data-val="da"] { color: #127a3a; border-color: #62c08a; background: #e3f5e9; }
+.mess[data-mess="tg"] .mess-btn.on[data-val="da"] { color: #146e9e; border-color: #6cc2ec; background: #e2f3fb; }
+.mess-vid { flex: 1 1 100%; font-size: 12.5px; color: var(--ink-3); }
+:root[data-theme="dark"] .mess .mess-btn.on[data-val="da"] { background: var(--surface-2); color: var(--ink); border-color: var(--ink-3); }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .pill[data-ch="whatsapp"].on, :root:not([data-theme="light"]) .pill[data-ch="telegram"].on { background: var(--surface-2); color: var(--ink); }
+  :root:not([data-theme="light"]) .mess .mess-btn.on[data-val="da"] { background: var(--surface-2); color: var(--ink); border-color: var(--ink-3); }
 }
 .contact-go { display: flex; gap: 4px; margin-left: auto; }
 .contact-go a { width: 34px; height: 34px; border-radius: 50%; background: var(--surface-2); color: var(--ink-2); }
@@ -1075,6 +1089,7 @@ input:not([type=file]), select, textarea {
   .way-ask-btn { min-height: 44px; }
   .card .vip, .cs-head .vip, .contact .main-star { width: 44px; height: 44px; }
   .chips button, .seg button, .pill, .deal-tab { min-height: 44px; }
+  .mess-btn { min-height: 44px; min-width: 44px; }
   /* ⭐22.09.2026: крестик удаления сделки был 34px — пальцем мимо.
      Значок остался 13px, выросла только область нажатия. */
   .deal-del { width: 44px; height: 44px; right: 0; }

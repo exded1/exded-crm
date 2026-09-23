@@ -3493,12 +3493,22 @@ window.CrmSupabaseStore = (() => {
   const TITLE = Object.fromEntries(STATUSES.map((s) => [s.key, s.title]));
   const CLOSED = ['client', 'lost'];
   const LOST_REASONS = ['Дорого', 'Купили у другого', 'Нет бюджета', 'Не отвечает', 'Передумали', 'Нет в наличии', 'Долгий срок поставки'];
-  const CHANNELS = [
-    { key: 'phone', label: 'Звонок' },
-    { key: 'whatsapp', label: 'WhatsApp' },
-    { key: 'telegram', label: 'Telegram' },
-    { key: 'email', label: 'Email' },
+  /* Мессенджеры у номера. Узнать, есть ли у номера WhatsApp или Telegram,
+     приложение не может: официального способа нет, а сторонние службы работают
+     в обход правил, и им пришлось бы отдать телефоны клиентов. Поэтому значок
+     показываем по типу номера, а пометка, поставленная руками, всегда главнее.
+     Три состояния: '' — не знаю, 'da' — есть, 'net' — нет. */
+  const MESS = [
+    { key: 'wa', label: 'WhatsApp' },
+    { key: 'tg', label: 'Telegram' },
   ];
+  const MESS_OTVETY = [
+    { val: 'da', label: 'есть' },
+    { val: 'net', label: 'нет' },
+    { val: '', label: 'не знаю' },
+  ];
+  const MESS_SLOVO = { da: 'есть', net: 'нет', '': 'не знаю' };
+  const PUSTAYA_MESS = Object.freeze({ wa: '', tg: '', sprosili_wa: false, sprosili_tg: false });
   const LINKS = [
     { key: 'website', label: 'Сайт', placeholder: 'example.de' },
     { key: 'instagram', label: 'Instagram', placeholder: 'instagram.com/…' },
@@ -3702,6 +3712,66 @@ window.CrmSupabaseStore = (() => {
     if (d.startsWith('0')) return '49' + d.slice(1);
     return d;
   }
+  /* Тип номера: мобильный или городской. У Германии мобильные — 015x, 016x, 017x
+     в любой записи: +49, 0049, 0. У остальных стран — по коду страны и известным
+     диапазонам. Чего не знаем — считаем мобильным: лучше лишний значок, чем
+     спрятанный нужный.
+     ⚠️ Побеждает самое длинное совпадение: городской Зальцбург 662 сильнее
+     мобильного австрийского 66, польский мобильный 88 сильнее городского 8.
+     ⚠️ Номер без кода страны считаем немецким — магазин работает по Германии. */
+  const NOMERA = {
+    // Германия: 015x/016x/017x — мобильные, 018x — служебные, 2…9 — города
+    '49': { mob: ['15', '16', '17'], fix: ['18', '2', '3', '4', '5', '6', '7', '8', '9'] },
+    // Австрия: мобильные перечислены по три знака, иначе 662 (Зальцбург) уедет в мобильные
+    '43': { mob: ['650', '651', '652', '653', '655', '657', '659', '660', '661', '663', '664', '665', '666', '667', '668', '669', '67', '68', '69'], fix: ['1', '2', '3', '4', '5', '6', '7'] },
+    '41': { mob: ['75', '76', '77', '78', '79'], fix: ['2', '3', '4', '5', '6', '7', '8', '9'] },
+    '31': { mob: ['6'], fix: ['1', '2', '3', '4', '5', '7', '8', '9'] },
+    '32': { mob: ['46', '47', '48', '49'], fix: ['1', '2', '3', '4', '5', '6', '7', '8', '9'] },
+    '48': { mob: ['45', '50', '51', '53', '57', '60', '66', '69', '72', '73', '78', '79', '88'], fix: ['1', '2', '3', '4', '5', '6', '7', '8', '9'] },
+    '420': { mob: ['60', '70', '72', '73', '77', '79'], fix: ['2', '3', '4', '5'] },
+    '33': { mob: ['6', '7'], fix: ['1', '2', '3', '4', '5', '8', '9'] },
+    // Италия: ноль — часть городского номера, а не выход на межгород
+    '39': { mob: ['3'], fix: ['0'] },
+    '34': { mob: ['6', '7'], fix: ['8', '9'] },
+    '44': { mob: ['7'], fix: ['1', '2', '3', '8', '9'] },
+  };
+  const dlinaSovpadeniya = (spisok, s) => spisok.reduce((m, p) => (s.startsWith(p) && p.length > m ? p.length : m), 0);
+  const kodStrany = (d) => [3, 2, 1].map((n) => d.slice(0, n)).find((k) => NOMERA[k]) || '';
+  // 'mob' — мобильный, 'fix' — городской, 'net' — номера нет
+  function tipNomera(p) {
+    const raw = str(p).trim();
+    const d = digits(raw);
+    if (!d) return 'net';
+    let kod = '49';
+    let nac = d;
+    if (raw.startsWith('+') || d.startsWith('00')) {
+      const bez = raw.startsWith('+') ? d : d.slice(2);
+      kod = kodStrany(bez);
+      if (!kod) return 'mob';                  // страна незнакомая — не гадаем
+      nac = bez.slice(kod.length);
+    }
+    const t = NOMERA[kod];
+    if (!nac || !t) return 'mob';
+    let m = dlinaSovpadeniya(t.mob, nac);
+    let f = dlinaSovpadeniya(t.fix, nac);
+    // «+49 (0) 351» и запись через ноль: ноль — выход на межгород. В Италии он
+    // часть номера, поэтому сначала пробуем как есть и только потом без нуля.
+    if (!m && !f && nac.startsWith('0')) {
+      const bezNulya = nac.replace(/^0+/, '');
+      m = dlinaSovpadeniya(t.mob, bezNulya);
+      f = dlinaSovpadeniya(t.fix, bezNulya);
+    }
+    return f > m ? 'fix' : 'mob';
+  }
+  const messOf = (ct) => (ct && ct.mess && typeof ct.mess === 'object' ? ct.mess : PUSTAYA_MESS);
+  // Показывать ли значок мессенджера. Пометка руками главнее типа номера.
+  function pokazatMess(ct, kind) {
+    const z = messOf(ct)[kind];
+    if (z === 'da') return true;
+    if (z === 'net') return false;
+    return tipNomera(ct && ct.phone) === 'mob';
+  }
+
   function linkHref(v) {
     const s = str(v).trim();
     if (!s) return '';
@@ -4368,6 +4438,22 @@ window.CrmSupabaseStore = (() => {
     return `Сделка от ${shortDate(new Date(d.created_at))}`;
   }
 
+  /* Пометка о мессенджерах у контакта. Старые карточки отмечали канал списком
+     channels — переносим: отмеченный канал значит «есть». Снятый не значит «нет»:
+     его чаще просто не отмечали, поэтому остаётся «не знаю».
+     ⚠️ Пометка живёт только в CRM: в документы и на сайт она не уходит. */
+  function normalizeMess(m, channels) {
+    const src = m && typeof m === 'object' ? m : {};
+    const ch = Array.isArray(channels) ? channels : [];
+    const odna = (v, staroe) => (v === 'da' || v === 'net' ? v : (staroe ? 'da' : ''));
+    return {
+      wa: odna(src.wa, ch.includes('whatsapp')),
+      tg: odna(src.tg, ch.includes('telegram')),
+      sprosili_wa: Boolean(src.sprosili_wa),
+      sprosili_tg: Boolean(src.sprosili_tg),
+    };
+  }
+
   function normalize(d) {
     const src = d && typeof d === 'object' ? d : {};
     const legacy = !Array.isArray(src.deals);
@@ -4382,7 +4468,7 @@ window.CrmSupabaseStore = (() => {
     c.vip = Boolean(c.vip);
     if (!Array.isArray(c.contacts)) c.contacts = [];
     if (!Array.isArray(c.log)) c.log = [];
-    c.contacts = c.contacts.filter(Boolean).map((ct) => ({ id: ct.id || uid(), name: '', role: '', phone: '', email: '', dm: false, main: false, channels: [], ...ct, channels: Array.isArray(ct.channels) ? ct.channels : [] }));
+    c.contacts = c.contacts.filter(Boolean).map((ct) => ({ id: ct.id || uid(), name: '', role: '', phone: '', email: '', dm: false, main: false, channels: [], ...ct, channels: Array.isArray(ct.channels) ? ct.channels : [], mess: normalizeMess(ct.mess, ct.channels) }));
     c.log = c.log.filter((e) => e && e.text !== undefined).map((e) => ({ id: e.id || uid(), at: e.at || c.created_at || nowIso(), text: String(e.text) }));
     // Заказы магазина: только строка для глаз, хозяин заказов — WooCommerce
     if (!Array.isArray(c.orders)) c.orders = [];
@@ -4998,20 +5084,21 @@ window.CrmSupabaseStore = (() => {
 
   // Одна сделка = одна карточка. Когда у клиента на доске больше одной карточки,
   // подписываем номер сделки и её название: это не дубль компании, а разные сделки.
-  /* Кнопки связи на карточке доски. Показываем только отмеченные каналы:
-     проверить, есть ли у номера WhatsApp, приложение не может, поэтому
-     ничего не угадываем. Порядок всегда один: WhatsApp, Telegram, почта, телефон. */
+  /* Кнопки связи на карточке доски. Значки мессенджеров показываем только там,
+     где они могут быть: у городского номера их нет вовсе, у мобильного есть,
+     а пометка, поставленная руками, главнее типа номера. Звонок и почта — по
+     наличию номера и адреса. Порядок всегда один: WhatsApp, Telegram, почта, телефон. */
   function waysHTML(c) {
     const m = mainContact(c);
     if (!m) return '';
-    const ch = Array.isArray(m.channels) ? m.channels : [];
-    const wa = ch.includes('whatsapp') ? waDigits(m.phone) : '';
-    const tg = ch.includes('telegram') ? digits(m.phone) : '';
-    const mail = ch.includes('email') ? str(m.email).trim() : '';
+    const wa = pokazatMess(m, 'wa') ? waDigits(m.phone) : '';
+    const tg = pokazatMess(m, 'tg') ? waDigits(m.phone) : '';
+    const mail = str(m.email).trim();
     const phone = str(m.phone).trim();
+    const komu = ` data-client="${esc(c.id)}" data-ct="${esc(m.id)}"`;
     const out = [];
-    if (wa) out.push(`<a class="way way-wa" href="https://wa.me/${esc(wa)}" target="_blank" rel="noopener noreferrer" data-act="way" data-way="wa" aria-label="Написать в WhatsApp" title="WhatsApp">${ICON.wa}</a>`);
-    if (tg) out.push(`<a class="way way-tg" href="https://t.me/+${esc(tg)}" target="_blank" rel="noopener noreferrer" data-act="way" data-way="tg" aria-label="Написать в Telegram" title="Telegram">${ICON.tg}</a>`);
+    if (wa) out.push(`<a class="way way-wa" href="https://wa.me/${esc(wa)}" target="_blank" rel="noopener noreferrer" data-act="way" data-way="wa"${komu} aria-label="Написать в WhatsApp" title="WhatsApp">${ICON.wa}</a>`);
+    if (tg) out.push(`<a class="way way-tg" href="https://t.me/+${esc(tg)}" target="_blank" rel="noopener noreferrer" data-act="way" data-way="tg"${komu} aria-label="Написать в Telegram" title="Telegram">${ICON.tg}</a>`);
     if (mail) out.push(`<button type="button" class="way way-mail" data-act="way" data-way="mail" data-value="${esc(mail)}" aria-label="Скопировать почту ${esc(mail)}" title="Скопировать почту">${ICON.mail}</button>`);
     if (phone) out.push(`<button type="button" class="way way-call" data-act="way" data-way="phone" data-value="${esc(phone)}" aria-label="Телефон ${esc(phone)}" title="Позвонить или скопировать номер">${ICON.phone}</button>`);
     return out.length ? `<div class="card-ways">${out.join('')}</div>` : '';
@@ -5326,6 +5413,101 @@ window.CrmSupabaseStore = (() => {
     if (way === 'phone') askPhone(btn);
   }
 
+  /* ⭐Подсказка после первого разговора. Владелец нажал значок WhatsApp или
+     Telegram, ушёл в мессенджер и вернулся — один раз спрашиваем, есть ли у
+     номера этот мессенджер; ответ ставит пометку. Спрашиваем, только когда стоит
+     «не знаю», и только один раз на контакт: «потом» тоже считается ответом,
+     переключатель в карточке никуда не девается.
+     ⚠️ Замысел храним в этом устройстве: приложение могло уйти из памяти, пока
+     владелец писал в мессенджере, и вернуться уже перезапуском. */
+  const SPROS_KEY = 'exded-crm-sprosit';
+  const SPROS_SROK = 6 * 60 * 60 * 1000;      // ушёл на полдня — спрашивать поздно
+  let sprosCtx = null;
+  const sprosRead = () => { try { return JSON.parse(localStorage.getItem(SPROS_KEY) || 'null'); } catch { return null; } };
+  const sprosWrite = (v) => { try { if (v) localStorage.setItem(SPROS_KEY, JSON.stringify(v)); else localStorage.removeItem(SPROS_KEY); } catch {} };
+
+  function zapomnitUhod(a) {
+    const id = a.dataset.client;
+    const ct = a.dataset.ct;
+    const kind = a.dataset.way;
+    if (!id || !ct || !MESS.some((m) => m.key === kind)) return;
+    const c = state.clients.get(id);
+    const x = c && c.contacts.find((k) => k.id === ct);
+    if (!x || messOf(x)[kind] || messOf(x)['sprosili_' + kind]) return;   // уже знаем или уже спрашивали
+    sprosWrite({ id, ct, kind, at: Date.now(), ushli: false });
+  }
+
+  function sprosPora() {
+    const z = sprosRead();
+    if (!z || !z.ushli) return null;
+    if (Date.now() - z.at > SPROS_SROK) { sprosWrite(null); return null; }
+    const c = state.clients.get(z.id);
+    const x = c && c.contacts.find((k) => k.id === z.ct);
+    if (!x || messOf(x)[z.kind] || messOf(x)['sprosili_' + z.kind]) { sprosWrite(null); return null; }
+    return { c, x, kind: z.kind };
+  }
+
+  function sprositProMess() {
+    const dlg = $('#dlg-mess');
+    if (!dlg || dlg.open || document.hidden) return;
+    const z = sprosPora();
+    if (!z) return;
+    sprosCtx = { id: z.c.id, ct: z.x.id, kind: z.kind };
+    const nazvanie = (MESS.find((m) => m.key === z.kind) || {}).label || '';
+    const kto = str(z.x.name).trim() || clientName(z.c);
+    $('#mess-q').textContent = `Написали? У этого номера есть ${nazvanie}?`;
+    $('#mess-sub').textContent = [kto, str(z.x.phone).trim()].filter(Boolean).join(' · ');
+    sprosWrite(null);                      // спрашиваем один раз, даже если сейчас закроют
+    dlg.showModal();
+    fitSheets();
+  }
+
+  function stavitMess(id, ctId, kind, val, sprosili) {
+    const c = state.clients.get(id);
+    if (!c) return;
+    const contacts = updateContact(c, ctId, (x) => {
+      x.mess = { ...messOf(x), [kind]: val };
+      if (sprosili) x.mess['sprosili_' + kind] = true;
+    });
+    if (!contacts) return;
+    patch(id, { contacts }, { now: true });
+    if (state.openId === id && $('#dlg-card').open) renderCard();
+  }
+
+  function bindMess() {
+    const dlg = $('#dlg-mess');
+    if (!dlg) return;
+    dlg.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-mess-ans]');
+      if (!b) return;
+      const otvet = b.dataset.messAns;
+      const ctx = sprosCtx;
+      sprosCtx = null;
+      dlg.close();
+      if (!ctx) return;
+      stavitMess(ctx.id, ctx.ct, ctx.kind, otvet === 'da' ? 'da' : otvet === 'net' ? 'net' : '', true);
+      const nazvanie = (MESS.find((m) => m.key === ctx.kind) || {}).label || '';
+      if (otvet === 'da') toast(`Запомнил: ${nazvanie} есть`);
+      else if (otvet === 'net') toast(`Запомнил: ${nazvanie} нет`);
+      else toast('Хорошо. Пометку можно поставить в карточке контакта');
+    });
+    // ⚠️ Уход в мессенджер видно только по тому, что приложение спрятали:
+    // ссылка могла и не открыться, и тогда спрашивать не о чем.
+    document.addEventListener('click', (e) => {
+      const a = e.target.closest('a[data-way="wa"], a[data-way="tg"]');
+      if (a) zapomnitUhod(a);
+    }, true);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        const z = sprosRead();
+        if (z && !z.ushli) sprosWrite({ ...z, ushli: true });
+        return;
+      }
+      setTimeout(sprositProMess, 400);
+    });
+    window.addEventListener('pageshow', () => setTimeout(sprositProMess, 800));
+  }
+
   function bindBoard() {
     const board = $('#board');
     $$('.col-list').forEach((el) => { el.dataset.emptyDefault = el.dataset.empty; });
@@ -5579,7 +5761,7 @@ window.CrmSupabaseStore = (() => {
           if (name && !known.name) known.name = name;
           if (phone && !known.phone) known.phone = phone;
         } else if (phone || name) {
-          contacts.push({ id: uid(), name, role: '', phone, email: '', dm: false, main: !contacts.length, channels: phone ? ['phone'] : [] });
+          contacts.push({ id: uid(), name, role: '', phone, email: '', dm: false, main: !contacts.length, channels: phone ? ['phone'] : [], mess: { ...PUSTAYA_MESS } });
         }
         // открытая сделка есть — дописываем в неё; все закрыты — это новая покупка, новая сделка
         const open = openDeals(c);
@@ -5611,7 +5793,7 @@ window.CrmSupabaseStore = (() => {
         if (CLOSED.includes(deal.status)) deal.closed_at = deal.status_at;
         const created = await createClient({
           company, log: logEntry, deals: [deal],
-          contacts: phone || name ? [{ id: uid(), name, role: '', phone, email: '', dm: false, main: true, channels: phone ? ['phone'] : [] }] : [],
+          contacts: phone || name ? [{ id: uid(), name, role: '', phone, email: '', dm: false, main: true, channels: phone ? ['phone'] : [], mess: { ...PUSTAYA_MESS } }] : [],
         });
         savedId = created.id;
         savedDeal = created.deals[0].id;
@@ -5873,9 +6055,30 @@ ${badge}
 </div>`;
   }
 
+  /* Переключатель пометки — в карточке контакта, а не долгим нажатием на значок:
+     у городского номера значка нет вовсе, поставить на нём «есть» было бы негде,
+     а на айфоне долгое нажатие по ссылке открывает своё меню. Три кнопки — три
+     состояния, каждое нажатие сразу выбирает ответ, угадывать нечего. */
+  function messHTML(x) {
+    const tip = tipNomera(x.phone);
+    const mess = messOf(x);
+    return `<div class="contact-mess">${MESS.map((m) => {
+    const cur = mess[m.key];
+    const vidno = pokazatMess(x, m.key);
+    const pochemu = cur ? 'по вашей пометке' : tip === 'net' ? 'номера нет' : tip === 'fix' ? 'номер городской' : 'номер мобильный';
+    return `<div class="mess" data-mess="${m.key}" role="group" aria-label="${esc(m.label)} у этого номера">
+      <span class="mess-label">${esc(m.label)}</span>
+      ${MESS_OTVETY.map((o) => `<button type="button" class="mess-btn${cur === o.val ? ' on' : ''}" data-act="c-mess" data-mess="${m.key}" data-val="${o.val}" aria-pressed="${cur === o.val}">${o.label}</button>`).join('')}
+      <span class="mess-vid">${vidno ? 'значок показан' : 'значок скрыт'} · ${pochemu}</span>
+    </div>`;
+  }).join('')}</div>`;
+  }
+
   function contactsHTML(c) {
     const rows = c.contacts.map((x) => {
-      const wa = x.channels.includes('whatsapp') && waDigits(x.phone);
+      const wa = pokazatMess(x, 'wa') ? waDigits(x.phone) : '';
+      const tg = pokazatMess(x, 'tg') ? waDigits(x.phone) : '';
+      const komu = ` data-client="${esc(c.id)}" data-ct="${esc(x.id)}"`;
       return `<div class="contact" data-contact="${esc(x.id)}">
   <button type="button" class="main-star${x.main ? ' on' : ''}" data-act="c-main" aria-pressed="${x.main}" aria-label="С ним ведём общение" title="С ним ведём общение">${ICON.star}</button>
   <div class="contact-fields">
@@ -5887,13 +6090,14 @@ ${badge}
   <div class="contact-tools"><button type="button" class="icon-btn" data-act="c-del" aria-label="Удалить контакт">${ICON.trash}</button></div>
   <div class="contact-opts">
     <button type="button" class="pill dm${x.dm ? ' on' : ''}" data-act="c-dm" aria-pressed="${x.dm}">ЛПР</button>
-    ${CHANNELS.map((ch) => `<button type="button" class="pill${x.channels.includes(ch.key) ? ' on' : ''}" data-act="c-ch" data-ch="${ch.key}" aria-pressed="${x.channels.includes(ch.key)}">${ch.label}</button>`).join('')}
     <span class="contact-go">
       ${x.phone ? `<a class="icon-btn" href="tel:${esc(telHref(x.phone))}" aria-label="Позвонить">${ICON.phone}</a>` : ''}
-      ${wa ? `<a class="icon-btn" href="https://wa.me/${esc(wa)}" target="_blank" rel="noopener noreferrer" aria-label="Написать в WhatsApp">${ICON.wa}</a>` : ''}
+      ${wa ? `<a class="icon-btn" href="https://wa.me/${esc(wa)}" target="_blank" rel="noopener noreferrer" data-way="wa"${komu} aria-label="Написать в WhatsApp">${ICON.wa}</a>` : ''}
+      ${tg ? `<a class="icon-btn" href="https://t.me/+${esc(tg)}" target="_blank" rel="noopener noreferrer" data-way="tg"${komu} aria-label="Написать в Telegram">${ICON.tg}</a>` : ''}
       ${x.email ? `<a class="icon-btn" href="mailto:${esc(x.email)}" aria-label="Написать письмо">${ICON.mail}</a>` : ''}
     </span>
   </div>
+  ${messHTML(x)}
 </div>`;
     }).join('');
     const links = LINKS.map((l) => {
@@ -6703,7 +6907,7 @@ ${badge}
       if (act === 'next-clear' && d) { patchDeal(c.id, d.id, { next: null }, { now: true }); renderCard(); return; }
 
       if (act === 'c-add') {
-        const contacts = [...clone(c.contacts), { id: uid(), name: '', role: '', phone: '', email: '', dm: false, main: !c.contacts.length, channels: ['phone'] }];
+        const contacts = [...clone(c.contacts), { id: uid(), name: '', role: '', phone: '', email: '', dm: false, main: !c.contacts.length, channels: ['phone'], mess: { ...PUSTAYA_MESS } }];
         patch(c.id, { contacts }, { now: true });
         renderCard();
         const inputs = $$('[data-cbind="name"]', body);
@@ -6716,7 +6920,7 @@ ${badge}
         let contacts = null;
         if (act === 'c-main') contacts = updateContact(c, contactId, (x, all) => { const on = !x.main; all.forEach((k) => { k.main = false; }); x.main = on; });
         if (act === 'c-dm') contacts = updateContact(c, contactId, (x) => { x.dm = !x.dm; });
-        if (act === 'c-ch') contacts = updateContact(c, contactId, (x) => { const k = btn.dataset.ch; x.channels = x.channels.includes(k) ? x.channels.filter((y) => y !== k) : [...x.channels, k]; });
+        if (act === 'c-mess') contacts = updateContact(c, contactId, (x) => { x.mess = { ...messOf(x), [btn.dataset.mess]: btn.dataset.val }; });
         if (act === 'c-del') {
           if (btn.dataset.confirm !== '1') { btn.dataset.confirm = '1'; btn.style.color = 'var(--red)'; btn.setAttribute('aria-label', 'Нажмите ещё раз, чтобы удалить'); return; }
           contacts = clone(c.contacts).filter((k) => k.id !== contactId);
@@ -6838,9 +7042,10 @@ ${badge}
       for (const [k, label] of [['name', 'имя'], ['role', 'должность'], ['phone', 'телефон'], ['email', 'почта']]) {
         if (str(old[k]) !== str(ct[k])) add(`контакт ${who}, ${label}: ${logVal(old[k])} → ${logVal(ct[k])}`);
       }
-      if (old.channels.join(',') !== ct.channels.join(',')) {
-        const names = ct.channels.map((k) => (CHANNELS.find((x) => x.key === k) || {}).label || k).join(', ');
-        add(`контакт ${who}: каналы ${names || 'сняты'}`);
+      for (const m of MESS) {
+        const bylo = str(messOf(old)[m.key]);
+        const stalo = str(messOf(ct)[m.key]);
+        if (bylo !== stalo) add(`контакт ${who}: ${m.label} — ${MESS_SLOVO[stalo]}`);
       }
       if (Boolean(old.dm) !== Boolean(ct.dm)) add(`контакт ${who}: ${ct.dm ? 'отмечен ЛПР' : 'снята отметка ЛПР'}`);
       if (Boolean(old.main) !== Boolean(ct.main) && ct.main) add(`контакт ${who}: теперь главный`);
@@ -7655,6 +7860,7 @@ ${badge}
       bindPlan();
       bindLogView();
       bindIstochnik();
+      bindMess();
       bindSettings();
       bindShortcuts();
       bindViewport();
@@ -7676,6 +7882,8 @@ ${badge}
     // ⭐Шторку убираем последней: под ней уже нарисована доска, а не пустой экран
     hideBoot();
     setTimeout(checkReturns, 1500);
+    // приложение могло перезапуститься, пока владелец писал в мессенджере
+    setTimeout(sprositProMess, 1200);
   }
 
   async function afterLogin(user) {
@@ -7779,7 +7987,7 @@ ${badge}
 
   // для проверок: чистые функции схемы, без данных
   Object.defineProperty(window, 'EXDED_CRM_TEST_STORE', { get: () => store, configurable: true });
-  window.EXDED_CRM_TEST = { dopolnit, prinyatPodskazku, istochnikDlya, znachenieDlya, normalizeIstochniki, normalize, legacyToClients, boardDeals, activeDeal, dealTitle, normalizeDeal, loadCatalog, catalog, catalogFind, catalogBlocked, keepFocusVisible, fitSheets, renderBoardNow: renderBoard, dealDocNos, bornShort, itemsVat, refreshAll, changeLines, logSeen, readTheme, applyTheme, setTheme, docPayload, docSubject, docItemsOf, normalizeDocRec };
+  window.EXDED_CRM_TEST = { tipNomera, pokazatMess, normalizeMess, sprositProMess, dopolnit, prinyatPodskazku, istochnikDlya, znachenieDlya, normalizeIstochniki, normalize, legacyToClients, boardDeals, activeDeal, dealTitle, normalizeDeal, loadCatalog, catalog, catalogFind, catalogBlocked, keepFocusVisible, fitSheets, renderBoardNow: renderBoard, dealDocNos, bornShort, itemsVat, refreshAll, changeLines, logSeen, readTheme, applyTheme, setTheme, docPayload, docSubject, docItemsOf, normalizeDocRec };
 
   /* Фирменный знак. Источник один — window.EXDED_BRAND.logo (его кладёт сборка).
      Отсюда он расходится по интерфейсу, значку вкладки и значку «На экран «Домой»»:
