@@ -206,6 +206,22 @@
     </div>
   </dialog>
 
+  <!-- ⭐26.09.2026. Откуда взялось значение: показываем источник и дату.
+       Если дополнение не стало значением (поле было занято своим), здесь же
+       можно поставить его вместо своего — но только руками, по решению владельца. -->
+  <dialog id="dlg-istochnik" class="modal" aria-labelledby="ist-title">
+    <div class="modal-box">
+      <h2 id="ist-title">Откуда это значение</h2>
+      <p class="sub" id="ist-pole"></p>
+      <dl class="ist-list" id="ist-list"></dl>
+      <footer class="modal-foot">
+        <button type="button" class="btn ghost" id="ist-take" hidden>Поставить вместо моего</button>
+        <span class="grow"></span>
+        <button type="button" class="btn primary" data-close>Понятно</button>
+      </footer>
+    </div>
+  </dialog>
+
   <!-- Удаление сделки -->
   <dialog id="dlg-deal-del" class="modal" aria-labelledby="deal-del-title">
     <div class="modal-box">
