@@ -338,17 +338,27 @@ input::placeholder, textarea::placeholder { color: var(--ink-3); }
   grid-template-rows: auto auto auto minmax(0, 1fr);
   grid-template-columns: minmax(0, 1fr);
 }
+/* ⭐25.09.2026. Шапка: логотипа слева нет, поиск начинается от края шапки —
+   там же, где начинаются карточки списка. Знак переехал в кнопку «Обновить».
+   ⚠️Промежутки между точкой связи, знаком и шестерёнкой одинаковы НА ВИД: у кнопок
+   вокруг значка есть свой внутренний зазор, а у точки его нет — поэтому ей добавлен
+   такой же справа. На сенсорном экране кнопка 44 px вместо 38, зазор другой,
+   поэтому он вынесен в переменную. */
 .top {
   display: flex; align-items: center; gap: 10px;
   padding: 10px 16px;
+  --znachok: 24px;
+  --zazor-znachka: 7px;                 /* (38 − 24) / 2 */
 }
 /* шапка начинается ниже часов и значка сети, а не под ними */
 .top { padding: calc(10px + var(--sat)) max(16px, var(--sar)) 10px max(16px, var(--sal)); }
-.search { position: relative; flex: 1; min-width: 0; max-width: 460px; margin-left: 14px; }
+@media (pointer: coarse) { .top { --zazor-znachka: 10px; } }   /* кнопка 44 × 44 */
+.top .icon-btn svg, .top .icon-btn .brand-mark { width: var(--znachok); height: var(--znachok); }
+.search { position: relative; flex: 1; min-width: 0; max-width: 460px; }
 .search svg { position: absolute; left: 12px; top: 50%; width: 17px; height: 17px; margin-top: -8.5px; color: var(--ink-3); pointer-events: none; }
 .search input[type=search] { padding-left: 37px; min-height: 40px; background: var(--surface); }
 .btn-new { margin-left: 4px; }
-.sync { width: 8px; height: 8px; border-radius: 50%; background: var(--line-2); margin-left: auto; flex: none; }
+.sync { width: 8px; height: 8px; border-radius: 50%; background: var(--line-2); margin-left: auto; margin-right: var(--zazor-znachka); flex: none; }
 .sync.live { background: var(--green); }
 .sync.error { background: var(--red); }
 
@@ -822,10 +832,16 @@ input:not([type=file]), select, textarea {
 .cs-foot { display: flex; align-items: center; gap: 10px; padding: 10px 16px 12px; border-top: 1px solid var(--line); font-size: 13px; color: var(--ink-3); }
 .cs-foot { padding-bottom: max(12px, calc(var(--sab) + 8px)); }
 
-/* Обновление: кнопка в шапке и кружок при жесте «потянуть вниз» */
+/* Обновление: знак в шапке и кружок при жесте «потянуть вниз» */
 @keyframes spin { to { transform: rotate(360deg); } }
-#btn-refresh.is-spin svg { animation: spin 900ms linear infinite; }
+/* ⭐25.09.2026. Знак делает полный оборот с плавным разгоном и замедлением.
+   Оборот бесконечный, а останавливает его код — на конце ближайшего круга
+   (`animationiteration`), поэтому начатый оборот всегда доигрывает до конца,
+   а если данные ещё идут, начинается следующий. */
+@keyframes znak-oborot { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+#btn-refresh.is-turn .brand-mark { animation: znak-oborot 700ms cubic-bezier(.45, .05, .55, .95) infinite; }
 #btn-refresh[disabled] { opacity: .5; }
+#btn-refresh[disabled].is-turn { opacity: 1; }   /* пока крутится, приглушать незачем */
 .pull {
   position: fixed; left: 50%; top: 0; z-index: 30; pointer-events: none;
   display: grid; place-items: center; width: 34px; height: 34px;
@@ -907,9 +923,9 @@ input:not([type=file]), select, textarea {
 
 /* ---------- Планшет и телефон ---------- */
 @media (max-width: 1023px) {
-  .top .brand-name { display: none; }
   .brand-mark { width: 24px; height: 24px; }
-  .search { margin-left: 4px; max-width: none; }
+  /* ⭐25.09.2026: отступ слева убран вместе с логотипом — поиск начинается от края шапки */
+  .search { max-width: none; }
   .tabs {
     display: flex; gap: 6px; padding: 0 12px 10px;
     overflow-x: auto; scrollbar-width: none;

@@ -6985,11 +6985,26 @@ ${badge}
   let refreshing = false;
   const catalogStale = () => !catalog.at || (Date.now() - Date.parse(catalog.at) > CAT_TTL);
 
+  /* ⭐25.09.2026. Знак EXDED в шапке — он же кнопка «Обновить». Пока идут данные,
+     он крутится; начатый оборот ВСЕГДА доигрывает до конца, а если данные ещё идут —
+     начинается следующий. Сделано так: анимация бесконечная, а снимаем её не сразу,
+     а на конце ближайшего круга (`animationiteration`).
+     ⚠️При «уменьшении движения» не крутим вовсе — обновление видно по тому, что
+     кнопка на время становится недоступной, как и раньше. */
+  function krutitZnak(on) {
+    const btn = $('#btn-refresh');
+    const znak = btn && btn.querySelector('.brand-mark');
+    if (!btn || !znak) return;
+    if (on) { if (!MQ_CALM.matches) btn.classList.add('is-turn'); return; }
+    if (!btn.classList.contains('is-turn')) return;
+    znak.addEventListener('animationiteration', () => btn.classList.remove('is-turn'), { once: true });
+  }
+
   async function refreshAll() {
     if (refreshing) return false;           // повторные нажатия игнорируем
     refreshing = true;
     const btn = $('#btn-refresh');
-    if (btn) { btn.classList.add('is-spin'); btn.disabled = true; }
+    if (btn) { krutitZnak(true); btn.disabled = true; }
     let ok = true;
     try {
       if (store && typeof store.pull === 'function') await store.pull();
@@ -6997,7 +7012,7 @@ ${badge}
     } catch { ok = false; }
     try { if (!catalogBlocked() && catalogStale()) await loadCatalog({ background: true }); } catch {}
     refreshing = false;
-    if (btn) { btn.classList.remove('is-spin'); btn.disabled = false; }
+    if (btn) { krutitZnak(false); btn.disabled = false; }
     if (!ok) toast('Не удалось обновить', 'err');   // данные на экране не трогаем
     return ok;
   }
