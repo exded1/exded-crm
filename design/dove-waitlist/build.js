@@ -17,16 +17,18 @@ const body=(v)=>`
   <p class="eyebrow">Welcome aboard</p>
   <h1>You're on the <em>list</em> ${I.heart}</h1>
   <p class="sub">Your spot is saved. Invite friends and help bring Dove to your city first.</p>
-  <div class="faces"><span style="--h:340">A</span><span style="--h:20">J</span><span style="--h:45">K</span><span style="--h:300">R</span><b>+2.4k joined this week</b></div>
+  <div class="photo"><img src="couple.jpg"></div>
+  <div class="faces"><span style="--h:340">A</span><span style="--h:20">J</span><span style="--h:45">K</span><span style="--h:300">R</span><b>+2.4k this week</b></div>
 </header>
 <main>
 <section class="card stat">
   <div class="row"><span class="live"><i></i>Live waitlist</span><span class="today">${I.up} +124 today</span></div>
   <div class="big">113,581</div><p class="muted">people waiting for Dove</p>
   <div class="row small"><b>Community goal</b><span class="muted">Growing toward 500K</span></div>
-  <div class="bar"><div class="fill"></div></div>
+  <div class="bar"><div class="fill"></div><span class="tip">113,581</span></div>
   <div class="ticks"><span>0</span><span>125K</span><span>250K</span><span>375K</span><span>500K</span></div>
-  <div class="ticket"><span>Your position</span><strong>#113,581</strong></div>
+  <div class="perf"><span>Admit one · your place is secured</span></div>
+  <div class="ticket"><div class="mini"><span style="--h:340">M</span><span style="--h:20">D</span><span style="--h:300">L</span><span style="--h:45">S</span></div><p>Join <b>386,419</b> more to reach the 500K goal</p><strong>#113,581</strong></div>
 </section>
 <section class="card check">
   <div class="row"><h2>Your launch checklist</h2><div class="ring"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" class="bg"/><circle cx="20" cy="20" r="16" class="fg"/></svg><span>2/3</span></div></div>
@@ -41,6 +43,7 @@ const body=(v)=>`
   <div class="timer"><code>24:00:00</code><span>starts on your first referral</span></div>
   <button class="btn invite">${I.share} Invite your people</button>
   <div class="link"><code>fly.dove-app.com/r/KBCQZSD</code><button>${I.copy} Copy</button></div>
+  <p class="fine">Referral rewards are available during early access and end when Dove launches.</p>
 </section>
 <section class="card code">
   <h2>Have an invite code?</h2><p class="muted">Enter a friend's code so they get credit when you get verified.</p>
@@ -50,7 +53,13 @@ const body=(v)=>`
 <a class="skip">Skip for now</a>
 </main>
 <nav><a class="on"><span>${I.hour}</span>Waitlist</a><a><span>${I.gift}</span>Earn</a><a><span>${I.user}</span>Profile</a></nav>`;
-const base=`*{box-sizing:border-box;margin:0}body{width:430px;font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+const base=`.photo{position:absolute;right:18px;top:172px;width:160px;height:110px;border-radius:18px;overflow:hidden;transform:rotate(5deg);border:3px solid var(--photobd);box-shadow:6px 6px 0 var(--sh)}.photo img{width:100%;height:100%;object-fit:cover}.sub{max-width:205px!important;font-size:14px!important}h1{font-size:36px!important}.faces{margin-top:26px!important}
+.card{box-shadow:5px 6px 0 var(--sh)!important;border:2px solid var(--cardbd)!important}.promo{border-color:var(--sh)!important}
+.bar{position:relative;overflow:visible!important;margin-top:30px!important}.tip{position:absolute;left:23%;top:-30px;transform:translateX(-50%);font-size:11px;font-weight:800;padding:4px 8px;border-radius:8px;background:var(--tipbg);color:var(--tipfg)}.tip:after{content:'';position:absolute;left:50%;bottom:-4px;margin-left:-4px;border:4px solid transparent;border-top-color:var(--tipbg);border-bottom:0}
+.perf{position:relative;margin:18px -20px 0;text-align:center;font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;opacity:.75}.perf:before{content:'';position:absolute;left:24px;right:24px;top:50%;border-top:1.5px dashed currentColor;opacity:.4;z-index:0}.perf span{position:relative;background:var(--perfbg);padding:0 8px}.perf:after{content:'';position:absolute;inset:-6px -12px;background:radial-gradient(circle at 0 50%,var(--bg) 11px,transparent 12px),radial-gradient(circle at 100% 50%,var(--bg) 11px,transparent 12px)}
+.ticket{gap:10px}.ticket p{flex:1;font-size:12px;line-height:1.35;font-weight:500}.mini{display:flex}.mini span{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:800;color:#fff;background:hsl(var(--h) 75% 58%);margin-right:-6px;border:2px solid var(--facebd)}.mini{margin-right:6px}
+.fine{font-size:11px!important;opacity:.75!important;margin-top:12px!important;line-height:1.4}.invite,.cta,.btn.sm,.link button,.field button{border:2px solid var(--sh)}
+*{box-sizing:border-box;margin:0}body{width:430px;font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
 h1,h2,h3,.big,.money{font-family:var(--hf)}button{font:inherit;border:0;cursor:pointer}
 .hero{padding:22px 22px 70px;position:relative;overflow:hidden}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:26px}
 .logo{display:flex;align-items:center;gap:8px;font-weight:800;font-size:20px}.logo svg{background:var(--logobg);border-radius:12px;padding:6px;width:38px;height:38px}
@@ -83,7 +92,7 @@ h2{font-size:21px;letter-spacing:-.01em}
 nav{display:flex;justify-content:space-around;padding:10px 0 22px}nav a{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;font-weight:700;opacity:.55}nav a span{width:44px;height:44px;display:grid;place-items:center;border-radius:16px}nav a.on{opacity:1}`;
 const V={
 // A: brand plum hero + warm cream + coral & sunflower
-a:{logo:'#5A1827',css:`:root{--hf:'Fraunces',serif;--bg:#FFF4EC;--ink:#3A0F19;--line:#5A182722;--facebd:#5A1827;--logobg:#FFD6C2}
+a:{logo:'#5A1827',css:`:root{--sh:#5A1827;--cardbd:#5A1827;--photobd:#FFF4EC;--tipbg:#5A1827;--tipfg:#FFC94A;--perfbg:#fff;--hf:'Fraunces',serif;--bg:#FFF4EC;--ink:#3A0F19;--line:#5A182722;--facebd:#5A1827;--logobg:#FFD6C2}
 .hero{background:radial-gradient(circle at 90% 0%,#8C2A3E 0,transparent 55%),#5A1827;color:#FFEDE3;border-radius:0 0 36px 36px}
 .hero:after{content:'';position:absolute;right:-40px;bottom:-60px;width:200px;height:200px;border-radius:50%;background:#FF7A59;opacity:.25;filter:blur(10px)}
 .pill{background:#FFC94A;color:#5A1827}.eyebrow{color:#FFB199}h1 em{color:#FF8A6B}h1 svg{color:#FF8A6B}
@@ -96,7 +105,7 @@ a:{logo:'#5A1827',css:`:root{--hf:'Fraunces',serif;--bg:#FFF4EC;--ink:#3A0F19;--
 .code{background:#FFE9A8}.field input{border:1.5px solid #5A182733;background:#fff}.field button{background:#5A1827;color:#FFC94A}
 .cta{background:#5A1827;color:#fff;box-shadow:0 6px 0 #FF7A59}nav{background:#fff;border-top:1px solid #5A182715}nav a.on span{background:#5A1827;color:#FFC94A}`},
 // B: light & airy, brand as ink, lilac + mint
-b:{logo:'#fff',css:`:root{--hf:'Bricolage Grotesque',sans-serif;--bg:#F7F1FB;--ink:#2B0B13;--line:#5A182720;--facebd:#F7F1FB;--logobg:#5A1827}
+b:{logo:'#fff',css:`:root{--sh:#D63A79;--cardbd:#5A1827;--photobd:#fff;--tipbg:#5A1827;--tipfg:#fff;--perfbg:#fff;--hf:'Bricolage Grotesque',sans-serif;--bg:#F7F1FB;--ink:#2B0B13;--line:#5A182720;--facebd:#F7F1FB;--logobg:#5A1827}
 .hero{background:linear-gradient(160deg,#FCE7F0 0%,#EDE3FF 60%,#F7F1FB 100%);padding-bottom:66px}
 .hero:before{content:'';position:absolute;right:-70px;top:-50px;width:170px;height:170px;border-radius:44px;transform:rotate(18deg);background:linear-gradient(135deg,#B892FF,#FF8FB8);opacity:.3}
 .pill{background:#5A1827;color:#fff}.eyebrow{color:#8C3A55}h1{color:#5A1827}h1 em{color:#D63A79;font-style:normal;background:#FFD3E5;padding:0 8px;border-radius:12px}h1 svg{color:#D63A79}
@@ -109,7 +118,7 @@ b:{logo:'#fff',css:`:root{--hf:'Bricolage Grotesque',sans-serif;--bg:#F7F1FB;--i
 .code{background:#E7FBF1;border-color:#2EC48A55}.field input{border:1.5px solid #5A182722;background:#fff}.field button{background:#2EC48A;color:#fff}
 .cta{background:linear-gradient(90deg,#5A1827,#8E2547);color:#fff;box-shadow:0 14px 30px -12px #5A1827aa}nav{background:#fff;border-radius:26px 26px 0 0;box-shadow:0 -10px 30px -20px #5A182755}nav a{color:#5A1827}nav a.on span{background:#FFD3E5;color:#D63A79}`},
 // C: dark plum night mode with pink + gold
-c:{logo:'#5A1827',css:`:root{--hf:'Fraunces',serif;--bg:#1E070D;--ink:#FFEFF2;--line:#ffffff1c;--facebd:#2A0B13;--logobg:#FFB8C8}
+c:{logo:'#5A1827',css:`:root{--sh:#FF4F8B;--cardbd:#FF8FB155;--photobd:#FFC857;--tipbg:#FFC857;--tipfg:#3A0E19;--perfbg:#4A1220;--hf:'Fraunces',serif;--bg:#1E070D;--ink:#FFEFF2;--line:#ffffff1c;--facebd:#2A0B13;--logobg:#FFB8C8}
 body{background:radial-gradient(ellipse at 50% 0,#5A1827 0,#1E070D 60%)}
 .hero:after{content:'';position:absolute;left:50%;top:-80px;width:340px;height:340px;transform:translateX(-50%);border-radius:50%;background:#FF4F8B;opacity:.18;filter:blur(60px)}
 .pill{border:1.5px solid #FFC857;color:#FFC857}.eyebrow{color:#FF8FB1}h1 em{color:#FFC857}h1 svg{color:#FF4F8B}.sub{opacity:.8}
