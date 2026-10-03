@@ -1,0 +1,159 @@
+const {I,grain,reset,fonts,faces,barcode}=require('./common');
+module.exports=`<!doctype html><html><head><meta charset="utf-8">${fonts}<style>${reset}${grain}
+:root{--plum:#5A1827;--plum2:#3D0E1A;--cream:#FFF6EE;--paper:#FFFBF6;--coral:#FF6B4A;--rose:#E8336B;--butter:#FFD45C;--ink:#2A0A12}
+body{background:var(--cream);color:var(--ink)}
+.serif{font-family:'Instrument Serif',serif;font-weight:400}
+.hero{position:relative;padding:20px 22px 120px;color:#FFEDE6;overflow:hidden;
+ background:radial-gradient(60% 50% at 100% 35%,#E8336B 0,transparent 70%),radial-gradient(50% 40% at 0% 100%,#FF6B4A99 0,transparent 70%),radial-gradient(80% 60% at 30% 0%,#7D2338 0,transparent 70%),var(--plum);border-radius:0 0 44px 44px}
+.hero:before{content:'';position:absolute;inset:0;background-image:radial-gradient(#fff2 1px,transparent 1px);background-size:18px 18px;mask:linear-gradient(180deg,#000,transparent 70%)}
+.bar{display:flex;justify-content:space-between;align-items:center;position:relative;z-index:2}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:19px;letter-spacing:-.01em}
+.logo i{width:38px;height:38px;border-radius:13px;background:var(--cream);display:grid;place-items:center;box-shadow:0 6px 16px #0004,inset 0 -3px 0 #f5d9cc}
+.chip{display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;padding:9px 13px;border-radius:99px;background:#ffffff14;border:1px solid #ffffff30;backdrop-filter:blur(8px)}
+.chip svg{width:11px;color:var(--butter)}
+.eyebrow{font-size:10.5px;font-weight:800;letter-spacing:.2em;text-transform:uppercase}
+.hero .eyebrow{margin-top:34px;color:#FFB59F;display:flex;align-items:center;gap:8px}.hero .eyebrow:before{content:'';width:18px;height:1.5px;background:currentColor}
+h1{font-size:68px;line-height:.9;letter-spacing:-.02em;margin-top:12px;position:relative;z-index:2}
+h1 em{color:var(--butter);font-style:italic}
+h1 .hrt{display:inline-block;width:34px;height:34px;color:var(--coral);transform:rotate(12deg) translateY(-4px)}
+.sub{font-size:14.5px;line-height:1.55;color:#FFD9CEcc;margin-top:16px;max-width:190px;position:relative;z-index:2}
+.arch{position:absolute;right:20px;top:118px;width:166px;height:212px;border-radius:120px 120px 22px 22px;overflow:hidden;border:4px solid var(--cream);transform:rotate(4deg);box-shadow:0 24px 40px -10px #1a0208aa;z-index:1}
+.arch img{width:100%;height:100%;object-fit:cover;object-position:52% 40%;filter:saturate(1.15) contrast(1.05)}
+.arch:after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent 55%,#5A182766)}
+.sticker{position:absolute;z-index:3;right:150px;top:300px;background:var(--butter);color:var(--plum);font-weight:800;font-size:12px;padding:8px 12px;border-radius:12px;transform:rotate(-8deg);box-shadow:3px 4px 0 var(--plum2);display:flex;gap:6px;align-items:center}
+.sticker svg{width:13px;color:var(--rose)}
+.seal{position:absolute;right:6px;top:296px;width:78px;height:78px;z-index:3;animation:none}
+.seal circle{fill:var(--coral)}.seal text{fill:#fff;font:800 8.2px 'Plus Jakarta Sans';letter-spacing:2.3px}
+.seal .c{fill:#fff}
+.social{display:flex;align-items:center;gap:12px;margin-top:26px;position:relative;z-index:2}
+.av{display:flex}.av span{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:800;color:#fff;margin-right:-9px;border:2.5px solid var(--plum)}
+.social p{font-size:12.5px;color:#FFD9CE;line-height:1.3;padding-left:8px}.social b{color:#fff}
+main{padding:0 16px;margin-top:-84px;position:relative;z-index:5}
+/* ticket */
+.ticket{background:var(--paper);border-radius:28px;position:relative;box-shadow:0 30px 50px -28px #5A1827aa,0 2px 0 #5A182712}
+.t-top{padding:22px 22px 18px}
+.row{display:flex;justify-content:space-between;align-items:center}
+.live{display:flex;align-items:center;gap:8px;font-size:10.5px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--plum)}
+.live i{width:8px;height:8px;border-radius:50%;background:#1FBF75;box-shadow:0 0 0 4px #1FBF7526}
+.up{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:800;color:#0F7A4A;background:#DDF7E9;padding:6px 10px;border-radius:99px}
+.num{font-size:92px;line-height:.95;color:var(--plum);letter-spacing:-.03em;margin-top:10px}
+.num small{font-size:20px;font-family:'Plus Jakarta Sans';font-weight:600;color:#5A182799;letter-spacing:0;margin-left:4px}
+.goal{display:flex;justify-content:space-between;font-size:11.5px;font-weight:700;margin-top:22px;color:#5A1827aa}.goal b{color:var(--plum);letter-spacing:.12em;text-transform:uppercase;font-size:10.5px}
+.track{position:relative;height:14px;border-radius:99px;background:#F6E4DC;margin-top:30px;box-shadow:inset 0 2px 3px #5A182714}
+.fill{position:absolute;left:0;top:0;bottom:0;width:22.7%;border-radius:99px;background:linear-gradient(90deg,var(--coral),var(--rose));box-shadow:0 4px 10px -2px #E8336B88}
+.fill:after{content:'';position:absolute;right:-3px;top:50%;width:20px;height:20px;margin-top:-10px;border-radius:50%;background:#fff;border:4px solid var(--rose);box-sizing:border-box}
+.tip{position:absolute;left:22.7%;top:-32px;transform:translateX(-50%);background:var(--plum);color:var(--butter);font-size:11px;font-weight:800;padding:4px 9px;border-radius:8px}
+.tip:after{content:'';position:absolute;left:50%;bottom:-4px;margin-left:-4px;border:4px solid transparent;border-top-color:var(--plum);border-bottom:0}
+.ticks{display:flex;justify-content:space-between;font-size:10.5px;font-weight:700;color:#5A182777;margin-top:9px}
+.perf{position:relative;height:28px}
+.perf:before{content:'';position:absolute;left:26px;right:26px;top:50%;border-top:2px dashed #5A182730}
+.perf i{position:absolute;top:0;width:28px;height:28px;border-radius:50%;background:var(--cream)}.perf i:first-child{left:-14px}.perf i:last-child{right:-14px}
+.stub{display:flex;align-items:center;gap:16px;padding:6px 22px 22px}
+.stub .lbl{font-size:10px;font-weight:800;letter-spacing:.18em;color:#5A182788;text-transform:uppercase}
+.stub .pos{font-size:34px;color:var(--plum);line-height:1;margin-top:4px}
+.stub .bc{margin-left:auto;text-align:center;color:var(--plum)}.stub .bc svg{fill:var(--plum);height:38px}.stub .bc p{font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:.2em;margin-top:4px;opacity:.6}
+.admit{position:absolute;right:-6px;top:24px;transform:rotate(90deg) translateX(50%);transform-origin:right top;font-size:9px;font-weight:800;letter-spacing:.3em;color:#5A182744}
+/* checklist */
+.sec{margin-top:18px}
+.card{background:var(--paper);border-radius:28px;padding:22px;box-shadow:0 20px 40px -30px #5A1827aa,0 2px 0 #5A182710}
+h2{font-family:'Instrument Serif';font-weight:400;font-size:30px;line-height:1;letter-spacing:-.01em;color:var(--plum)}
+h2 em{font-style:italic;color:var(--rose)}
+.prog{display:flex;gap:6px;margin:16px 0 6px}.prog i{flex:1;height:6px;border-radius:9px;background:var(--plum)}.prog i.o{background:#F2DDD5}
+.meta{font-size:12px;color:#5A182799;font-weight:600}
+.step{display:flex;align-items:center;gap:14px;padding:15px 0;border-bottom:1px solid #5A182712}.step:last-child{border:0;padding-bottom:0}
+.step .d{width:34px;height:34px;border-radius:12px;display:grid;place-items:center;flex:none}
+.step.done .d{background:var(--plum);color:var(--butter)}.step.done b{text-decoration:line-through;text-decoration-color:#5A182744;color:#5A1827aa}
+.step.now{background:linear-gradient(90deg,#FFE9E1,#FFF1EC);margin:6px -10px 0;padding:14px 10px;border-radius:18px;border:0}
+.step.now .d{background:#fff;color:var(--rose);box-shadow:0 4px 10px -4px #E8336B66}
+.step b{font-size:15px;font-weight:700;display:block}.step small{font-size:12px;color:#5A182799}
+.step div{flex:1}
+.vbtn{background:var(--rose);color:#fff;font-weight:800;font-size:13px;padding:11px 16px;border-radius:99px;box-shadow:0 8px 18px -6px #E8336Baa,inset 0 -2px 0 #0002}
+/* reward */
+.shead{display:flex;justify-content:space-between;align-items:flex-end;margin:34px 6px 14px}
+.shead .eyebrow{color:var(--rose);margin-bottom:6px}.shead a{font-size:13px;font-weight:800;color:var(--plum);display:flex;gap:4px;align-items:center}
+.reward{position:relative;border-radius:30px;padding:24px 22px 22px;color:#fff;overflow:hidden;background:radial-gradient(90% 70% at 100% 0,#FFB04A 0,transparent 60%),radial-gradient(80% 80% at 0 100%,#B5174F 0,transparent 70%),linear-gradient(160deg,#FF6B4A,#E8336B);box-shadow:0 30px 50px -24px #E8336Bcc}
+.reward:before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(115deg,#ffffff0a 0 2px,transparent 2px 14px)}
+.reward>*{position:relative}
+.feat{display:inline-flex;gap:6px;align-items:center;background:#fff2;border:1px solid #fff4;padding:6px 11px;border-radius:99px;font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}
+.feat svg{width:10px;color:var(--butter)}
+.big{font-family:'Instrument Serif';font-size:128px;line-height:.85;letter-spacing:-.04em;margin-top:14px;text-shadow:0 6px 0 #9C1440}
+.big sup{font-size:56px;vertical-align:top;position:relative;top:14px;margin-right:2px}
+.reward h3{font-size:22px;font-weight:800;letter-spacing:-.01em;margin-top:6px}
+.reward .d2{font-size:14px;opacity:.9;margin-top:2px}
+.badge{position:absolute;right:18px;top:20px;width:92px;height:92px}
+.badge .ring{fill:var(--plum)}.badge text{fill:var(--butter);font:800 6.4px 'Plus Jakarta Sans';letter-spacing:2.1px}
+.badge .n{position:absolute;inset:0;padding-top:4px;display:grid;place-items:center;font-family:'Instrument Serif';font-size:26px;line-height:.9;text-align:center;color:#fff}
+.badge .n small{display:block;font-family:'Plus Jakarta Sans';font-size:9px;font-weight:800;letter-spacing:.1em;opacity:.7}
+.dots{display:flex;gap:6px;margin:18px 0 0}.dots i{flex:1;height:8px;border-radius:9px;background:#ffffff38}
+.timer{display:flex;align-items:center;gap:10px;margin:14px 0 18px;font-size:12px;opacity:.95}
+.timer code{font-family:'JetBrains Mono',monospace;font-weight:700;background:var(--plum2);color:var(--butter);padding:6px 10px;border-radius:10px;font-size:13px;letter-spacing:.06em}
+.invite{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;background:var(--cream);color:var(--plum);font-weight:800;font-size:16px;padding:17px;border-radius:99px;box-shadow:0 6px 0 var(--plum2)}
+.link{display:flex;align-items:center;justify-content:space-between;margin-top:14px;background:#00000024;border:1px dashed #ffffff66;border-radius:16px;padding:7px 7px 7px 14px}
+.link code{font-family:'JetBrains Mono',monospace;font-size:12.5px}
+.link button{display:flex;gap:6px;align-items:center;background:#fff;color:var(--rose);font-weight:800;font-size:12.5px;padding:9px 13px;border-radius:11px}
+.fine{font-size:11px;opacity:.8;margin-top:12px;line-height:1.45}
+/* code */
+.code{margin-top:18px;background:var(--butter);border-radius:28px;padding:22px;position:relative;overflow:hidden}
+.code:after{content:'';position:absolute;right:-30px;top:-30px;width:120px;height:120px;border-radius:50%;border:18px solid #ffffff40}
+.code h2{color:var(--plum)}.code p{font-size:13.5px;color:#5A1827cc;line-height:1.5;margin:8px 0 16px;max-width:300px}
+.field{display:flex;background:#fff;border-radius:99px;padding:6px;box-shadow:0 10px 20px -14px #5A1827}
+.field span{flex:1;font-family:'JetBrains Mono',monospace;font-size:13px;color:#5A182766;padding:12px 14px;letter-spacing:.06em}
+.field button{background:var(--plum);color:var(--butter);font-weight:800;font-size:14px;padding:0 22px;border-radius:99px}
+.cta{margin-top:22px;width:100%;display:flex;align-items:center;justify-content:space-between;background:var(--plum);color:#fff;border-radius:99px;padding:8px 8px 8px 28px;font-weight:800;font-size:17px;box-shadow:0 20px 30px -16px #5A1827}
+.cta i{width:52px;height:52px;border-radius:50%;background:var(--coral);display:grid;place-items:center}
+.skip{display:block;text-align:center;font-size:13.5px;font-weight:700;color:#5A1827aa;margin:18px 0 26px}
+nav{position:relative;width:max-content;margin:0 auto 28px;display:flex;gap:6px;padding:7px;border-radius:99px;background:#2A0A12ee;box-shadow:0 20px 40px -12px #2A0A12aa}
+nav a{display:flex;align-items:center;gap:8px;color:#FFD9CE99;font-size:13px;font-weight:700;padding:12px 16px;border-radius:99px}
+nav a.on{background:var(--cream);color:var(--plum)}
+</style></head><body>
+<header class="hero">
+ <div class="bar"><div class="logo"><i>${I.dove('#5A1827')}</i>Dove</div><div class="chip">${I.spark}Early access</div></div>
+ <div class="eyebrow">Spot confirmed</div>
+ <h1 class="serif">You're<br>on the<br><em>list.</em><span class="hrt">${I.heart}</span></h1>
+ <p class="sub">Your spot is saved. Now help bring Dove to your city.</p>
+ <div class="arch"><img src="couple.jpg"></div>
+ <svg class="seal" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50"/><path id="sc" d="M50,50 m-36,0 a36,36 0 1,1 72,0 a36,36 0 1,1 -72,0" fill="none"/><text><textPath href="#sc">YOU'RE IN · EARLY ACCESS · 2026 ·</textPath></text><g transform="translate(38 38) scale(1)"><path class="c" d="M12 21s-8-5.3-8-11a4.5 4.5 0 018-2.8A4.5 4.5 0 0120 10c0 5.7-8 11-8 11z" transform="scale(1)"/></g></svg>
+ <div class="social"><div class="av">${faces([['A','#FF6B4A'],['J','#E8336B'],['K','#C99A2E'],['R','#9B3A9E']])}</div><p><b>2,418 joined</b><br>this week near you</p></div>
+</header>
+<main>
+ <section class="ticket">
+  <div class="t-top">
+   <div class="row"><span class="live"><i></i>Live waitlist</span><span class="up">${I.up}+124 today</span></div>
+   <div class="num serif">113,581</div>
+   <div class="meta" style="font-size:14px;margin-top:2px">people waiting for Dove</div>
+   <div class="goal"><b>Community goal</b><span>Growing toward 500K</span></div>
+   <div class="track"><div class="fill"></div><span class="tip">113,581</span></div>
+   <div class="ticks"><span>0</span><span>125K</span><span>250K</span><span>375K</span><span>500K</span></div>
+  </div>
+  <div class="perf"><i></i><i></i></div>
+  <div class="stub"><div><div class="lbl">Admit one · your number</div><div class="pos serif">№ 113,581</div></div><div class="bc">${barcode()}<p>DOVE·EA·2026</p></div></div>
+ </section>
+ <section class="card sec">
+  <div class="row"><h2>Your launch <em>checklist</em></h2><span class="meta">2 of 3</span></div>
+  <div class="prog"><i></i><i></i><i class="o"></i></div>
+  <div class="step done"><span class="d">${I.check}</span><div><b>Account created</b></div></div>
+  <div class="step done"><span class="d">${I.check}</span><div><b>Profile finished</b></div></div>
+  <div class="step now"><span class="d">${I.shield}</span><div><b>Get verified</b><small>Unlock all features</small></div><button class="vbtn">Verify now</button></div>
+ </section>
+ <div class="shead"><div><div class="eyebrow">Waitlist reward · before launch</div><h2>Earn before <em>Dove</em> launches</h2></div><a>View all ${I.arrow.replace(/18/g,'14')}</a></div>
+ <section class="reward">
+  <span class="feat">${I.spark}Featured challenge</span>
+  <svg class="badge" viewBox="0 0 100 100"><circle class="ring" cx="50" cy="50" r="50"/><path id="bc" d="M50,50 m-41,0 a41,41 0 1,1 82,0 a41,41 0 1,1 -82,0" fill="none"/><text><textPath href="#bc">INVITED · INVITED · INVITED · INVITED ·</textPath></text></svg>
+  <div class="badge"><div class="n">0<small>OF 10</small></div></div>
+  <div class="big"><sup>$</sup>100</div>
+  <h3>Referral Challenge</h3><p class="d2">Invite 10 friends in 24 hours</p>
+  <div class="dots">${'<i></i>'.repeat(10)}</div>
+  <div class="timer"><code>24:00:00</code><span>starts on your first referral</span></div>
+  <button class="invite">${I.share} Invite your people</button>
+  <div class="link"><code>fly.dove-app.com/r/KBCQZSD</code><button>${I.copy} Copy</button></div>
+  <p class="fine">Referral rewards are available during early access and end when Dove launches.</p>
+ </section>
+ <section class="code">
+  <h2>Have an <em>invite code?</em></h2><p>Enter a friend's code so they get credit when you get verified.</p>
+  <div class="field"><span>ENTER CODE</span><button>Apply</button></div>
+ </section>
+ <button class="cta">Open the app<i>${I.arrow}</i></button>
+ <a class="skip">Skip for now</a>
+</main>
+<nav><a class="on">${I.hour}Waitlist</a><a>${I.gift}Earn</a><a>${I.user}Profile</a></nav>
+</body></html>`;
