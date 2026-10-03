@@ -1,0 +1,17 @@
+exports.I={check:'<svg viewBox="0 0 24 24" width="14" height="14"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+shield:'<svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 3l7 3v6c0 4.5-3 7.8-7 9-4-1.2-7-4.5-7-9V6z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9 12l2 2 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+share:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 15V3M7 8l5-5 5 5M5 13v6a2 2 0 002 2h10a2 2 0 002-2v-6"/></svg>',
+copy:'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="9" y="9" width="12" height="12" rx="3"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>',
+arrow:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+hour:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 3h12M6 21h12M7 3c0 5 10 6 10 9s-10 4-10 9M17 3c0 5-10 6-10 9"/></svg>',
+gift:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="18" height="5" rx="1"/><path d="M5 13v8h14v-8M12 8v13M12 8S10 3 7.5 4.5 9 8 12 8zm0 0s2-5 4.5-3.5S15 8 12 8z"/></svg>',
+user:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>',
+up:'<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg>',
+heart:'<svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 21s-8-5.3-8-11a4.5 4.5 0 018-2.8A4.5 4.5 0 0120 10c0 5.7-8 11-8 11z"/></svg>',
+spark:'<svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 0c.8 6.4 5.6 11.2 12 12-6.4.8-11.2 5.6-12 12-.8-6.4-5.6-11.2-12-12C6.4 11.2 11.2 6.4 12 0z"/></svg>',
+dove:c=>`<svg viewBox="0 0 48 48" width="22" height="22"><path fill="${c}" d="M8 30c6 0 10-3 13-8 2-4 5-8 11-8 4 0 7 2 8 4l-4 1c-1 6-6 14-16 15l3 6h-4l-3-5c-4 0-7-2-8-5z"/></svg>`};
+exports.grain=`body:after{content:'';position:absolute;inset:0;pointer-events:none;z-index:99;opacity:var(--grain,.06);mix-blend-mode:multiply;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}`;
+exports.reset=`*{box-sizing:border-box;margin:0;padding:0}html,body{width:430px}body{position:relative;font-family:'Plus Jakarta Sans',sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden}button{font:inherit;border:0;color:inherit;background:none}img{display:block}`;
+exports.fonts=`<link rel="stylesheet" href="fonts.css">`;
+exports.faces=(arr)=>arr.map(([l,h])=>`<span style="background:${h}">${l}</span>`).join('');
+exports.barcode=()=>{let s='';let x=0;const w=[2,1,3,1,1,2,1,3,2,1,1,2,3,1,2,1,1,3,1,2,2,1,3,1,1,2,1,1,3,2,1,2];for(const v of w){s+=`<rect x="${x}" width="${v}" height="40"/>`;x+=v+1.6}return `<svg viewBox="0 0 ${x} 40" width="${x}" height="40" preserveAspectRatio="none">${s}</svg>`};
