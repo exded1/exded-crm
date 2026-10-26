@@ -6169,7 +6169,7 @@ ${badge}
     <b>№ ${esc(o.number)}</b>
     <time>${esc(o.at ? fmtDateTime(o.at) : '')}</time>
     <span class="order-sum">${esc(Number.isFinite(o.total) ? fmtMoney(o.total) : '')}</span>
-    ${o.url ? `<a class="order-link" href="${esc(o.url)}" target="_blank" rel="noopener noreferrer">Открыть в магазине</a>` : ''}
+    ${linkHref(o.url) ? `<a class="order-link" href="${esc(linkHref(o.url))}" target="_blank" rel="noopener noreferrer">Открыть в магазине</a>` : ''}
   </li>`).join('')}</ul>
   <p class="hint">Заказы ведёт сам магазин: статусы, оплата и отправка — там. Здесь только отметка, что заказ был.</p>
 </section>`;
