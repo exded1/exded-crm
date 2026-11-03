@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="robots" content="noindex, nofollow, noarchive">
-  <meta name="theme-color" content="#191918">
+  <meta name="theme-color" content="#f3f2ee" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#191918" media="(prefers-color-scheme: dark)">
   <meta name="format-detection" content="telephone=no">
   <meta name="apple-mobile-web-app-title" content="EXDED CRM">
   <title>EXDED CRM</title>
@@ -253,9 +254,9 @@
     <form id="form-deal-pwd" class="modal-box" autocomplete="off">
       <h2 id="dpw-title">Удалить сделку с документами?</h2>
       <p class="sub" id="dpw-text"></p>
-      <label class="f" id="dpw-old-wrap"><span id="dpw-old-label">ПИН-код</span><input type="password" name="old" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" class="pin"></label>
-      <label class="f" id="dpw-new-wrap" hidden><span>Придумайте ПИН-код</span><input type="password" name="new" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" class="pin"></label>
-      <label class="f" id="dpw-new2-wrap" hidden><span>Повторите</span><input type="password" name="new2" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" class="pin"></label>
+      <label class="f" id="dpw-old-wrap"><span id="dpw-old-label">ПИН-код</span><input type="text" name="old" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="one-time-code" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" class="pin"><span class="pin-dots" aria-hidden="true"></span></label>
+      <label class="f" id="dpw-new-wrap" hidden><span>Придумайте ПИН-код</span><input type="text" name="new" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="one-time-code" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" class="pin"><span class="pin-dots" aria-hidden="true"></span></label>
+      <label class="f" id="dpw-new2-wrap" hidden><span>Повторите</span><input type="text" name="new2" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="one-time-code" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" class="pin"><span class="pin-dots" aria-hidden="true"></span></label>
       <p class="form-error" id="dpw-error" role="alert"></p>
       <footer class="modal-foot">
         <button type="button" class="btn ghost" data-close>Отмена</button>

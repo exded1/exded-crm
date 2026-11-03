@@ -2576,12 +2576,20 @@ window.ExdedDocs = (() => {
     }
     return lines.filter((l) => l.length);
   }
+  /* ⭐03.11.2026 (этап iOS, v27). После «€ » посреди строки — отдельный кусок, сдвинутый на EURO_LUFT:
+     у Helvetica от Apple (iPhone, Mac) знак € шире своей клетки и съедал следующий пробел —
+     в Proforma читалось «3.562,80 €nach». В остальных просмотрщиках 1,5 pt не заметны. */
+  const EURO_LUFT = 1.5;
   function runLineOps(line, x, y, size, color) {
     const ops = [];
     let cx = x;
     for (const part of line) {
-      ops.push({ t: 'text', x: cx, y, size, bold: part.bold, color, text: part.text });
-      cx += textWidth(part.text, size, part.bold);
+      const kuski = String(part.text).split(/(?<=€ )(?=\S)/);
+      kuski.forEach((text, i) => {
+        if (i > 0) cx += EURO_LUFT;
+        ops.push({ t: 'text', x: cx, y, size, bold: part.bold, color, text });
+        cx += textWidth(text, size, part.bold);
+      });
     }
     return ops;
   }
@@ -2681,8 +2689,13 @@ window.ExdedDocs = (() => {
         + `/Resources << /Font << /F1 ${F1} 0 R /F2 ${F2} 0 R >>${znak ? ` /XObject << /Im0 ${MASK} 0 R >>` : ''} >> /Contents ${CONT1 + i} 0 R >>`;
       objs[CONT1 + i] = null;         // поток собирается ниже
     });
-    objs[F1] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
-    objs[F2] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
+    /* ⭐03.11.2026 (этап iOS, v27). Ширины букв — в самом файле (/Widths), те же, по которым
+       textWidth() раскладывает строку. Без них каждая программа брала ширины своей Helvetica:
+       у Apple (iPhone, Mac) знак € уже стандартного, и в Proforma читалось «3.562,80 €nach» —
+       следующий за € пробел почти исчезал. С /Widths буквы встают одинаково в любом просмотрщике. */
+    const shiriny = (w) => `/FirstChar 32 /LastChar 255 /Widths [${Array.from({ length: 224 }, (_, i) => w[i] || 500).join(' ')}]`;
+    objs[F1] = `<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding ${shiriny(WIDTHS().reg)} >>`;
+    objs[F2] = `<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding ${shiriny(WIDTHS().bold)} >>`;
     objs[INFO] = `<< /Title (${escapePdf(title || 'EXDED')}) /Producer (EXDED CRM) >>`;
 
     const enc = new TextEncoder();
@@ -3793,13 +3806,21 @@ window.CrmSupabaseStore = (() => {
     const root = document.documentElement;
     if (want === 'auto') root.removeAttribute('data-theme');
     else root.setAttribute('data-theme', want);
-    let meta = document.querySelector('meta[name="theme-color"]');
-    if (!meta && document.head) {
-      meta = document.createElement('meta');
+    /* ⭐03.11.2026 (этап iOS, v27). Полоса статуса — цвета фона страницы. В <head> два тега:
+       для светлой и тёмной системы (верно ещё до запуска приложения). Выбрана тема вручную —
+       оба тега получают её цвет; «Как в системе» — каждый снова своего. */
+    let metas = Array.from(document.querySelectorAll('meta[name="theme-color"]'));
+    if (!metas.length && document.head) {
+      const meta = document.createElement('meta');
       meta.setAttribute('name', 'theme-color');
       document.head.appendChild(meta);
+      metas = [meta];
     }
-    if (meta) meta.setAttribute('content', THEME_COLOR[real]);
+    for (const meta of metas) {
+      const media = meta.getAttribute('media') || '';
+      const own = /dark/.test(media) ? THEME_COLOR.dark : /light/.test(media) ? THEME_COLOR.light : THEME_COLOR[real];
+      meta.setAttribute('content', want === 'auto' ? own : THEME_COLOR[real]);
+    }
     return real;
   }
   let themeTimer = null;
@@ -5043,6 +5064,9 @@ window.CrmSupabaseStore = (() => {
         continue;
       }
       if (k === 'log' && extra && extra.log) continue;
+      // ⭐v27: время последнего контакта ставит каждая заметка; два устройства с заметками в одну
+      // секунду — не столкновение правок, а «Данные обновил кто-то ещё» пугало зря
+      if (k === 'last_contact_at') continue;
       values[k] = JSON.stringify(snap[k] === undefined ? null : snap[k]);
     }
     lastSent.set(snap.id, { at: Date.now(), values });
@@ -7786,6 +7810,15 @@ ${badge}
       err.textContent = '';
     }
     $('#dpw-go').disabled = !ok;
+    // точки вместо цифр (сами цифры в поле прозрачные — см. .pin в app.css)
+    for (const el of [f.elements.old, f.elements.new, f.elements.new2]) {
+      const dots = el && el.nextElementSibling;
+      if (!dots || !dots.classList.contains('pin-dots')) continue;
+      dots.textContent = '●'.repeat(el.value.length);
+      const cs = getComputedStyle(el);
+      Object.assign(dots.style, { top: el.offsetTop + 'px', left: el.offsetLeft + 'px', height: el.offsetHeight + 'px',
+        paddingLeft: (parseFloat(cs.paddingLeft) + parseFloat(cs.borderLeftWidth)) + 'px' });
+    }
   }
 
   async function openDealPwd(clientId, dealId) {
@@ -7827,7 +7860,7 @@ ${badge}
     const f = $('#form-deal-pwd');
     if (!dlg) return;
     f.addEventListener('input', (e) => {
-      if (e.target && e.target.type === 'password') {
+      if (e.target && e.target.classList.contains('pin')) {
         const only = e.target.value.replace(/[^0-9]/g, '').slice(0, PIN_LEN);   // буквы и знаки не принимаем
         if (e.target.value !== only) e.target.value = only;
       }

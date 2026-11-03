@@ -859,6 +859,12 @@ input:not([type=file]), select, textarea {
 .log .icon-btn svg { width: 16px; height: 16px; }
 .cs-foot { display: flex; align-items: center; gap: 10px; padding: 10px 16px 12px; border-top: 1px solid var(--line); font-size: 13px; color: var(--ink-3); }
 .cs-foot { padding-bottom: max(12px, calc(var(--sab) + 8px)); }
+/* ⭐03.11.2026 (этап iOS, v27). На телефоне «Точно удалить? 30 дней можно вернуть» уходила за правый
+   край, а дата «Создан …» сжималась в 4 строки. Дата теперь в одну строку, кнопка при нехватке места
+   переносится на свою строку справа, а её текст — на две строки внутри кнопки. */
+.cs-foot { flex-wrap: wrap; row-gap: 6px; }
+.cs-foot > span:first-child { white-space: nowrap; }
+.cs-foot [data-act="delete"] { margin-left: auto; min-width: 0; max-width: 100%; white-space: normal; text-align: right; }
 
 /* Обновление: знак в шапке и кружок при жесте «потянуть вниз» */
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -884,6 +890,15 @@ input:not([type=file]), select, textarea {
 
 /* ПИН: четыре цифры, набирать удобнее крупно */
 .pin { max-width: 140px; letter-spacing: .32em; font-size: 17px !important; font-variant-numeric: tabular-nums; }
+/* ⭐03.11.2026 (этап iOS, v27). ПИН — не пароль. С type="password" iOS при каждом вводе предлагал
+   «Starkes Passwort verwenden?» и сохранить ПИН в «Passwörter»; маска -webkit-text-security вызывала
+   то же самое (проверено на симуляторе). Поэтому поле обычное (one-time-code), сами цифры прозрачные,
+   а поверх рисуются точки по числу набранных цифр (app.js, pwdSyncButton). */
+#form-deal-pwd .f { position: relative; }
+.pin { color: transparent !important; caret-color: transparent; }   /* курсор шёл по невидимым цифрам и наползал на точки */
+.pin::selection { color: transparent; background: transparent; }
+.pin-dots { position: absolute; display: flex; align-items: center; pointer-events: none;
+  font-size: 13px; letter-spacing: .5em; color: var(--ink); }
 
 /* строка настройки с кнопкой справа */
 .set-row { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--ink-2); }
