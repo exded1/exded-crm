@@ -298,6 +298,15 @@
           <span>ПИН-код для удаления сделок с документами</span>
           <button type="button" class="btn small" id="btn-deal-pwd">Изменить</button>
         </div>
+        <!-- ⭐03.11.2026 (этап 2): корзина на 30 дней и календарь-подписка -->
+        <div class="set-row">
+          <span id="set-trash-label">Корзина</span>
+          <button type="button" class="btn small" id="btn-trash">Открыть</button>
+        </div>
+        <div class="set-row" id="set-cal-row" hidden>
+          <span>Календарь на iPhone, iPad и Mac</span>
+          <button type="button" class="btn small" id="btn-cal">Настроить</button>
+        </div>
         <!-- ⭐23.09.2026. Диагностика клавиатуры: включается только здесь, по умолчанию
              выключена, состояние лежит на этом устройстве и в базу не пишется. -->
         <div class="set-row">
@@ -307,11 +316,63 @@
         <button type="button" class="btn" id="btn-export">Скачать резервную копию</button>
         <button type="button" class="btn" id="btn-import">Загрузить из копии</button>
         <input type="file" id="import-file" accept=".json,application/json" hidden>
+        <div class="set-row" id="set-logout-all" hidden>
+          <span>Выйти на всех устройствах сразу</span>
+          <button type="button" class="btn small ghost danger" id="btn-logout-all">Выйти везде</button>
+        </div>
       </div>
       <p class="hint">Раз в неделю скачивайте копию и храните у себя. Загрузка из копии только добавляет недостающих клиентов и ничего не стирает.</p>
       <footer class="modal-foot">
         <button type="button" class="btn ghost danger" id="btn-logout" hidden>Выйти</button>
         <span class="grow"></span>
+        <button type="button" class="btn primary" data-close>Готово</button>
+      </footer>
+    </div>
+  </dialog>
+
+  <!-- ⭐03.11.2026 (этап 2). Корзина: удалённые клиенты 30 дней -->
+  <dialog id="dlg-trash" class="modal" aria-labelledby="trash-title">
+    <div class="modal-box">
+      <h2 id="trash-title">Корзина</h2>
+      <p class="sub">Удалённые клиенты лежат здесь 30 дней, потом удаляются сами — вместе с их строками в истории изменений. На доске, в поиске и в календаре их не видно.</p>
+      <div class="trash-rows" id="trash-rows"></div>
+      <footer class="modal-foot">
+        <span class="grow"></span>
+        <button type="button" class="btn primary" data-close>Готово</button>
+      </footer>
+    </div>
+  </dialog>
+
+  <!-- ⭐03.11.2026 (этап 2). Календарь на iPhone/iPad/Mac по личной ссылке -->
+  <dialog id="dlg-cal" class="modal" aria-labelledby="cal-title">
+    <div class="modal-box">
+      <h2 id="cal-title">Календарь на iPhone, iPad и Mac</h2>
+      <p class="sub" id="cal-state">Проверяю…</p>
+      <div class="cal-new" id="cal-new" hidden>
+        <input id="cal-link" readonly aria-label="Ссылка на календарь" autocomplete="off" spellcheck="false">
+        <div class="cal-btns">
+          <button type="button" class="btn" id="cal-copy">Скопировать</button>
+          <a class="btn primary" id="cal-open">Открыть на этом устройстве</a>
+        </div>
+      </div>
+      <div class="cal-howto">
+        <h3>iPhone и iPad</h3>
+        <ol>
+          <li>Скопируйте ссылку или нажмите «Открыть на этом устройстве» — айфон сам предложит подписаться.</li>
+          <li>Вручную: Настройки → Календарь → Учётные записи → Добавить учётную запись → Другое → Подписной календарь.</li>
+          <li>Вставьте ссылку → Далее → Сохранить.</li>
+        </ol>
+        <h3>Mac</h3>
+        <ol>
+          <li>Календарь → Файл → Новая подписка на календарь.</li>
+          <li>Вставьте ссылку → Подписаться → «Обновлять: каждые 15 минут» → ОК.</li>
+        </ol>
+        <p class="hint">В календаре видно только «Anruf/Termin: компания», время и ссылку на карточку. Телефонов, почт, имён и сумм там нет. Звонки в «Минусе» и клиенты в корзине в календарь не попадают.</p>
+      </div>
+      <footer class="modal-foot">
+        <button type="button" class="btn ghost danger" id="cal-revoke" hidden>Отозвать ссылку</button>
+        <span class="grow"></span>
+        <button type="button" class="btn" id="cal-create">Создать ссылку</button>
         <button type="button" class="btn primary" data-close>Готово</button>
       </footer>
     </div>

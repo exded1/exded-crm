@@ -3249,6 +3249,153 @@ window.ExdedDocs = (() => {
 })();
 
 ;
+/* EXDED CRM — файл календаря .ics (этап 2, 03.11.2026).
+   Один и тот же файл работает в приложении (кнопка «В календарь» у звонка) и в Edge Function
+   «calendar» (подписка на iPhone/iPad/Mac): сборка копирует его в supabase/functions/calendar/.
+   ⚠️В событие попадает только «Anruf/Termin: компания», время и ссылка на карточку CRM.
+   Телефонов, почт, имён контактов, товаров, договорённостей и сумм здесь нет и быть не должно. */
+(function (root) {
+  'use strict';
+  const TZID = 'Europe/Berlin';
+  const CRM_URL = 'https://exded1.github.io/exded-crm/';
+  const DAY = 24 * 60 * 60 * 1000;
+
+  const VTIMEZONE = [
+    'BEGIN:VTIMEZONE',
+    'TZID:Europe/Berlin',
+    'X-LIC-LOCATION:Europe/Berlin',
+    'BEGIN:DAYLIGHT',
+    'TZOFFSETFROM:+0100',
+    'TZOFFSETTO:+0200',
+    'TZNAME:CEST',
+    'DTSTART:19700329T020000',
+    'RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU',
+    'END:DAYLIGHT',
+    'BEGIN:STANDARD',
+    'TZOFFSETFROM:+0200',
+    'TZOFFSETTO:+0100',
+    'TZNAME:CET',
+    'DTSTART:19701025T030000',
+    'RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU',
+    'END:STANDARD',
+    'END:VTIMEZONE',
+  ];
+
+  const pad = (n) => String(n).padStart(2, '0');
+  const fmt = new Intl.DateTimeFormat('en-GB', {
+    timeZone: TZID, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+  });
+  // Время по Берлину для DTSTART;TZID=Europe/Berlin — правильно и в дни перехода часов
+  function berlinStamp(date) {
+    const p = {};
+    for (const part of fmt.formatToParts(date)) p[part.type] = part.value;
+    return `${p.year}${p.month}${p.day}T${p.hour}${p.minute}${p.second}`;
+  }
+  const utcStamp = (date) => `${date.getUTCFullYear()}${pad(date.getUTCMonth() + 1)}${pad(date.getUTCDate())}T${pad(date.getUTCHours())}${pad(date.getUTCMinutes())}${pad(date.getUTCSeconds())}Z`;
+
+  // RFC 5545, 3.3.11: обратная косая, точка с запятой, запятая, перевод строки
+  const escText = (s) => String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+
+  // RFC 5545, 3.1: строка не длиннее 75 байт, продолжение — с пробела; UTF-8 не рвём посреди знака
+  function fold(line) {
+    const enc = new TextEncoder();
+    if (enc.encode(line).length <= 75) return line;
+    const out = [];
+    let cur = '';
+    let len = 0;
+    for (const ch of line) {
+      const b = enc.encode(ch).length;
+      const max = out.length ? 74 : 75;
+      if (len + b > max) { out.push(cur); cur = ''; len = 0; }
+      cur += ch; len += b;
+    }
+    out.push(cur);
+    return out.join('\r\n ');
+  }
+
+  const cardUrl = (clientId, dealId) => `${CRM_URL}#k=${encodeURIComponent(clientId)}${dealId ? `&s=${encodeURIComponent(dealId)}` : ''}`;
+
+  // Название клиента для календаря: только компания. Без компании — номер клиента, не имя контакта.
+  function clientTitle(c) {
+    const company = String((c && c.company) || '').replace(/\s+/g, ' ').trim();
+    if (company) return company;
+    const no = String((c && c.billing && c.billing.customer_no) || '').trim();
+    return no ? `Kunde ${no}` : 'Kunde';
+  }
+
+  const summaryOf = (c, next) => `${next && next.kind === 'meeting' ? 'Termin' : 'Anruf'}: ${clientTitle(c)}`;
+  const minutesOf = (next) => (next && next.kind === 'meeting' ? 60 : 15);
+
+  // Какие события идут в календарь: запланированный звонок/встреча, не «Минус», не корзина
+  function eventsOf(clients, { now = Date.now(), from = -30, to = 180 } = {}) {
+    const out = [];
+    const min = now + from * DAY;
+    const max = now + to * DAY;
+    for (const c of clients || []) {
+      if (!c || !c.id || c.trashed_at) continue;
+      for (const d of Array.isArray(c.deals) ? c.deals : []) {
+        if (!d || !d.id || d.status === 'lost' || !d.next || !d.next.at) continue;
+        const at = Date.parse(d.next.at);
+        if (!Number.isFinite(at) || at < min || at > max) continue;
+        out.push({ client: c, deal: d });
+      }
+    }
+    out.sort((a, b) => Date.parse(a.deal.next.at) - Date.parse(b.deal.next.at));
+    return out;
+  }
+
+  function vevent(c, d, stamp) {
+    const start = new Date(d.next.at);
+    const end = new Date(start.getTime() + minutesOf(d.next) * 60000);
+    const title = summaryOf(c, d.next);
+    const url = cardUrl(c.id, d.id);
+    return [
+      'BEGIN:VEVENT',
+      // UID по клиенту и сделке: при переносе звонка календарь меняет событие, а не заводит второе
+      `UID:${escText(`${c.id}-${d.id}@exded-crm`)}`,
+      `DTSTAMP:${stamp}`,
+      `DTSTART;TZID=${TZID}:${berlinStamp(start)}`,
+      `DTEND;TZID=${TZID}:${berlinStamp(end)}`,
+      `SUMMARY:${escText(title)}`,
+      `DESCRIPTION:${escText(url)}`,
+      `URL:${url}`,
+      'BEGIN:VALARM',
+      'ACTION:DISPLAY',
+      `DESCRIPTION:${escText(title)}`,
+      'TRIGGER:-PT15M',
+      'END:VALARM',
+      'END:VEVENT',
+    ];
+  }
+
+  function calendar(pairs, { name = 'EXDED CRM', now = Date.now() } = {}) {
+    const stamp = utcStamp(new Date(now));
+    const lines = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//EXDED//CRM//DE',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      `X-WR-CALNAME:${escText(name)}`,
+      `X-WR-TIMEZONE:${TZID}`,
+      'REFRESH-INTERVAL;VALUE=DURATION:PT15M',
+      'X-PUBLISHED-TTL:PT15M',
+      ...VTIMEZONE,
+    ];
+    for (const { client, deal } of pairs) lines.push(...vevent(client, deal, stamp));
+    lines.push('END:VCALENDAR');
+    return lines.map(fold).join('\r\n') + '\r\n';
+  }
+
+  // Подписка: все события команды
+  const feed = (clients, opts = {}) => calendar(eventsOf(clients, opts), opts);
+  // Одно событие (кнопка «В календарь» в карточке)
+  const single = (client, deal, opts = {}) => calendar([{ client, deal }], { name: 'EXDED CRM', ...opts });
+
+  root.ExdedIcs = { feed, single, eventsOf, summaryOf, clientTitle, cardUrl, berlinStamp, escText, fold, CRM_URL, TZID };
+})(typeof globalThis !== 'undefined' ? globalThis : window);
+
+;
 /* Хранилище Supabase (версия для GitHub Pages). Таблица crm_docs: id, kind, data jsonb. */
 window.CrmSupabaseStore = (() => {
   const PAGE = 1000;
@@ -3308,7 +3455,14 @@ window.CrmSupabaseStore = (() => {
         if (error) throw new Error(error.message === 'Invalid login credentials' ? 'Неверный email или пароль' : error.message);
         return data.user;
       },
-      async logout() { if (channel) sb.removeChannel(channel); channel = null; await sb.auth.signOut(); },
+      /* ⭐03.11.2026 (этап 2). По умолчанию — выход только на ЭТОМ устройстве (scope 'local').
+         Раньше signOut() без параметров выходил везде ('global'): нажали на iPad — iPhone и Mac
+         тоже просили пароль. 'global' остался отдельной кнопкой в настройках. */
+      async logout(scope = 'local') {
+        if (channel) sb.removeChannel(channel);
+        channel = null;
+        await sb.auth.signOut({ scope: scope === 'global' ? 'global' : 'local' });
+      },
       /* ⭐Вход, сохранённый на ЭТОМ устройстве. Библиотека Supabase кладёт его
          в localStorage под именем sb-<проект>-auth-token. Имя со временем может поменяться,
          поэтому ищем по образцу, а не по точной строке. Наружу ничего не отдаётся:
@@ -3405,6 +3559,44 @@ window.CrmSupabaseStore = (() => {
         map.delete(id);
       },
       async lock() { return true; },
+      /* ⭐03.11.2026 (этап 2). Удалить навсегда из корзины: ПИН проверяет база, вместе с клиентом
+         уходят его строки истории (crm_purge_client, 8_istoriya-pri-udalenii.sql). -1 — ПИН неверный. */
+      async purgeClient(id, pin) {
+        const { data, error } = await sb.rpc('crm_purge_client', { p_id: id, p_pass: String(pin || '') });
+        if (error) throw new Error(error.message.includes('crm_purge_client')
+          ? 'В базе нет корзины. Запустите файлы 8_istoriya-pri-udalenii.sql и 9_korzina.sql.'
+          : error.message);
+        const n = Number(data);
+        if (n !== -1) map.delete(id);
+        return n;
+      },
+      // ⭐03.11.2026 (этап 2). Номер клиента выдаёт счётчик в базе: номера не повторяются
+      async nextCustomerNo() {
+        const { data, error } = await sb.rpc('next_customer_no');
+        if (error) throw new Error(error.message);
+        const n = Number(data);
+        if (!Number.isFinite(n) || n < 1) throw new Error('База не выдала номер клиента');
+        return n;
+      },
+      /* ⭐03.11.2026 (этап 2). Календарь-подписка: личная ссылка. Токен приходит из базы один раз
+         и сразу превращается в адрес webcal://; в браузере он нигде не сохраняется. */
+      async calStatus() {
+        const { data, error } = await sb.rpc('crm_cal_status');
+        if (error) throw new Error(error.message.includes('crm_cal_status') ? 'В базе нет календаря. Запустите файл 12_kalendar.sql.' : error.message);
+        return data || { active: false };
+      },
+      async calCreate() {
+        const { data, error } = await sb.rpc('crm_cal_create');
+        if (error) throw new Error(error.message);
+        const tok = String(data || '');
+        if (!/^[0-9a-f]{64}$/.test(tok)) throw new Error('База не выдала ссылку');
+        return config.supabaseUrl.replace(/^https?:\/\//, 'webcal://') + '/functions/v1/calendar/' + tok + '.ics';
+      },
+      async calRevoke() {
+        const { data, error } = await sb.rpc('crm_cal_revoke');
+        if (error) throw new Error(error.message);
+        return Number(data) || 0;
+      },
       // История изменений: отдельная таблица crm_log. Пишем не дожидаясь ответа,
       // читаем последние записи. Править и удалять записи нельзя — это запрещено в базе.
       async logWrite(rows) {
@@ -3786,6 +3978,14 @@ window.CrmSupabaseStore = (() => {
       html += `<option value="${t}"${t === selected ? ' selected' : ''}>${t}</option>`;
     }
     return html;
+  }
+  /* ⭐03.11.2026 (этап 2). Звонок и встреча — только 08:00–20:00 по Берлину. Время вне окна
+     (подставленное в обход списка или из старых данных) при сохранении прижимается к краю окна. */
+  function clampTime(time) {
+    const [hh, mm] = String(time || '').split(':').map(Number);
+    if (!Number.isFinite(hh) || !Number.isFinite(mm)) return '10:00';
+    const m = Math.min(DAY_END, Math.max(DAY_START, hh * 60 + mm));
+    return `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
   }
   // ближайшее удобное время звонка для выбранного дня
   function defaultSlot(days) {
@@ -4196,7 +4396,7 @@ window.CrmSupabaseStore = (() => {
   }
 
   let toastTimer = null;
-  function toast(text, type = '', action = null) {
+  function toast(text, type = '', action = null, ms = 0) {
     const el = $('#toast');
     el.textContent = text;
     if (action) {
@@ -4208,7 +4408,7 @@ window.CrmSupabaseStore = (() => {
     }
     el.className = `toast show ${type}`;
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { el.className = 'toast'; }, type === 'err' ? 6000 : action ? 5000 : 2600);
+    toastTimer = setTimeout(() => { el.className = 'toast'; }, ms || (type === 'err' ? 6000 : action ? 5000 : 2600));
   }
 
   /* ===================================================================
@@ -4321,6 +4521,7 @@ window.CrmSupabaseStore = (() => {
      =================================================================== */
   const state = {
     clients: new Map(),
+    trash: new Map(),          // ⭐03.11.2026: клиенты в корзине (data.trashed_at) — не на доске, не в поиске
     search: '',
     tab: 'work',
     openId: null,
@@ -4335,6 +4536,7 @@ window.CrmSupabaseStore = (() => {
   const inflight = new Map();    // id -> updated_at отправляемой версии
   const creating = new Set();
   const deleting = new Set();
+  const korbBusy = new Set();    // в корзину / из корзины прямо сейчас: живая синхронизация не перекладывает
   const saveTimers = new Map();
   const migrating = new Set();   // документы первой схемы, переписываемые под новую
   let appStarted = false;
@@ -4665,19 +4867,36 @@ window.CrmSupabaseStore = (() => {
     return normalize({ id: uid(), created_at: t, updated_at: t, last_contact_at: t, ...fields });
   }
 
-  // номер клиента для документов: один раз, начиная с 10001
-  function nextCustomerNo() {
+  /* Номер клиента для документов: один раз, когда у клиента появилась сделка.
+     ⭐03.11.2026 (этап 2). Номер выдаёт база (счётчик next_customer_no, как у номеров документов):
+     после удаления клиента его номер больше никому не достаётся. Хранилище без счётчика
+     (версия в claude.ai) считает как раньше — максимум + 1, но с учётом корзины. */
+  function nextCustomerNoLocal() {
     let max = CUSTOMER_NO_START - 1;
-    for (const c of state.clients.values()) {
+    for (const c of [...state.clients.values(), ...state.trash.values()]) {
       const n = parseInt(c.billing.customer_no, 10);
       if (Number.isFinite(n) && n > max) max = n;
     }
     return String(max + 1);
   }
-  function ensureCustomerNo(id) {
+  const assigningNo = new Set();
+  // не вышло (нет связи) — пусто: номер появится при следующем открытии карточки
+  async function takeCustomerNo() {
+    if (!store || typeof store.nextCustomerNo !== 'function') return nextCustomerNoLocal();
+    try { return String(await store.nextCustomerNo()); } catch (e) { console.warn('номер клиента', e); return ''; }
+  }
+  async function ensureCustomerNo(id) {
     const c = state.clients.get(id);
-    if (!c || c.billing.customer_no || !c.deals.length) return;
-    patch(id, { billing: { ...c.billing, customer_no: nextCustomerNo() } });
+    if (!c || c.billing.customer_no || !c.deals.length || assigningNo.has(id)) return;
+    assigningNo.add(id);
+    try {
+      const no = await takeCustomerNo();
+      const fresh = state.clients.get(id);
+      if (!fresh || fresh.billing.customer_no || !no) return;
+      patch(id, { billing: { ...fresh.billing, customer_no: no } });
+    } finally {
+      assigningNo.delete(id);
+    }
   }
 
   // первая версия CRM (таблицы companies/contacts/notes/events) -> клиенты
@@ -4729,9 +4948,13 @@ window.CrmSupabaseStore = (() => {
     const incoming = new Map();
     const legacyIds = [];
     let clash = false;
+    const trash = new Map();
     for (const d of docs) {
       if (!d || !d.id) continue;
+      if (korbBusy.has(d.id)) continue;
       const c = normalize(d);
+      // ⭐03.11.2026 (этап 2). В корзине — не на доске, не в поиске, не в «Перезвонить»
+      if (c.trashed_at) { trash.set(d.id, c); continue; }
       incoming.set(d.id, c);
       if (c.__legacy) legacyIds.push(d.id);
     }
@@ -4746,8 +4969,11 @@ window.CrmSupabaseStore = (() => {
       }
     }
     for (const id of Array.from(state.clients.keys())) {
-      if (!incoming.has(id) && !dirty.has(id) && !inflight.has(id) && !creating.has(id)) { state.clients.delete(id); logForget(id); }
+      if (!incoming.has(id) && !dirty.has(id) && !inflight.has(id) && !creating.has(id) && !korbBusy.has(id)) { state.clients.delete(id); if (!trash.has(id)) logForget(id); }
     }
+    for (const [id, c] of state.trash) if (korbBusy.has(id) && !trash.has(id)) trash.set(id, c);
+    state.trash = trash;
+    renderTrash();
     scheduleRender();
     if (clash) {
       toast('Данные обновил кто-то ещё');
@@ -4843,35 +5069,80 @@ window.CrmSupabaseStore = (() => {
 
   async function createClient(fields) {
     const c = newClient(fields);
-    if (!c.billing.customer_no && c.deals.length) c.billing = { ...c.billing, customer_no: nextCustomerNo() };
     state.clients.set(c.id, c);
     creating.add(c.id);
     dirty.set(c.id, new Set(Object.keys(c)));
     scheduleRender();
+    // номер — до первой записи: карточка уходит в базу сразу с ним, без лишней правки и строки в истории
+    if (!c.billing.customer_no && c.deals.length) {
+      assigningNo.add(c.id);
+      try {
+        const no = await takeCustomerNo();
+        if (no && !c.billing.customer_no) c.billing = { ...c.billing, customer_no: no };
+      } finally {
+        assigningNo.delete(c.id);
+      }
+    }
     await flush(c.id);
+    ensureCustomerNo(c.id);      // счётчик не ответил — попробуем ещё раз
     return c;
   }
 
+  /* ⭐03.11.2026 (этап 2). «Удалить клиента» — не навсегда, а в корзину на 30 дней:
+     в карточку ставится пометка trashed_at. 10 секунд в подсказке есть «Вернуть», дальше —
+     настройки → «Корзина». Через 30 дней база удаляет карточку сама вместе с её строками
+     в истории изменений (9_korzina.sql). */
   async function deleteClient(id) {
     const c = state.clients.get(id);
     if (!c) return;
-    deleting.add(id);
+    if (dirty.has(id)) await flush(id);
+    const cur = state.clients.get(id) || c;
+    const t = nowIso();
+    const snap = { ...clone(cur), trashed_at: t, updated_at: t };
+    korbBusy.add(id);
     state.clients.delete(id);
+    state.trash.set(id, snap);
     dirty.delete(id);
     clearTimeout(saveTimers.get(id));
     scheduleRender();
     try {
-      await store.remove(id);
-      pushLog(c, ['клиент удалён'], 'delete');
-      logForget(id);
+      await store.save(snap, ['trashed_at']);
+      pushLog(snap, ['клиент в корзине'], 'delete');
       lastSent.delete(id);
-      toast(`«${c.company || 'Клиент'}» удалён`);
+      renderTrash();
+      toast(`«${cur.company || 'Клиент'}» в корзине`, '', { label: 'Вернуть', fn: () => restoreClient(id) }, 10000);
     } catch (err) {
-      state.clients.set(id, c);
+      state.trash.delete(id);
+      state.clients.set(id, cur);
       scheduleRender();
       toast('Не удалилось: ' + err.message, 'err');
     } finally {
-      setTimeout(() => deleting.delete(id), 4000);
+      setTimeout(() => korbBusy.delete(id), 4000);
+    }
+  }
+
+  async function restoreClient(id) {
+    const c = state.trash.get(id);
+    if (!c) return;
+    const t = nowIso();
+    const back = { ...clone(c), trashed_at: null, updated_at: t };
+    korbBusy.add(id);
+    state.trash.delete(id);
+    state.clients.set(id, back);
+    scheduleRender();
+    renderTrash();
+    try {
+      await store.save(back, ['trashed_at']);
+      pushLog(back, ['клиент возвращён из корзины']);
+      toast(`«${back.company || 'Клиент'}» вернулся на доску`);
+    } catch (err) {
+      state.clients.delete(id);
+      state.trash.set(id, c);
+      scheduleRender();
+      renderTrash();
+      toast('Не вернулся: ' + err.message, 'err');
+    } finally {
+      setTimeout(() => korbBusy.delete(id), 4000);
     }
   }
 
@@ -4880,9 +5151,8 @@ window.CrmSupabaseStore = (() => {
     if (!c) return null;
     const d = newDeal(fields);
     const deals = [...clone(c.deals), d];
-    const changes = { deals };
-    if (!c.billing.customer_no) changes.billing = { ...c.billing, customer_no: nextCustomerNo() };
-    patch(clientId, changes, { now: true });
+    patch(clientId, { deals }, { now: true });
+    ensureCustomerNo(clientId);
     return d;
   }
 
@@ -5045,6 +5315,8 @@ window.CrmSupabaseStore = (() => {
     return (a, b) => vip(a, b) || byNext(a, b) || cmp(b.c.updated_at || '', a.c.updated_at || '');
   }
 
+  // ⭐03.11.2026 (этап 2). Поиск без учёта регистра и написания: ü = ue, ö = oe, ä = ae, ß = ss
+  const fold = (v) => String(v || '').toLowerCase().replace(/ß/g, 'ss').replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue');
   function matches(c, q) {
     const qd = digits(q);
     if (qd.length >= 3 && c.contacts.some((x) => digits(x.phone).includes(qd))) return true;
@@ -5052,8 +5324,9 @@ window.CrmSupabaseStore = (() => {
       ...c.orders.map((o) => o.number),
       ...c.deals.flatMap((d) => [d.title, d.product, d.invoice_no, d.agreed, d.lost_reason, ...d.items.map((it) => it.name)]),
       ...c.contacts.flatMap((x) => [x.name, x.role, x.email, x.phone]),
-      ...c.log.map((e) => e.text)].join(' ').toLowerCase();
-    return q.toLowerCase().split(/\s+/).filter(Boolean).every((w) => hay.includes(w));
+      ...c.log.map((e) => e.text)].join(' ');
+    const where = fold(hay);
+    return fold(q).split(/\s+/).filter(Boolean).every((w) => where.includes(w));
   }
 
   /* ===================================================================
@@ -5742,7 +6015,7 @@ window.CrmSupabaseStore = (() => {
 
       let next = null;
       if (newState.days !== '') {
-        const at = dateFromKeyTime(f.elements.date.value, f.elements.time.value);
+        const at = dateFromKeyTime(f.elements.date.value, clampTime(f.elements.time.value));
         if (Number.isNaN(at.getTime())) { toast('Выберите дату звонка', 'err'); return; }
         if (at.getTime() < Date.now() - 60000) { toast('Это время уже прошло', 'err'); return; }
         next = { at: at.toISOString(), kind: f.elements.kind.value === 'meeting' ? 'meeting' : 'call' };
@@ -5784,8 +6057,8 @@ window.CrmSupabaseStore = (() => {
         }
         const changes = { contacts, deals, log: [...logEntry, ...c.log], last_contact_at: t };
         if (company && !c.company) changes.company = company;
-        if (!c.billing.customer_no) changes.billing = { ...c.billing, customer_no: nextCustomerNo() };
         patch(c.id, changes, { now: true });
+        ensureCustomerNo(c.id);
         savedId = c.id;
         savedDeal = d.id;
       } else {
@@ -5828,25 +6101,32 @@ window.CrmSupabaseStore = (() => {
     if (scroller) scroller.scrollTop = 0;
   }
 
+  /* ⭐03.11.2026 (этап 2). В событии Google только «Anruf/Termin: компания» и ссылка на карточку CRM:
+     без телефона, имени контакта, товара и договорённостей — то же, что в подписке (ics.js). */
   function gcalUrl(c, d) {
-    const main = mainContact(c);
     const start = new Date(d.next.at);
     const end = new Date(start.getTime() + (d.next.kind === 'meeting' ? 60 : 15) * 60000);
     const stamp = (x) => { const p = tzParts(x); return `${p.y}${pad(p.m)}${pad(p.d)}T${pad(p.h)}${pad(p.mi)}00`; };
-    const details = [
-      d.product ? `Товар: ${d.product}` : '',
-      d.agreed ? `Договорились: ${d.agreed}` : '',
-      main && main.name ? `Контакт: ${main.name}` : '',
-      main && main.phone ? `Телефон: ${main.phone}` : '',
-    ].filter(Boolean).join('\n');
     const params = new URLSearchParams({
       action: 'TEMPLATE',
-      text: `${d.next.kind === 'meeting' ? 'Встреча' : 'Позвонить'}: ${c.company || (main && main.name) || 'клиент'}`,
+      text: ExdedIcs.summaryOf(c, d.next),
       dates: `${stamp(start)}/${stamp(end)}`,
       ctz: TZ,
-      details,
+      details: ExdedIcs.cardUrl(c.id, d.id),
     });
     return `https://calendar.google.com/calendar/render?${params}`;
+  }
+
+  // ⭐03.11.2026 (этап 2). «В календарь»: файл .ics на одно событие — то же содержание, что в подписке
+  function icsFile(c, d) {
+    const day = dayKey(new Date(d.next.at));
+    const name = `EXDED-${d.next.kind === 'meeting' ? 'Termin' : 'Anruf'}-${day}.ics`;
+    const url = URL.createObjectURL(new Blob([ExdedIcs.single(c, d)], { type: 'text/calendar;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    window.__crmIcs = { name };
   }
 
   function nextHTML(c, d) {
@@ -5870,6 +6150,7 @@ window.CrmSupabaseStore = (() => {
   </div>
   <div class="next-actions">
     <button type="button" class="btn" data-act="next-done">${ICON.check}Сделано</button>
+    <button type="button" class="btn" data-act="next-ics">${ICON.cal}В календарь</button>
     <a class="btn" href="${esc(gcalUrl(c, d))}" target="_blank" rel="noopener noreferrer">${ICON.cal}В Google Календарь</a>
     <button type="button" class="btn ghost" data-act="next-clear">Не нужно</button>
   </div>
@@ -6074,6 +6355,9 @@ ${badge}
   }).join('')}</div>`;
   }
 
+  /* ⭐03.11.2026 (этап 2). Почта, похожая на ошибку (заявка с сайта сохраняет её как есть),
+     помечается оранжевым «Почта: проверить». Само значение не меняется. */
+  const pochtaProverit = (v) => { const s2 = str(v).trim(); return Boolean(s2) && !/^[^\s@]+@[^\s@]+\.[^\s@.]{2,}$/.test(s2); };
   function contactsHTML(c) {
     const rows = c.contacts.map((x) => {
       const wa = pokazatMess(x, 'wa') ? waDigits(x.phone) : '';
@@ -6085,8 +6369,9 @@ ${badge}
     <input data-cbind="name" value="${esc(x.name)}" placeholder="Имя" aria-label="Имя">
     <input data-cbind="role" value="${esc(x.role)}" placeholder="Должность" aria-label="Должность">
     <input data-cbind="phone" value="${esc(x.phone)}" type="tel" inputmode="tel" placeholder="Телефон" aria-label="Телефон">
-    <input data-cbind="email" value="${esc(x.email)}" type="email" inputmode="email" placeholder="Email" aria-label="Email">
+    <input data-cbind="email" value="${esc(x.email)}" type="email" inputmode="email" placeholder="Email" aria-label="Email"${pochtaProverit(x.email) ? ' class="is-check"' : ''}>
   </div>
+  <p class="mail-check" data-mail-check${pochtaProverit(x.email) ? '' : ' hidden'}>Почта: проверить</p>
   <div class="contact-tools"><button type="button" class="icon-btn" data-act="c-del" aria-label="Удалить контакт">${ICON.trash}</button></div>
   <div class="contact-opts">
     <button type="button" class="pill dm${x.dm ? ' on' : ''}" data-act="c-dm" aria-pressed="${x.dm}">ЛПР</button>
@@ -6729,6 +7014,12 @@ ${badge}
         const contactId = el.closest('[data-contact]').dataset.contact;
         const contacts = updateContact(c, contactId, (x) => { x[el.dataset.cbind] = el.value; });
         if (contacts) { patch(c.id, { contacts }); cardRenderedJSON = JSON.stringify(c); }
+        if (el.dataset.cbind === 'email') {
+          const bad = pochtaProverit(el.value);
+          el.classList.toggle('is-check', bad);
+          const m = el.closest('[data-contact]').querySelector('[data-mail-check]');
+          if (m) m.hidden = !bad;
+        }
       }
     });
 
@@ -6740,7 +7031,7 @@ ${badge}
       if (!el.dataset.next || !d || !d.next) return;
       const dt = new Date(d.next.at);
       const date = el.dataset.next === 'date' ? el.value : dayKey(dt);
-      const time = el.dataset.next === 'time' ? el.value : timeStr(dt);
+      const time = clampTime(el.dataset.next === 'time' ? el.value : timeStr(dt));
       const kind = el.dataset.next === 'kind' ? el.value : d.next.kind;
       const at = date ? dateFromKeyTime(date, time) : null;
       if (!at || Number.isNaN(at.getTime())) { renderCard(); return; }
@@ -6905,6 +7196,7 @@ ${badge}
         return;
       }
       if (act === 'next-clear' && d) { patchDeal(c.id, d.id, { next: null }, { now: true }); renderCard(); return; }
+      if (act === 'next-ics' && d && d.next) { icsFile(c, d); return; }
 
       if (act === 'c-add') {
         const contacts = [...clone(c.contacts), { id: uid(), name: '', role: '', phone: '', email: '', dm: false, main: !c.contacts.length, channels: ['phone'], mess: { ...PUSTAYA_MESS } }];
@@ -6930,7 +7222,7 @@ ${badge}
       }
 
       if (act === 'delete') {
-        if (btn.dataset.confirm !== '1') { btn.dataset.confirm = '1'; btn.textContent = 'Точно удалить навсегда?'; return; }
+        if (btn.dataset.confirm !== '1') { btn.dataset.confirm = '1'; btn.textContent = 'Точно удалить? 30 дней можно вернуть'; return; }
         const id = c.id;
         state.openId = null;
         dlg.close();
@@ -7290,7 +7582,8 @@ ${badge}
       go.disabled = true;
       try {
         if (pwdCtx.mode === 'ask') {
-          const ok = await store.dealPwdCheck(oldPass);
+          // ⭐03.11.2026 (этап 2). Удалить навсегда из корзины: ПИН проверяет сама база (crm_purge_client)
+          const ok = pwdCtx.purgeId ? await purgeNow(pwdCtx.purgeId, oldPass) : await store.dealPwdCheck(oldPass);
           if (!ok) {
             pwdFails += 1;
             if (pwdFails >= PWD_TRIES) {
@@ -7307,10 +7600,11 @@ ${badge}
           }
           pwdFails = 0;
           pwdUnblock();
-          const { clientId, dealId } = pwdCtx;
+          const { clientId, dealId, purgeId } = pwdCtx;
           pwdCtx = null;
           dlg.close();
-          removeDeal(clientId, dealId, { force: true });
+          if (purgeId) purgeDone(purgeId);
+          else removeDeal(clientId, dealId, { force: true });
           return;
         }
 
@@ -7325,11 +7619,12 @@ ${badge}
           refreshPwdButton();
           return;
         }
-        const { clientId, dealId } = pwdCtx;
+        const { clientId, dealId, purgeId } = pwdCtx;
         pwdCtx = null;
         dlg.close();
         refreshPwdButton();
-        removeDeal(clientId, dealId, { force: true });
+        if (purgeId) { if (await purgeNow(purgeId, newPass)) purgeDone(purgeId); else toast('Не удалилось', 'err'); }
+        else removeDeal(clientId, dealId, { force: true });
       } catch (e2) {
         err.textContent = (e2 && e2.message) || 'Не вышло';
       } finally {
@@ -7337,6 +7632,153 @@ ${badge}
         pwdSyncButton();
       }
     });
+  }
+
+  /* ===================================================================
+     ⭐03.11.2026 (этап 2). Корзина: удалённые клиенты 30 дней.
+     «Вернуть» — обратно на доску. «Удалить навсегда» — с ПИН-кодом (тот же, что на удаление
+     сделки с документами), вместе со строками истории изменений этого клиента.
+     =================================================================== */
+  const KORB_DAYS = 30;
+  const korbStore = () => (store && typeof store.purgeClient === 'function' ? store : null);
+  async function purgeNow(id, pin) {
+    const n = await store.purgeClient(id, pin);
+    return n !== -1;
+  }
+  function purgeDone(id) {
+    const c = state.trash.get(id);
+    state.trash.delete(id);
+    logForget(id);
+    renderTrash();
+    toast(`«${(c && c.company) || 'Клиент'}» удалён навсегда`);
+  }
+  async function openPurge(id) {
+    const c = state.trash.get(id);
+    if (!c) return;
+    const left = pwdBlockedFor();
+    if (left) { toast(`Слишком много попыток. Ещё ${Math.ceil(left / 1000)} с.`, 'err'); return; }
+    if (!korbStore() || !pwdStore()) { toast('Удалять навсегда умеет только версия CRM с базой', 'err'); return; }
+    let isSet = false;
+    try { isSet = await store.dealPwdIsSet(); } catch (e) { toast((e && e.message) || 'ПИН-код не проверить', 'err'); return; }
+    const title = c.company || clientName(c);
+    pwdCtx = { mode: isSet ? 'ask' : 'create', purgeId: id, title };
+    pwdShow(pwdCtx.mode);
+    $('#dpw-title').textContent = 'Удалить клиента навсегда?';
+    $('#dpw-text').textContent = isSet
+      ? `«${title}» и все его строки в истории изменений будут удалены. Вернуть будет нельзя. Введите ПИН-код.`
+      : `«${title}» и все его строки в истории изменений будут удалены. ПИН-код ещё не задан — придумайте его сейчас, ${PIN_LEN} цифры. Вернуть будет нельзя.`;
+    $('#dlg-deal-pwd').showModal();
+    fitSheets();
+  }
+  const korbUntil = (c) => { const t = Date.parse(c.trashed_at || ''); return Number.isFinite(t) ? new Date(t + KORB_DAYS * 86400000) : null; };
+  function renderTrash() {
+    const label = $('#set-trash-label');
+    if (label) label.textContent = state.trash.size ? `Корзина · ${state.trash.size}` : 'Корзина';
+    const box = $('#trash-rows');
+    if (!box || !$('#dlg-trash').open) return;
+    const list = Array.from(state.trash.values()).sort((a, b) => cmp(b.trashed_at || '', a.trashed_at || ''));
+    box.innerHTML = list.length ? list.map((c) => {
+      const until = korbUntil(c);
+      return `<div class="trash-row" data-id="${esc(c.id)}">
+  <div class="trash-name"><b>${esc(clientName(c))}</b><span>удалён ${esc(fmtDateTime(c.trashed_at))}${until ? ` · удалится сам ${esc(shortDate(until))}` : ''}</span></div>
+  <button type="button" class="btn small" data-trash="back">Вернуть</button>
+  <button type="button" class="btn small ghost danger" data-trash="purge">Удалить навсегда</button>
+</div>`;
+    }).join('') : '<p class="hint">Корзина пуста.</p>';
+  }
+  function bindTrash() {
+    const dlg = $('#dlg-trash');
+    if (!dlg) return;
+    dlg.addEventListener('click', (e) => {
+      if (e.target === dlg || e.target.closest('[data-close]')) { dlg.close(); return; }
+      const b = e.target.closest('[data-trash]');
+      if (!b) return;
+      const id = b.closest('[data-id]').dataset.id;
+      if (b.dataset.trash === 'back') restoreClient(id);
+      if (b.dataset.trash === 'purge') openPurge(id);
+    });
+  }
+  function openTrash() {
+    const dlg = $('#dlg-trash');
+    dlg.showModal();
+    renderTrash();
+    fitSheets();
+  }
+
+  /* ===================================================================
+     ⭐03.11.2026 (этап 2). Календарь на iPhone/iPad/Mac: личная ссылка-подписка (webcal://).
+     Ссылку база показывает ОДИН раз, при создании: хранится только её хеш. «Отозвать» —
+     старая перестаёт работать сразу. Новая ссылка отзывает прежнюю этого же человека.
+     =================================================================== */
+  const calStore = () => (store && typeof store.calStatus === 'function' ? store : null);
+  async function calRefresh() {
+    const st = $('#cal-state');
+    const create = $('#cal-create');
+    const revoke = $('#cal-revoke');
+    if (!calStore()) { st.textContent = 'Подписка работает только в версии CRM на GitHub.'; create.hidden = true; revoke.hidden = true; return; }
+    st.textContent = 'Проверяю…';
+    let s2 = null;
+    try { s2 = await store.calStatus(); } catch (e) { st.textContent = 'Не проверить: ' + ((e && e.message) || 'нет связи'); return; }
+    if (s2 && s2.active) {
+      st.textContent = `Ваша ссылка создана ${fmtDateTime(s2.created_at)}${s2.last_used_at ? `, календарь забирал её ${fmtDateTime(s2.last_used_at)}` : ', календарь её ещё не забирал'}. Показать её ещё раз нельзя: если потерялась — создайте новую, старая перестанет работать.`;
+      create.textContent = 'Создать новую ссылку';
+      revoke.hidden = false;
+    } else {
+      st.textContent = 'Ссылки нет. Создайте её и подпишитесь на всех своих устройствах: звонки и встречи появятся в календаре сами и будут переноситься вместе с CRM.';
+      create.textContent = 'Создать ссылку';
+      revoke.hidden = true;
+    }
+    create.hidden = false;
+  }
+  function bindCal() {
+    const dlg = $('#dlg-cal');
+    if (!dlg) return;
+    dlg.addEventListener('click', (e) => { if (e.target === dlg || e.target.closest('[data-close]')) dlg.close(); });
+    dlg.addEventListener('close', () => { $('#cal-new').hidden = true; $('#cal-link').value = ''; $('#cal-open').removeAttribute('href'); });
+    $('#cal-create').addEventListener('click', async () => {
+      const b = $('#cal-create');
+      if (b.dataset.confirm !== '1' && !$('#cal-revoke').hidden) {
+        b.dataset.confirm = '1'; b.textContent = 'Старая отключится. Создать?'; return;
+      }
+      delete b.dataset.confirm;
+      b.disabled = true;
+      try {
+        const link = await store.calCreate();
+        $('#cal-link').value = link;
+        $('#cal-open').href = link;
+        $('#cal-new').hidden = false;
+        await calRefresh();
+        $('#cal-state').textContent = 'Ссылка создана. Она показывается один раз — подпишитесь сейчас на всех своих устройствах или сохраните её.';
+      } catch (e) {
+        toast('Ссылка не создана: ' + ((e && e.message) || 'нет связи'), 'err');
+      } finally {
+        b.disabled = false;
+      }
+    });
+    $('#cal-copy').addEventListener('click', () => copyText($('#cal-link').value, 'Ссылка скопирована'));
+    $('#cal-revoke').addEventListener('click', async () => {
+      const b = $('#cal-revoke');
+      if (b.dataset.confirm !== '1') { b.dataset.confirm = '1'; b.textContent = 'Точно отозвать?'; return; }
+      delete b.dataset.confirm;
+      b.textContent = 'Отозвать ссылку';
+      try {
+        await store.calRevoke();
+        $('#cal-new').hidden = true;
+        $('#cal-link').value = '';
+        toast('Ссылка отозвана. Подписку в календаре можно удалить.');
+      } catch (e) { toast('Не отозвалась: ' + ((e && e.message) || 'нет связи'), 'err'); }
+      calRefresh();
+    });
+  }
+  function openCal() {
+    const dlg = $('#dlg-cal');
+    $('#cal-new').hidden = true;
+    $('#cal-revoke').textContent = 'Отозвать ссылку';
+    delete $('#cal-revoke').dataset.confirm;
+    delete $('#cal-create').dataset.confirm;
+    dlg.showModal();
+    fitSheets();
+    calRefresh();
   }
 
   // кнопка в настройках: «Задать», пока ПИН не задан, дальше «Изменить»
@@ -7631,6 +8073,10 @@ ${badge}
     if (logBtn) logBtn.addEventListener('click', () => { dlg.close(); openLogView(); });
     const pwdBtn = $('#btn-deal-pwd');
     if (pwdBtn) pwdBtn.addEventListener('click', () => { dlg.close(); openPwdChange(); });
+    const trashBtn = $('#btn-trash');
+    if (trashBtn) trashBtn.addEventListener('click', () => { dlg.close(); openTrash(); });
+    const calBtn = $('#btn-cal');
+    if (calBtn) calBtn.addEventListener('click', () => { dlg.close(); openCal(); });
     const seg = $('#theme-seg');
     if (seg) {
       setTheme(readTheme());
@@ -7665,6 +8111,9 @@ ${badge}
         ? 'Клиенты хранятся в вашем аккаунте Claude и синхронизируются на всех устройствах, где вы вошли. Видите их только вы и те, кому вы дадите право редактирования.'
         : `Вы вошли как ${store.user && store.user.email ? store.user.email : ''}. Клиенты хранятся в вашей базе Supabase.`;
       $('#btn-logout').hidden = store.kind !== 'supabase';
+      $('#set-logout-all').hidden = store.kind !== 'supabase';
+      $('#set-cal-row').hidden = !calStore();
+      renderTrash();
       dlg.showModal();
       fitSheets();
     });
@@ -7719,10 +8168,19 @@ ${badge}
         : `Добавлено: клиентов ${added}, сделок ${deals}, записей истории ${notes}`, failed ? 'err' : '');
     });
 
+    /* ⭐03.11.2026 (этап 2). «Выйти» — только на этом устройстве. На всех сразу — отдельной
+       кнопкой и с подтверждением: раньше «Выйти» на iPad выкидывало и iPhone, и Mac. */
     $('#btn-logout').addEventListener('click', async () => {
       dlg.close();
       flushAll();
-      await store.logout();
+      await store.logout('local');
+      location.reload();
+    });
+    $('#btn-logout-all').addEventListener('click', async () => {
+      if (!window.confirm('Выйти на всех устройствах? На iPhone, iPad и Mac придётся снова ввести пароль.')) return;
+      dlg.close();
+      flushAll();
+      await store.logout('global');
       location.reload();
     });
   }
@@ -7862,7 +8320,10 @@ ${badge}
       bindIstochnik();
       bindMess();
       bindSettings();
+      bindTrash();
+      bindCal();
       bindShortcuts();
+      window.addEventListener('hashchange', openFromHash);
       bindViewport();
       setInterval(() => {
         scheduleRender();
@@ -7884,6 +8345,17 @@ ${badge}
     setTimeout(checkReturns, 1500);
     // приложение могло перезапуститься, пока владелец писал в мессенджере
     setTimeout(sprositProMess, 1200);
+    openFromHash();
+  }
+
+  // ⭐03.11.2026 (этап 2). Ссылка на карточку из календаря: …/#k=<клиент>&s=<сделка>
+  function openFromHash() {
+    const h = new URLSearchParams(String(location.hash || '').replace(/^#/, ''));
+    const id = h.get('k');
+    if (!id) return;
+    try { history.replaceState(null, '', location.pathname + location.search); } catch {}
+    if (state.clients.has(id)) openCard(id, h.get('s'));
+    else toast(state.trash.has(id) ? 'Этот клиент в корзине: настройки → «Корзина»' : 'Карточка не найдена', 'err');
   }
 
   async function afterLogin(user) {
@@ -7987,7 +8459,7 @@ ${badge}
 
   // для проверок: чистые функции схемы, без данных
   Object.defineProperty(window, 'EXDED_CRM_TEST_STORE', { get: () => store, configurable: true });
-  window.EXDED_CRM_TEST = { tipNomera, pokazatMess, normalizeMess, sprositProMess, dopolnit, prinyatPodskazku, istochnikDlya, znachenieDlya, normalizeIstochniki, normalize, legacyToClients, boardDeals, activeDeal, dealTitle, normalizeDeal, loadCatalog, catalog, catalogFind, catalogBlocked, keepFocusVisible, fitSheets, renderBoardNow: renderBoard, dealDocNos, bornShort, itemsVat, refreshAll, changeLines, logSeen, readTheme, applyTheme, setTheme, docPayload, docSubject, docItemsOf, normalizeDocRec };
+  window.EXDED_CRM_TEST = { clampTime, fold, pochtaProverit, gcalUrl, state, tipNomera, pokazatMess, normalizeMess, sprositProMess, dopolnit, prinyatPodskazku, istochnikDlya, znachenieDlya, normalizeIstochniki, normalize, legacyToClients, boardDeals, activeDeal, dealTitle, normalizeDeal, loadCatalog, catalog, catalogFind, catalogBlocked, keepFocusVisible, fitSheets, renderBoardNow: renderBoard, dealDocNos, bornShort, itemsVat, refreshAll, changeLines, logSeen, readTheme, applyTheme, setTheme, docPayload, docSubject, docItemsOf, normalizeDocRec };
 
   /* Фирменный знак. Источник один — window.EXDED_BRAND.logo (его кладёт сборка).
      Отсюда он расходится по интерфейсу, значку вкладки и значку «На экран «Домой»»:
@@ -8012,7 +8484,20 @@ ${badge}
   }
 
 
+  /* ⭐03.11.2026 (этап 2). Защита от показа CRM внутри чужого сайта (подсунутые клики).
+     Только версия на GitHub: версия в claude.ai по природе живёт во фрейме.
+     В рамке интерфейс не показывается и база не трогается: только текст и ссылка. */
+  function vRamke() {
+    if (!window.EXDED_CRM_SW) return false;
+    try { return window.top !== window.self; } catch { return true; }
+  }
+  function pokazatRamku() {
+    const url = location.href.split('#')[0];
+    document.body.innerHTML = `<main class="frame-stop"><p>Откройте CRM напрямую</p><a href="${esc(url)}" target="_top" rel="noopener noreferrer">${esc(url)}</a></main>`;
+  }
+
   function init() {
+    if (vRamke()) { pokazatRamku(); return; }
     applyBrand();
     registerSW();
     zakrepitHranilishche();
