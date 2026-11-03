@@ -523,6 +523,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 /* ---------- Листы и окна ---------- */
 dialog { padding: 0; border: 0; color: var(--ink); background: transparent; max-width: none; max-height: none; }
 dialog::backdrop { background: rgba(20, 20, 19, .42); }
+dialog:focus { outline: none; }   /* ⭐03.11.2026: окно держит фокус после касания (app.js, openCard) */
 
 .sheet[open] {
   width: min(640px, calc(100vw - 32px)); max-height: calc(100dvh - 48px);
@@ -556,6 +557,7 @@ dialog::backdrop { background: rgba(20, 20, 19, .42); }
 @media (min-width: 700px) {
   .match { --match-h: 52px; grid-template-columns: minmax(0, 1fr) auto; }
 }
+
 .when { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 8px; margin-top: 8px; }
 
 .drawer[open] {

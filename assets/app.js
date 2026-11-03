@@ -3411,6 +3411,7 @@ window.CrmSupabaseStore = (() => {
     let channel = null;
     let hooks = null;
     let mergeOff = false;      // в базе ещё нет crm_merge — работаем как раньше
+    let dealsOff = false;      // в базе ещё нет crm_merge_v2 — сделки уходят списком целиком
 
     const emit = () => hooks && hooks.onData(Array.from(map.values()));
 
@@ -3529,7 +3530,11 @@ window.CrmSupabaseStore = (() => {
       // Раньше здесь уходил весь документ, и правка одного затирала правку другого,
       // сделанную в это же время в другом поле того же клиента.
       // keys не передали (новый клиент) — пишем целиком.
-      async save(doc, keys) {
+      /* ⭐03.11.2026 (этап iOS). extra.deals = { id сделки: { f: изменённые поля, d: сделка целиком } } — правили только
+         поля сделок. Тогда список deals не шлём: crm_merge_v2 вписывает поля в свежую версию
+         в самой базе, и одновременная правка с другого устройства (или новая заявка с сайта)
+         не затирается. Функции ещё нет — шлём deals целиком, как раньше. */
+      async save(doc, keys, extra = null) {
         const body = { ...doc };
         delete body.id;
         const list = Array.isArray(keys) ? keys.filter((k) => k !== 'id') : null;
@@ -3542,7 +3547,20 @@ window.CrmSupabaseStore = (() => {
         }
 
         const patch = { updated_at: body.updated_at };
-        for (const k of list) patch[k] = body[k] === undefined ? null : body[k];
+        const poSdelkam = Boolean(extra && extra.deals && list.includes('deals') && !dealsOff);
+        for (const k of list) if (!(poSdelkam && k === 'deals')) patch[k] = body[k] === undefined ? null : body[k];
+        if (poSdelkam) {
+          const { error: e2 } = await sb.rpc('crm_merge_v2', { p_id: doc.id, p_patch: patch, p_deals: extra.deals });
+          if (!e2) {
+            const cur = map.get(doc.id) || {};
+            map.set(doc.id, { ...cur, ...patch, deals: body.deals, id: doc.id });
+            return;
+          }
+          if (!/crm_merge_v2/.test(e2.message || '')) throw new Error(e2.message);
+          dealsOff = true;
+          console.warn('[EXDED CRM] Слияние по сделкам выключено: запустите 13_sliyanie-sdelok.sql в Supabase');
+          return this.save(doc, keys);
+        }
         const { error } = await sb.rpc('crm_merge', { p_id: doc.id, p_patch: patch });
         if (error) {
           // функции ещё нет — работаем по-старому, но говорим об этом в консоль
@@ -3815,10 +3833,23 @@ window.CrmSupabaseStore = (() => {
   const tzFmt = new Intl.DateTimeFormat('en-GB', {
     timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
   });
+  /* ⭐03.11.2026 (этап iOS). formatToParts — самое дорогое место перерисовки доски: его звали
+     для каждой карточки на каждую букву поиска (профиль стенда 300 клиентов / 1000 сделок).
+     Результат зависит только от минуты — запоминаем по минуте. */
+  const tzMemo = new Map();
   function tzParts(date) {
+    const t = +date;
+    const key = Number.isFinite(t) ? Math.floor(t / 60000) : NaN;
+    const hit = tzMemo.get(key);
+    if (hit) return { ...hit };
     const p = {};
     for (const part of tzFmt.formatToParts(date)) p[part.type] = part.value;
-    return { y: +p.year, m: +p.month, d: +p.day, h: +p.hour, mi: +p.minute };
+    const out = { y: +p.year, m: +p.month, d: +p.day, h: +p.hour, mi: +p.minute };
+    if (Number.isFinite(key)) {
+      if (tzMemo.size > 20000) tzMemo.clear();
+      tzMemo.set(key, out);
+    }
+    return { ...out };
   }
   // Время по Германии -> Date, правильно при любом поясе устройства и переходе часов
   function berlinDate(y, m, d, h = 0, mi = 0) {
@@ -4059,7 +4090,7 @@ window.CrmSupabaseStore = (() => {
      сдвигал бы всё окно вместе с шапкой карточки. */
   const PANEL_IOS = 50;    // серая панель iOS со стрелками и галочкой над клавиатурой
   const ZAPAS = 12;        // чтобы поле не липло к краю
-  const ZAPAS_KLAV = 80;   // над клавиатурой держим 80 px, чтобы поле было видно с запасом
+  const ZAPAS_KLAV = 80;   // запас прокрутки под последним полем (--kzap), чтобы его было куда поднять
 
   /* ⭐23.09.2026. Серую панель iOS (стрелки ↑ ↓ и «Готово») система не показывает
      ни одним свойством, и в `visualViewport.height` она попадает не всегда. Поэтому
@@ -4067,7 +4098,16 @@ window.CrmSupabaseStore = (() => {
      в том числе с внешней клавиатурой, когда экранной клавиатуры нет, а панель есть. */
   const sensornyi = () => { try { return window.matchMedia('(pointer: coarse)').matches; } catch { return false; } };
   const poleVFokuse = () => { const el = document.activeElement; return Boolean(el && el.matches && el.matches('input, textarea, select')); };
-  const zapasPodPolem = () => (poleVFokuse() && sensornyi() ? PANEL_IOS + ZAPAS_KLAV : 0);
+  /* ⭐03.11.2026 (этап iOS). Поле «уезжало вверх» под шапку окна. Замер на симуляторе
+     iOS 27 (iPhone SE, приложение с домашнего экрана и Safari): при открытой экранной
+     клавиатуре `visualViewport.height` УЖЕ не включает серую панель «↑ ↓ ✓» — низ полосы
+     стоит над ней. Прибавленные сверху 50 + 80 px подбрасывали поле на 130 px выше нужного,
+     и на телефоне оно оказывалось прямо под шапкой. Теперь при экранной клавиатуре держим
+     только ZAPAS_EKRAN; запас под панель (PANEL_IOS) остаётся для внешней клавиатуры —
+     тогда панель лежит внизу поверх страницы, а видимая полоса не уменьшается. */
+  const ZAPAS_EKRAN = 24;  // от поля до верха экранной клавиатуры (её панель уже вне полосы)
+  const zapasNadKlav = () => (klaviaturaOtkryta() ? ZAPAS_EKRAN : PANEL_IOS + ZAPAS);
+  const zapasPodPolem = () => (poleVFokuse() && sensornyi() ? zapasNadKlav() + ZAPAS_KLAV : 0);
 
   /* ⭐23.09.2026. Высоту клавиатуры считаем от полосы БЕЗ клавиатуры, а не от
      window.innerHeight: в приложении с домашнего экрана iOS это число меняет вместе
@@ -4213,8 +4253,8 @@ window.CrmSupabaseStore = (() => {
     const box = el.closest('.cat-pick') || el.closest('.f') || el;
     const spisok = prokrutkiVverh(box);
     if (!spisok.length) { if (box.scrollIntoView) box.scrollIntoView({ block: 'nearest' }); return; }
-    // запас под серую панель iOS и 80 px сверх неё держим, пока курсор в поле
-    const hochem = poleVFokuse() && sensornyi() ? PANEL_IOS + ZAPAS_KLAV : ZAPAS;
+    // над экранной клавиатурой — ZAPAS_EKRAN, с внешней — запас под серую панель iOS
+    const hochem = poleVFokuse() && sensornyi() ? zapasNadKlav() : ZAPAS;
     for (const cont of spisok) {
       const r = celFokusa(el, box);
       const c = cont.getBoundingClientRect();
@@ -4531,6 +4571,32 @@ window.CrmSupabaseStore = (() => {
   };
   let store = null;
   const dirty = new Map();       // id -> Set полей, ещё не отправленных
+  /* ⭐03.11.2026 (этап iOS). Правка поля сделки уходит в базу ОДНИМ полем этой сделки.
+     Раньше уходил весь список deals: на iPhone правили «Счёт №», на Mac в ту же секунду
+     «Сумму» — кто сохранял вторым, тот возвращал старую сумму (проверено на живой базе).
+     Так же терялась сделка, которую в эту минуту добавила заявка с сайта. */
+  const dealFields = new Map();  // id клиента -> Map(id сделки -> Set полей)
+  const dealsWhole = new Set();  // id клиента: список сделок менялся целиком (добавили, удалили)
+  /* Сделки, которые уже были в базе (пришли из хранилища или ушли туда нашим сохранением).
+     Полную копию сделки отдаём только для НОВОЙ — ни разу не сохранённой. Сделку из этого списка,
+     которую в эту секунду удалили на другом устройстве, правка поля не воскрешает. */
+  const dealsInDb = new Map();   // id клиента -> Set id сделок
+  const noteDealsInDb = (id, deals) => {
+    if (!Array.isArray(deals)) return;
+    const set = dealsInDb.get(id) || new Set();
+    for (const d of deals) if (d && d.id) set.add(d.id);
+    dealsInDb.set(id, set);
+  };
+  /* ⭐03.11.2026 (этап iOS). Чем человек работал последним — пальцем/мышью или клавиатурой.
+     После касания рамку фокуса не показываем: ни на звезде VIP при открытии карточки,
+     ни на карточке доски, куда браузер возвращает фокус после закрытия окна. */
+  let lastInputPointer = false;
+  document.addEventListener('pointerdown', () => { lastInputPointer = true; }, true);
+  document.addEventListener('keydown', (e) => { if (!['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) lastInputPointer = false; }, true);
+  document.addEventListener('close', (e) => {
+    if (!lastInputPointer || !(e.target instanceof HTMLDialogElement)) return;
+    requestAnimationFrame(() => { const a = document.activeElement; if (a && a.closest && a.closest('.card')) a.blur(); });
+  }, true);
   // что мы записали последним: если из базы вернулось другое, значит кто-то правил
   // то же поле в это же время — скажем об этом и покажем свежее значение
   const lastSent = new Map();    // id -> { at, values: { поле: json } }
@@ -4931,10 +4997,33 @@ window.CrmSupabaseStore = (() => {
     });
   }
 
-  function noteSent(snap, keys) {
+  /* { id сделки: { f: { поле: значение }, d: сделка целиком } } — изменённые поля из отправляемой версии.
+     d — на случай, когда этой сделки в базе ещё нет (пустая сделка клиента без сделок, которую приложение
+     показывает само): тогда база добавляет её целиком, а не теряет правку. */
+  function dealPatchOf(snap, perDeal) {
+    const out = {};
+    for (const [did, set] of perDeal) {
+      const d = (snap.deals || []).find((x) => x.id === did);
+      if (!d) continue;
+      const f = {};
+      for (const k of set) f[k] = d[k] === undefined ? null : d[k];
+      // полная копия — только для сделки, которой в базе ещё не было (иначе удалённая где-то вернулась бы)
+      out[did] = (dealsInDb.get(snap.id) || new Set()).has(did) ? { f } : { f, d: clone(d) };
+    }
+    return out;
+  }
+
+  function noteSent(snap, keys, extra = null) {
     if (!keys || !keys.length) { lastSent.delete(snap.id); return; }
     const values = {};
-    for (const k of keys) values[k] = JSON.stringify(snap[k] === undefined ? null : snap[k]);
+    for (const k of keys) {
+      // ушли отдельные поля сделок: сверять потом надо их, а не весь список (в нём законно бывают чужие правки)
+      if (k === 'deals' && extra && extra.deals) {
+        for (const [did, p] of Object.entries(extra.deals)) for (const [fk, v] of Object.entries(p.f)) values[`deal:${did}:${fk}`] = JSON.stringify(v);
+        continue;
+      }
+      values[k] = JSON.stringify(snap[k] === undefined ? null : snap[k]);
+    }
     lastSent.set(snap.id, { at: Date.now(), values });
   }
 
@@ -4942,8 +5031,14 @@ window.CrmSupabaseStore = (() => {
     const sent = lastSent.get(id);
     if (!sent) return false;
     if (Date.now() - sent.at > CLASH_WINDOW) { lastSent.delete(id); return false; }
-    return Object.keys(sent.values)
-      .some((k) => JSON.stringify(incoming[k] === undefined ? null : incoming[k]) !== sent.values[k]);
+    return Object.keys(sent.values).some((k) => {
+      const m = /^deal:(.+?):(.+)$/.exec(k);
+      if (m) {
+        const d = (incoming.deals || []).find((x) => x.id === m[1]);
+        return Boolean(d) && JSON.stringify(d[m[2]] === undefined ? null : d[m[2]]) !== sent.values[k];
+      }
+      return JSON.stringify(incoming[k] === undefined ? null : incoming[k]) !== sent.values[k];
+    });
   }
 
   function onData(docs) {
@@ -4953,6 +5048,7 @@ window.CrmSupabaseStore = (() => {
     const trash = new Map();
     for (const d of docs) {
       if (!d || !d.id) continue;
+      noteDealsInDb(d.id, d.deals);   // до normalize: пустую сделку клиента без сделок дорисовывает приложение, в базе её нет
       if (korbBusy.has(d.id)) continue;
       const c = normalize(d);
       // ⭐03.11.2026 (этап 2). В корзине — не на доске, не в поиске, не в «Перезвонить»
@@ -5007,9 +5103,20 @@ window.CrmSupabaseStore = (() => {
     el.title = mode === 'live' ? 'Синхронизация включена' : message || 'Нет связи';
   }
 
-  function patch(id, changes, { now = false } = {}) {
+  function patch(id, changes, { now = false, deal = null } = {}) {
     const c = state.clients.get(id);
     if (!c) return;
+    if ('deals' in changes) {
+      if (deal) {
+        const per = dealFields.get(id) || new Map();
+        const set = per.get(deal.id) || new Set();
+        deal.keys.forEach((k) => set.add(k));
+        per.set(deal.id, set);
+        dealFields.set(id, per);
+      } else {
+        dealsWhole.add(id);
+      }
+    }
     Object.assign(c, changes);
     c.updated_at = nowIso();
     const keys = dirty.get(id) || new Set();
@@ -5026,8 +5133,14 @@ window.CrmSupabaseStore = (() => {
     const deals = clone(c.deals);
     const d = deals.find((x) => x.id === dealId);
     if (!d) return null;
+    const before = clone(d);
+    const lenBefore = deals.length;
     Object.assign(d, typeof changes === 'function' ? changes(d, deals) || {} : changes);
-    patch(clientId, { deals }, opts);
+    // функция может добавить или убрать сделку в списке — тогда список уходит целиком
+    const keys = Array.from(new Set([...Object.keys(before), ...Object.keys(d)]))
+      .filter((k) => JSON.stringify(before[k]) !== JSON.stringify(d[k]));
+    const whole = deals.length !== lenBefore || deals.some((x, i) => x.id !== (c.deals[i] || {}).id);
+    patch(clientId, { deals }, { ...(opts || {}), deal: whole ? null : { id: dealId, keys } });
     return d;
   }
 
@@ -5043,23 +5156,38 @@ window.CrmSupabaseStore = (() => {
     const keys = dirty.get(id);
     if (!c || !keys) return;
     dirty.delete(id);
+    const perDeal = dealFields.get(id) || null;
+    const whole = dealsWhole.has(id);
+    dealFields.delete(id);
+    dealsWhole.delete(id);
     const snap = clone(c);
     inflight.set(id, snap.updated_at);
     const isNew = creating.has(id);
     const logPrev = isNew ? null : logBase.get(id);
     try {
       const sentKeys = isNew ? null : Array.from(keys);
+      // правили только поля сделок — отдаём их отдельно; хранилище, которое так не умеет, пишет deals целиком
+      const extra = !isNew && perDeal && !whole && keys.has('deals') ? { deals: dealPatchOf(snap, perDeal) } : null;
       // ⚠️ запоминаем ДО отправки: живая синхронизация успевает вернуть наш же
       // документ обратно раньше, чем придёт ответ, и мы приняли бы его за чужую правку
-      noteSent(snap, sentKeys);
-      await store.save(snap, sentKeys);
+      noteSent(snap, sentKeys, extra);
+      await store.save(snap, sentKeys, extra);
       creating.delete(id);
+      // теперь эти сделки в базе: при списке целиком — все, при правке полей — отправленные
+      if (extra) noteDealsInDb(id, Object.keys(extra.deals).map((x) => ({ id: x })));
+      else if (!sentKeys || sentKeys.includes('deals')) noteDealsInDb(id, snap.deals);
       logSaved(snap, logPrev);   // в историю уходит после сохранения и не ждётся
     } catch (err) {
       lastSent.delete(id);          // не сохранилось — что в базе, мы не знаем
       const again = dirty.get(id) || new Set();
       keys.forEach((k) => again.add(k));
       dirty.set(id, again);
+      if (whole) dealsWhole.add(id);
+      if (perDeal) {
+        const per = dealFields.get(id) || new Map();
+        for (const [did, set] of perDeal) { const s2 = per.get(did) || new Set(); set.forEach((k) => s2.add(k)); per.set(did, s2); }
+        dealFields.set(id, per);
+      }
       toast('Не сохранилось: ' + err.message + '. Повторю через несколько секунд.', 'err');
       scheduleSave(id, 5000);
     } finally {
@@ -5843,7 +5971,14 @@ window.CrmSupabaseStore = (() => {
       if (next !== cur) setTab(order[next]);
     }, { passive: true });
 
-    $('#q').addEventListener('input', (e) => { state.search = e.target.value; scheduleRender(); });
+    // ⭐03.11.2026 (этап iOS): на большой доске перерисовываем после паузы в наборе, а не на каждую букву
+    let qTimer = null;
+    $('#q').addEventListener('input', (e) => {
+      const el = e.target;
+      clearTimeout(qTimer);
+      const go = () => { state.search = el.value; scheduleRender(); };   // значение на момент показа (Esc мог очистить)
+      if (state.clients.size > 150) qTimer = setTimeout(go, 120); else go();
+    });
     setupDrag();
   }
 
@@ -5886,6 +6021,27 @@ window.CrmSupabaseStore = (() => {
      =================================================================== */
   const newState = { days: '', status: 'work', matchId: null, dismissed: new Set() };
 
+  /* ⭐03.11.2026 (этап iOS, вариант A). На телефоне «Перезвонить» и «Куда» — сразу под местом
+     подсказки: решение о звонке видно без прокрутки на iPhone SE, 16 и 16 Pro Max (как приложение
+     с экрана «Домой»; раньше ряд был ниже края на 95–314 px). Место подсказки постоянной высоты,
+     поэтому защита от промаха не меняется. Переставляем сами узлы, а не CSS order: порядок для
+     VoiceOver и Tab совпадает с тем, что на экране. На планшете и компьютере — прежний порядок. */
+  function raskladkaNovogo() {
+    const match = $('#new-match');
+    const when = $('#new-when') && $('#new-when').closest('.f');
+    const status = $('#new-status-wrap');
+    if (!match || !when || !status) return;
+    if (!raskladkaNovogo.mesto) raskladkaNovogo.mesto = { parent: when.parentElement, before: status.nextSibling };
+    if (MQ_PHONE.matches) {
+      match.after(when);
+      when.after(status);
+    } else {
+      const { parent, before } = raskladkaNovogo.mesto;
+      parent.insertBefore(when, before);
+      parent.insertBefore(status, before);
+    }
+  }
+
   function openNew() {
     const dlg = $('#dlg-new');
     const f = $('#form-new');
@@ -5899,10 +6055,16 @@ window.CrmSupabaseStore = (() => {
     f.elements.time.innerHTML = timeOptions('10:00');
     $$('#new-status button').forEach((b) => b.classList.toggle('on', b.dataset.status === 'work'));
     renderMatch();
+    raskladkaNovogo();
     $('#new-save').textContent = 'Сохранить';
     $('#new-title').textContent = 'Новый звонок';
     dlg.showModal();
     fitSheets();
+    /* ⭐03.11.2026 (этап iOS). На сенсорном экране курсор сам не ставим: iOS на фокус из setTimeout
+       клавиатуру не открывал — в «Телефоне» мигал курсор без клавиатуры (проверено на симуляторе),
+       а открытая сразу клавиатура закрыла бы ряд «Перезвонить». Одно касание по «Телефону» — и
+       клавиатура есть. С мышью и клавиатурой курсор в «Телефоне», как раньше. */
+    if (sensornyi()) { if (dlg.contains(document.activeElement)) document.activeElement.blur(); dlg.tabIndex = -1; dlg.focus({ preventScroll: true }); return; }
     setTimeout(() => { f.elements.phone.focus(); fitSheets(); }, 30);
   }
 
@@ -6124,7 +6286,13 @@ window.CrmSupabaseStore = (() => {
     ensureCustomerNo(id);
     renderCard();
     const dlg = $('#dlg-card');
-    if (!dlg.open) dlg.showModal();
+    if (!dlg.open) {
+      dlg.showModal();
+      // ⭐03.11.2026 (этап iOS). showModal ставит фокус на первую кнопку — звезду VIP, и Safari на iPhone
+      // обводил её оранжевой рамкой при каждом открытии пальцем. После касания фокус держит само окно;
+      // с клавиатуры (Tab, Enter) всё как было — первая кнопка с видимой рамкой.
+      if (lastInputPointer) { dlg.tabIndex = -1; dlg.focus({ preventScroll: true }); }
+    }
     fitSheets();
     const scroller = $('.cs-scroll');
     if (scroller) scroller.scrollTop = 0;
