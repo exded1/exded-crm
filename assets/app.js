@@ -3411,7 +3411,7 @@ window.CrmSupabaseStore = (() => {
     let channel = null;
     let hooks = null;
     let mergeOff = false;      // в базе ещё нет crm_merge — работаем как раньше
-    let dealsOff = false;      // в базе ещё нет crm_merge_v2 — сделки уходят списком целиком
+    let v3Off = false;         // в базе ещё нет crm_merge_v3 — сделки и история уходят списками целиком
 
     const emit = () => hooks && hooks.onData(Array.from(map.values()));
 
@@ -3530,10 +3530,12 @@ window.CrmSupabaseStore = (() => {
       // Раньше здесь уходил весь документ, и правка одного затирала правку другого,
       // сделанную в это же время в другом поле того же клиента.
       // keys не передали (новый клиент) — пишем целиком.
-      /* ⭐03.11.2026 (этап iOS). extra.deals = { id сделки: { f: изменённые поля, d: сделка целиком } } — правили только
-         поля сделок. Тогда список deals не шлём: crm_merge_v2 вписывает поля в свежую версию
-         в самой базе, и одновременная правка с другого устройства (или новая заявка с сайта)
-         не затирается. Функции ещё нет — шлём deals целиком, как раньше. */
+      /* ⭐03.11.2026 (этап iOS). extra = { deals?, log? } — разница вместо списков:
+         deals: { id сделки: { f: поля } | { f, d: сделка целиком (только новая) } | { del: true } },
+         log:   { add: [записи], del: [id], upd: [записи] }.
+         crm_merge_v3 (14_sliyanie-sdelok-istoriya.sql) применяет её к свежей версии в самой базе,
+         поэтому одновременная работа на двух устройствах и заявка с сайта не затирают друг друга.
+         Функции ещё нет — списки уходят целиком, как раньше (crm_merge). */
       async save(doc, keys, extra = null) {
         const body = { ...doc };
         delete body.id;
@@ -3547,18 +3549,19 @@ window.CrmSupabaseStore = (() => {
         }
 
         const patch = { updated_at: body.updated_at };
-        const poSdelkam = Boolean(extra && extra.deals && list.includes('deals') && !dealsOff);
-        for (const k of list) if (!(poSdelkam && k === 'deals')) patch[k] = body[k] === undefined ? null : body[k];
-        if (poSdelkam) {
-          const { error: e2 } = await sb.rpc('crm_merge_v2', { p_id: doc.id, p_patch: patch, p_deals: extra.deals });
-          if (!e2) {
+        const dDiff = Boolean(extra && extra.deals && list.includes('deals') && !v3Off);
+        const lDiff = Boolean(extra && extra.log && list.includes('log') && !v3Off);
+        for (const k of list) if (!(dDiff && k === 'deals') && !(lDiff && k === 'log')) patch[k] = body[k] === undefined ? null : body[k];
+        if (dDiff || lDiff) {
+          const { error: e3 } = await sb.rpc('crm_merge_v3', { p_id: doc.id, p_patch: patch, p_deals: dDiff ? extra.deals : null, p_log: lDiff ? extra.log : null });
+          if (!e3) {
             const cur = map.get(doc.id) || {};
-            map.set(doc.id, { ...cur, ...patch, deals: body.deals, id: doc.id });
+            map.set(doc.id, { ...cur, ...patch, deals: body.deals, log: body.log, id: doc.id });
             return;
           }
-          if (!/crm_merge_v2/.test(e2.message || '')) throw new Error(e2.message);
-          dealsOff = true;
-          console.warn('[EXDED CRM] Слияние по сделкам выключено: запустите 13_sliyanie-sdelok.sql в Supabase');
+          if (!/crm_merge_v3/.test(e3.message || '')) throw new Error(e3.message);
+          v3Off = true;
+          console.warn('[EXDED CRM] Слияние сделок и истории выключено: запустите 14_sliyanie-sdelok-istoriya.sql в Supabase');
           return this.save(doc, keys);
         }
         const { error } = await sb.rpc('crm_merge', { p_id: doc.id, p_patch: patch });
@@ -4571,12 +4574,17 @@ window.CrmSupabaseStore = (() => {
   };
   let store = null;
   const dirty = new Map();       // id -> Set полей, ещё не отправленных
-  /* ⭐03.11.2026 (этап iOS). Правка поля сделки уходит в базу ОДНИМ полем этой сделки.
-     Раньше уходил весь список deals: на iPhone правили «Счёт №», на Mac в ту же секунду
-     «Сумму» — кто сохранял вторым, тот возвращал старую сумму (проверено на живой базе).
-     Так же терялась сделка, которую в эту минуту добавила заявка с сайта. */
-  const dealFields = new Map();  // id клиента -> Map(id сделки -> Set полей)
-  const dealsWhole = new Set();  // id клиента: список сделок менялся целиком (добавили, удалили)
+  /* ⭐03.11.2026 (этап iOS). Сделки и история уходят в базу РАЗНИЦЕЙ, а не списком целиком.
+     Раньше уходил весь список: на iPhone правили «Счёт №», на Mac в ту же секунду «Сумму» —
+     кто сохранял вторым, тот возвращал старую сумму (проверено на живой базе). Так же терялись
+     сделка, добавленная в эту минуту на другом устройстве или заявкой с сайта, и заметка в истории.
+     Теперь patch() сравнивает старый и новый список и запоминает: какие поля каких сделок
+     изменились, какие сделки добавлены и удалены, какие записи истории добавлены и удалены.
+     Базе уходит только это (crm_merge_v3, 14_sliyanie-sdelok-istoriya.sql). */
+  const dealOps = new Map();     // id клиента -> Map(id сделки -> { keys: Set, add, del })
+  const dealsWhole = new Set();  // id клиента: разницу посчитать нельзя — список целиком
+  const logOps = new Map();      // id клиента -> { add: Set, del: Set, upd: Set } (id записей)
+  const logWhole = new Set();
   /* Сделки, которые уже были в базе (пришли из хранилища или ушли туда нашим сохранением).
      Полную копию сделки отдаём только для НОВОЙ — ни разу не сохранённой. Сделку из этого списка,
      которую в эту секунду удалили на другом устройстве, правка поля не воскрешает. */
@@ -4997,31 +5005,44 @@ window.CrmSupabaseStore = (() => {
     });
   }
 
-  /* { id сделки: { f: { поле: значение }, d: сделка целиком } } — изменённые поля из отправляемой версии.
-     d — на случай, когда этой сделки в базе ещё нет (пустая сделка клиента без сделок, которую приложение
-     показывает само): тогда база добавляет её целиком, а не теряет правку. */
+  /* { id сделки: { f: { поле: значение } } | { f, d: сделка целиком } | { del: true } }.
+     d — только для сделки, которой в базе ещё не было: новой или пустой сделки клиента без сделок,
+     которую приложение показывает само. Сделку, которая в базе была и которую в эту секунду удалили
+     на другом устройстве, правка её поля не возвращает. */
   function dealPatchOf(snap, perDeal) {
     const out = {};
-    for (const [did, set] of perDeal) {
+    const inDb = dealsInDb.get(snap.id) || new Set();
+    for (const [did, o] of perDeal) {
+      if (o.del) { if (inDb.has(did)) out[did] = { del: true }; continue; }
       const d = (snap.deals || []).find((x) => x.id === did);
       if (!d) continue;
       const f = {};
-      for (const k of set) f[k] = d[k] === undefined ? null : d[k];
-      // полная копия — только для сделки, которой в базе ещё не было (иначе удалённая где-то вернулась бы)
-      out[did] = (dealsInDb.get(snap.id) || new Set()).has(did) ? { f } : { f, d: clone(d) };
+      for (const k of o.keys) f[k] = d[k] === undefined ? null : d[k];
+      out[did] = !o.add && inDb.has(did) ? { f } : { f, d: clone(d) };
     }
     return out;
+  }
+  // { add: [записи, новые первыми], del: [id], upd: [записи] } — записи берём из отправляемой версии
+  function logPatchOf(snap, o) {
+    const log = snap.log || [];
+    if (!o) return { add: [], del: [], upd: [] };
+    return {
+      add: log.filter((e) => o.add.has(e.id)).map(clone),
+      del: Array.from(o.del),
+      upd: log.filter((e) => o.upd.has(e.id)).map(clone),
+    };
   }
 
   function noteSent(snap, keys, extra = null) {
     if (!keys || !keys.length) { lastSent.delete(snap.id); return; }
     const values = {};
     for (const k of keys) {
-      // ушли отдельные поля сделок: сверять потом надо их, а не весь список (в нём законно бывают чужие правки)
+      // ушла разница: сверять потом надо отдельные поля сделок, а не списки (в них законно бывают чужие правки)
       if (k === 'deals' && extra && extra.deals) {
-        for (const [did, p] of Object.entries(extra.deals)) for (const [fk, v] of Object.entries(p.f)) values[`deal:${did}:${fk}`] = JSON.stringify(v);
+        for (const [did, p] of Object.entries(extra.deals)) for (const [fk, v] of Object.entries(p.f || {})) values[`deal:${did}:${fk}`] = JSON.stringify(v);
         continue;
       }
+      if (k === 'log' && extra && extra.log) continue;
       values[k] = JSON.stringify(snap[k] === undefined ? null : snap[k]);
     }
     lastSent.set(snap.id, { at: Date.now(), values });
@@ -5103,20 +5124,52 @@ window.CrmSupabaseStore = (() => {
     el.title = mode === 'live' ? 'Синхронизация включена' : message || 'Нет связи';
   }
 
-  function patch(id, changes, { now = false, deal = null } = {}) {
-    const c = state.clients.get(id);
-    if (!c) return;
-    if ('deals' in changes) {
-      if (deal) {
-        const per = dealFields.get(id) || new Map();
-        const set = per.get(deal.id) || new Set();
-        deal.keys.forEach((k) => set.add(k));
-        per.set(deal.id, set);
-        dealFields.set(id, per);
-      } else {
-        dealsWhole.add(id);
+  // список объектов с уникальными id -> Map, иначе null (тогда разницу не считаем)
+  const poId = (list) => {
+    if (!Array.isArray(list)) return null;
+    const m = new Map();
+    for (const x of list) { if (!x || !x.id || m.has(x.id)) return null; m.set(x.id, x); }
+    return m;
+  };
+  function trackDeals(id, before, after) {
+    const a = poId(before); const b = poId(after);
+    if (!a || !b) { dealsWhole.add(id); return; }
+    const per = dealOps.get(id) || new Map();
+    const op = (did) => { if (!per.has(did)) per.set(did, { keys: new Set(), add: false, del: false }); return per.get(did); };
+    for (const [did, d] of b) {
+      const old = a.get(did);
+      if (!old) { const o = op(did); o.add = true; o.del = false; continue; }
+      for (const k of new Set([...Object.keys(old), ...Object.keys(d)])) {
+        if (k !== 'id' && JSON.stringify(old[k]) !== JSON.stringify(d[k])) op(did).keys.add(k);
       }
     }
+    for (const did of a.keys()) {
+      if (b.has(did)) continue;
+      const o = op(did);
+      if (o.add) per.delete(did);        // добавили и удалили до сохранения — базе ничего не нужно
+      else { o.del = true; o.keys.clear(); }
+    }
+    dealOps.set(id, per);
+  }
+  function trackLog(id, before, after) {
+    const a = poId(before); const b = poId(after);
+    if (!a || !b) { logWhole.add(id); return; }
+    const o = logOps.get(id) || { add: new Set(), del: new Set(), upd: new Set() };
+    for (const [eid, e] of b) {
+      if (!a.has(eid)) { o.add.add(eid); o.del.delete(eid); } else if (JSON.stringify(a.get(eid)) !== JSON.stringify(e)) o.upd.add(eid);
+    }
+    for (const eid of a.keys()) {
+      if (b.has(eid)) continue;
+      if (o.add.has(eid)) o.add.delete(eid); else { o.del.add(eid); o.upd.delete(eid); }
+    }
+    logOps.set(id, o);
+  }
+
+  function patch(id, changes, { now = false } = {}) {
+    const c = state.clients.get(id);
+    if (!c) return;
+    if ('deals' in changes) trackDeals(id, c.deals, changes.deals);
+    if ('log' in changes) trackLog(id, c.log, changes.log);
     Object.assign(c, changes);
     c.updated_at = nowIso();
     const keys = dirty.get(id) || new Set();
@@ -5133,14 +5186,8 @@ window.CrmSupabaseStore = (() => {
     const deals = clone(c.deals);
     const d = deals.find((x) => x.id === dealId);
     if (!d) return null;
-    const before = clone(d);
-    const lenBefore = deals.length;
     Object.assign(d, typeof changes === 'function' ? changes(d, deals) || {} : changes);
-    // функция может добавить или убрать сделку в списке — тогда список уходит целиком
-    const keys = Array.from(new Set([...Object.keys(before), ...Object.keys(d)]))
-      .filter((k) => JSON.stringify(before[k]) !== JSON.stringify(d[k]));
-    const whole = deals.length !== lenBefore || deals.some((x, i) => x.id !== (c.deals[i] || {}).id);
-    patch(clientId, { deals }, { ...(opts || {}), deal: whole ? null : { id: dealId, keys } });
+    patch(clientId, { deals }, opts);      // разницу (поля, новые и удалённые сделки) считает patch()
     return d;
   }
 
@@ -5156,25 +5203,28 @@ window.CrmSupabaseStore = (() => {
     const keys = dirty.get(id);
     if (!c || !keys) return;
     dirty.delete(id);
-    const perDeal = dealFields.get(id) || null;
+    const perDeal = dealOps.get(id) || null;
     const whole = dealsWhole.has(id);
-    dealFields.delete(id);
-    dealsWhole.delete(id);
+    const lOps = logOps.get(id) || null;
+    const lWhole = logWhole.has(id);
+    dealOps.delete(id); dealsWhole.delete(id); logOps.delete(id); logWhole.delete(id);
     const snap = clone(c);
     inflight.set(id, snap.updated_at);
     const isNew = creating.has(id);
     const logPrev = isNew ? null : logBase.get(id);
     try {
       const sentKeys = isNew ? null : Array.from(keys);
-      // правили только поля сделок — отдаём их отдельно; хранилище, которое так не умеет, пишет deals целиком
-      const extra = !isNew && perDeal && !whole && keys.has('deals') ? { deals: dealPatchOf(snap, perDeal) } : null;
+      // сделки и историю отдаём разницей; хранилище, которое так не умеет, пишет списки целиком
+      let extra = null;
+      if (!isNew && keys.has('deals') && !whole) extra = { deals: dealPatchOf(snap, perDeal || new Map()) };
+      if (!isNew && keys.has('log') && !lWhole) extra = { ...(extra || {}), log: logPatchOf(snap, lOps) };
       // ⚠️ запоминаем ДО отправки: живая синхронизация успевает вернуть наш же
       // документ обратно раньше, чем придёт ответ, и мы приняли бы его за чужую правку
       noteSent(snap, sentKeys, extra);
       await store.save(snap, sentKeys, extra);
       creating.delete(id);
       // теперь эти сделки в базе: при списке целиком — все, при правке полей — отправленные
-      if (extra) noteDealsInDb(id, Object.keys(extra.deals).map((x) => ({ id: x })));
+      if (extra && extra.deals) noteDealsInDb(id, Object.entries(extra.deals).filter(([, p]) => !p.del).map(([x]) => ({ id: x })));
       else if (!sentKeys || sentKeys.includes('deals')) noteDealsInDb(id, snap.deals);
       logSaved(snap, logPrev);   // в историю уходит после сохранения и не ждётся
     } catch (err) {
@@ -5182,11 +5232,23 @@ window.CrmSupabaseStore = (() => {
       const again = dirty.get(id) || new Set();
       keys.forEach((k) => again.add(k));
       dirty.set(id, again);
+      // не ушло — вернуть разницу на место (поверх того, что успели наработать за это время)
       if (whole) dealsWhole.add(id);
+      if (lWhole) logWhole.add(id);
       if (perDeal) {
-        const per = dealFields.get(id) || new Map();
-        for (const [did, set] of perDeal) { const s2 = per.get(did) || new Set(); set.forEach((k) => s2.add(k)); per.set(did, s2); }
-        dealFields.set(id, per);
+        const per = dealOps.get(id) || new Map();
+        for (const [did, o] of perDeal) {
+          const cur = per.get(did);
+          if (!cur) { per.set(did, o); continue; }
+          o.keys.forEach((k) => cur.keys.add(k));
+          cur.add = cur.add || o.add;
+        }
+        dealOps.set(id, per);
+      }
+      if (lOps) {
+        const cur = logOps.get(id) || { add: new Set(), del: new Set(), upd: new Set() };
+        for (const k of ['add', 'del', 'upd']) lOps[k].forEach((x) => cur[k].add(x));
+        logOps.set(id, cur);
       }
       toast('Не сохранилось: ' + err.message + '. Повторю через несколько секунд.', 'err');
       scheduleSave(id, 5000);
@@ -7028,6 +7090,11 @@ ${badge}
     state.openDeal = d ? d.id : null;
     const scroller = $('.cs-scroll', body);
     const top = scroller ? scroller.scrollTop : 0;
+    /* ⭐03.11.2026 (этап iOS). Недописанная заметка «О чём говорили сейчас» переживает перерисовку:
+       раньше её стирала любая перерисовка карточки — правка с другого устройства, VIP, смена этапа.
+       На iPhone: написали, нажали ✓ на клавиатуре, в эту минуту с Mac что-то сохранили — текст пропал. */
+    const talkWas = body.dataset.cid === c.id ? (($('[data-talk]', body) || {}).value || '') : '';
+    body.dataset.cid = c.id;
     body.innerHTML = `
 <div class="cs-head">
   <button type="button" class="vip${c.vip ? ' on' : ''}" data-act="vip" aria-pressed="${c.vip}" aria-label="VIP клиент">${ICON.star}</button>
@@ -7062,6 +7129,7 @@ ${badge}
   <span class="grow"></span>
   <button type="button" class="btn ghost danger" data-act="delete">Удалить клиента</button>
 </div>`;
+    if (talkWas) $('[data-talk]', body).value = talkWas;
     const newScroller = $('.cs-scroll', body);
     if (newScroller) newScroller.scrollTop = top;
     fitSheets();
@@ -7122,6 +7190,7 @@ ${badge}
           toast('Разговор записан в историю');
         }
       }
+      if (talk) talk.value = '';           // записано — при следующем открытии не подставлять второй раз
       if (id) flush(id);
       state.openId = null;
       state.openDeal = null;
