@@ -2342,21 +2342,23 @@ window.ExdedDocs = (() => {
     site: 'exded.com',
     ceo: 'Geschäftsführer: Borys Khomenko',
     register: 'HRB 43057 · Amtsgericht Dresden',
-    ustId: 'USt-IdNr. [entfernt]',
     /* ⭐22.09.2026. Банковские реквизиты и Steuernummer здесь больше НЕ лежат.
        Репозиторий на GitHub открытый — всё, что попало в assets/app.js, читает кто угодно.
        Теперь их приносит база после входа: таблица crm_settings, ключ seller_bank,
        функция seller_bank() (файл 6_rekvizity-dokumentov.sql). Кладёт их сюда
        setSellerBank(), зовёт app.js сразу после входа.
        ⛔ Не вписывать значения обратно в код: ни сюда, ни в проверки. */
+    /* ⭐03.11.2026 (этап 3). USt-IdNr. тоже приходит из базы (тот же ключ seller_bank, поле ustId,
+       строка целиком: «USt-IdNr. DE…»). В коде её больше нет — история репозитория очищена. */
+    ustId: '',
     taxNo: '',
     bankName: '',
     iban: '',
     bic: '',
   };
-  const BANK_POLYA = ['bankName', 'iban', 'bic', 'taxNo'];
+  const BANK_POLYA = ['bankName', 'iban', 'bic', 'taxNo', 'ustId'];
   const BANK_NET = 'Реквизиты для документов не пришли из базы. Обновите страницу или войдите заново: без банковских данных документ печатать нельзя.';
-  /* Возвращает true, когда все четыре поля на месте. */
+  /* Возвращает true, когда все пять полей на месте. */
   function setSellerBank(v) {
     if (!v || typeof v !== 'object') return false;
     for (const k of BANK_POLYA) {
@@ -5896,7 +5898,7 @@ window.CrmSupabaseStore = (() => {
     $('#new-when-detail').hidden = true;
     f.elements.time.innerHTML = timeOptions('10:00');
     $$('#new-status button').forEach((b) => b.classList.toggle('on', b.dataset.status === 'work'));
-    $('#new-match').hidden = true;
+    renderMatch();
     $('#new-save').textContent = 'Сохранить';
     $('#new-title').textContent = 'Новый звонок';
     dlg.showModal();
@@ -5920,14 +5922,28 @@ window.CrmSupabaseStore = (() => {
     return null;
   }
 
+  /* ⭐03.11.2026 (этап 3). Подсказка «Уже есть: …» живёт в заранее отведённом месте постоянной
+     высоты (.match, высота в app.css): появляется и меняется без сдвига полей и кнопок формы.
+     Пока подсказки нет, там тихая строка-заглушка. Длинное имя режется многоточием (целиком — в title).
+     matchChangedAt — когда подсказка поменялась: клик по её кнопкам, начатый раньше этого
+     или пришедший в первые 0,4 с, не засчитывается (см. bindNew). */
+  let matchChangedAt = 0;
+  const MATCH_GUARD = 400;
+  function setMatch(box, html, empty) {
+    if (box.innerHTML === html && box.classList.contains('is-empty') === empty) return;
+    box.innerHTML = html;
+    box.classList.toggle('is-empty', empty);
+    matchChangedAt = performance.now();
+  }
   function renderMatch() {
     const f = $('#form-new');
     const box = $('#new-match');
+    box.hidden = false;
     if (newState.matchId) {
       const c = state.clients.get(newState.matchId);
       const open = c ? openDeals(c) : [];
-      box.hidden = false;
-      box.innerHTML = `<span>Запишу разговор к клиенту <b>${esc(c ? clientName(c) : '')}</b>${c ? (open.length ? ` · в сделку «${esc(dealTitle(open[0]))}»` : ' · новой сделкой') : ''}</span><button type="button" class="btn ghost" data-match="cancel">Это другой клиент</button>`;
+      const imya = c ? clientName(c) : '';
+      setMatch(box, `<span class="match-text" title="${esc(imya)}">Запишу разговор к клиенту <b>${esc(imya)}</b>${c ? (open.length ? ` · в сделку «${esc(dealTitle(open[0]))}»` : ' · новой сделкой') : ''}</span><span class="match-btns"><button type="button" class="btn ghost" data-match="cancel">Это другой клиент</button></span>`, false);
       $('#new-save').textContent = 'Записать к клиенту';
       $('#new-title').textContent = 'Звонок клиента';
       return;
@@ -5935,10 +5951,10 @@ window.CrmSupabaseStore = (() => {
     const c = findMatch(f.elements.phone.value, f.elements.company.value);
     $('#new-save').textContent = 'Сохранить';
     $('#new-title').textContent = 'Новый звонок';
-    if (!c) { box.hidden = true; box.innerHTML = ''; return; }
+    if (!c) { setMatch(box, '<span class="match-text">Если такой клиент уже есть, он появится здесь</span>', true); return; }
     const d = activeDeal(c);
-    box.hidden = false;
-    box.innerHTML = `<span>Уже есть: <b>${esc(clientName(c))}</b> в колонке «${esc(TITLE[d ? d.status : 'work'])}»</span><button type="button" class="btn" data-match="use" data-id="${esc(c.id)}">Записать к нему</button><button type="button" class="btn ghost" data-match="no" data-id="${esc(c.id)}">Нет, новый</button>`;
+    const imya = clientName(c);
+    setMatch(box, `<span class="match-text" title="${esc(imya)}">Уже есть: <b>${esc(imya)}</b> в колонке «${esc(TITLE[d ? d.status : 'work'])}»</span><span class="match-btns"><button type="button" class="btn" data-match="use" data-id="${esc(c.id)}">Записать к нему</button><button type="button" class="btn ghost" data-match="no" data-id="${esc(c.id)}">Нет, новый</button></span>`, false);
   }
 
   function bindNew() {
@@ -5949,6 +5965,19 @@ window.CrmSupabaseStore = (() => {
 
     f.elements.phone.addEventListener('input', renderMatch);
     f.elements.company.addEventListener('input', renderMatch);
+
+    // Клик по кнопке подсказки, начатый до её появления (палец/мышь уже шли к другому месту)
+    // или в первые 0,4 с после смены подсказки, не засчитывается. Клавиатура (detail 0) — как обычно.
+    let downAt = 0;
+    dlg.addEventListener('pointerdown', () => { downAt = performance.now(); }, true);
+    dlg.addEventListener('click', (e) => {
+      if (!e.target.closest('#new-match button') || !e.detail) return;
+      const now = performance.now();
+      if (now - matchChangedAt < MATCH_GUARD || (downAt && downAt < matchChangedAt)) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      }
+    }, true);
 
     $('#new-match').addEventListener('click', (e) => {
       const b = e.target.closest('[data-match]');

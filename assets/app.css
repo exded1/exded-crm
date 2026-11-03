@@ -538,12 +538,24 @@ dialog::backdrop { background: rgba(20, 20, 19, .42); }
 .sheet-foot { padding-bottom: max(14px, calc(var(--sab) + 8px)); }
 
 .f-phone input { font-size: 24px !important; font-weight: 600; letter-spacing: .01em; font-variant-numeric: tabular-nums; min-height: 54px; }
+/* ⭐03.11.2026 (этап 3): место под подсказку отведено заранее и имеет постоянную высоту —
+   подсказка появляется без сдвига полей и кнопок. Текст в одну строку, кнопки — своей строкой
+   на узком экране и справа на широком. */
 .match {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 10px 12px;
-  border-radius: 12px; background: var(--orange-soft); color: var(--ink); font-size: 14px;
+  --match-h: 84px;
+  display: grid; grid-template-columns: minmax(0, 1fr); align-content: center; gap: 6px 12px;
+  box-sizing: border-box; flex: none; height: var(--match-h); padding: 6px 12px; overflow: hidden;
+  border: 1px solid transparent; border-radius: 12px; background: var(--orange-soft); color: var(--ink); font-size: 14px;
 }
+.match[hidden] { display: grid; }
+.match-text { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.match-btns { display: flex; gap: 8px; min-width: 0; }
 .match b { font-weight: 700; }
-.match .btn { min-height: 34px; padding: 0 12px; font-size: 13.5px; }
+.match .btn { min-height: 34px; padding: 0 12px; font-size: 13.5px; white-space: nowrap; }
+.match.is-empty { background: transparent; border: 1px dashed var(--line-2); color: var(--ink-3); font-size: 13px; }
+@media (min-width: 700px) {
+  .match { --match-h: 52px; grid-template-columns: minmax(0, 1fr) auto; }
+}
 .when { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 8px; margin-top: 8px; }
 
 .drawer[open] {
@@ -1101,6 +1113,8 @@ input:not([type=file]), select, textarea {
   .order-link { min-height: 44px; display: flex; align-items: center; }
   .set-row .btn.small { min-height: 44px; }
   .btn, .next-actions .btn, .match .btn { min-height: 44px; }
+  .match { --match-h: 104px; }
+  @media (min-width: 700px) { .match { --match-h: 62px; } }
   .docs .btn.small { min-height: 44px; }
   .docs .icon-btn { width: 44px; height: 44px; }
   .item-tag { min-height: 44px; padding: 5px 14px; }
