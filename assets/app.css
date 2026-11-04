@@ -979,7 +979,8 @@ input:not([type=file]), select, textarea {
 .toast { bottom: max(20px, calc(var(--sab) + 8px)); }   /* над полосой жеста */
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 .toast.err { background: var(--red); color: #fff; }
-.toast button { margin-left: 12px; border: 0; background: transparent; color: inherit; font-weight: 700; text-decoration: underline; padding: 0; pointer-events: auto; }
+.toast button { margin-left: 12px; border: 0; background: transparent; color: inherit; font-weight: 700; text-decoration: underline; padding: 0; }
+.toast.show button { pointer-events: auto; }   /* ⭐v28: сообщение теперь внутри окна; у скрытого кнопка не должна перехватывать нажатия */
 
 /* ---------- Ноутбук поменьше ---------- */
 @media (max-width: 1180px) {
@@ -1119,6 +1120,8 @@ input:not([type=file]), select, textarea {
   .card .vip, .cs-head .vip, .contact .main-star { width: 44px; height: 44px; }
   .chips button, .seg button, .pill, .deal-tab { min-height: 44px; }
   .mess-btn { min-height: 44px; min-width: 44px; }
+  /* ⭐04.11.2026 (v28): кнопка в сообщении теперь внутри окна. Строка сообщения той же высоты, выросла только область нажатия */
+  .toast button { min-height: 44px; min-width: 44px; margin-block: -12px; }
   /* ⭐22.09.2026: крестик удаления сделки был 34px — пальцем мимо.
      Значок остался 13px, выросла только область нажатия. */
   .deal-del { width: 44px; height: 44px; right: 0; }

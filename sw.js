@@ -1,5 +1,5 @@
 // Кэширует только файлы приложения. Запросы к базе с клиентами не кэшируются.
-const VERSION = 'exded-crm-v27';
+const VERSION = 'exded-crm-v28';
 const SHELL = [
   "./",
   "./index.html",

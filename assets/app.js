@@ -4340,6 +4340,7 @@ window.CrmSupabaseStore = (() => {
       zamokStranicy();
       fitSheets();
       diagNaverh();
+      toastNaverh();
     });
     nabl.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['open'] });
   }
@@ -4462,8 +4463,20 @@ window.CrmSupabaseStore = (() => {
   }
 
   let toastTimer = null;
+  /* ⭐04.11.2026 (v28). Сообщение жило в body и рисовалось ПОД открытой карточкой: окно через
+     `showModal()` стоит в верхнем слое, z-index туда не достаёт. На телефоне карточка во весь
+     экран, поэтому ни «PF0002 готов», ни ошибки документа видно не было: кнопка «молчала».
+     Кладём сообщение внутрь верхнего окна, как панель диагностики (`diagNaverh`), а не
+     popover: всё вне модального окна инертно, кнопка «Отправить» в сообщении не нажалась бы. */
+  function toastNaverh() {
+    const el = $('#toast');
+    if (!el) return;
+    const dlg = Array.from(document.querySelectorAll('dialog[open]')).pop() || document.body;
+    if (el.parentElement !== dlg) dlg.appendChild(el);
+  }
   function toast(text, type = '', action = null, ms = 0) {
     const el = $('#toast');
+    toastNaverh();
     el.textContent = text;
     if (action) {
       const b = document.createElement('button');
@@ -6928,7 +6941,26 @@ ${badge}
     } catch { return { unsupported: [], overflow: false }; }
   }
 
+  // Где в документе стоят знаки, которых нет в шрифте: без этого непонятно, что исправлять
+  function docGdeZnaki(c, d, items) {
+    const est = (v) => ExdedDocs.unsupported(v).length > 0;
+    return [
+      items.some((x) => est(x.name) || est(x.note)) && 'позиции',
+      Object.values(docClientOf(c)).some(est) && 'реквизиты клиента',
+      est(str(d.doc_note).trim()) && 'примечание',
+    ].filter(Boolean).join(', ');
+  }
+  // ⭐04.11.2026 (v28): любая неожиданная ошибка при создании видна человеку, а не теряется в консоли
   async function createDoc(kind, plan, planCustom) {
+    try {
+      await createDocShag(kind, plan, planCustom);
+    } catch (e) {
+      docBusy = false;
+      $$('[data-act^="doc-make"]', $('#card-body')).forEach((b) => { b.disabled = false; });
+      toast(`Документ не создан: ${(e && e.message) || 'неизвестная ошибка'}`, 'err', null, 10000);
+    }
+  }
+  async function createDocShag(kind, plan, planCustom) {
     if (docBusy) return;
     const c = state.clients.get(state.openId);
     const d = currentDeal(c);
@@ -6945,7 +6977,9 @@ ${badge}
     // иначе клиенту уедет строка из вопросительных знаков, а номер сгорит зря.
     const probe = docProbe(kind, c, d, items, plan, planCustom);
     if (probe.unsupported.length) {
-      toast(`В документе есть знаки, которых нет в шрифте: ${probe.unsupported.join(' ')}. Уберите их из названий позиций, реквизитов и примечания.`, 'err');
+      const znaki = probe.unsupported.slice(0, 10).join(' ') + (probe.unsupported.length > 10 ? ' …' : '');
+      const gde = docGdeZnaki(c, d, items);
+      toast(`Документ не создан, номер не потрачен. В документе есть знаки, которых нет в шрифте: ${znaki}.${gde ? ` Где: ${gde}.` : ''} Напишите это латиницей.`, 'err', null, 10000);
       return;
     }
 
@@ -6986,7 +7020,10 @@ ${badge}
     patchDeal(fresh.id, deal.id, { docs: [...clone(deal.docs), rec] }, { now: true });
     if (state.openId === fresh.id) renderCard();
     let made = null;
-    try { made = buildDoc(rec); } catch {}
+    try { made = buildDoc(rec); } catch (e) {
+      toast(`${rec.no} в списке, но PDF не собрался: ${(e && e.message) || 'неизвестная ошибка'}`, 'err', null, 10000);
+      return;
+    }
     if (made && made.doc.overflow) { toast(`${rec.no}: ${OVERFLOW_MSG}`, 'err'); return; }
     toast(`${rec.no} готов`, '', { label: shareSupported() ? 'Отправить' : 'Скачать', fn: () => shareDoc(rec) });
   }
@@ -7046,7 +7083,8 @@ ${badge}
   function openPlan(clientId, dealId) {
     const c = state.clients.get(clientId);
     const d = dealOf(c, dealId);
-    if (!c || !d || !window.ExdedDocs) return;
+    if (!c || !d) return;
+    if (!window.ExdedDocs) { toast('Модуль документов не загрузился, обновите страницу', 'err'); return; }
     const items = docItemsOf(d);
     if (!items.length) { toast('В сделке нет позиций с ценой', 'err'); return; }
     planCtx = { clientId, dealId, key: '100', custom: 50, total: ExdedDocs.totals(items).total };
@@ -7406,7 +7444,10 @@ ${badge}
       }
 
       if (act === 'doc-make-angebot') { createDoc('angebot', '100', null); return; }
-      if (act === 'doc-make-proforma' && d) { openPlan(c.id, d.id); return; }
+      if (act === 'doc-make-proforma' && d) {
+        try { openPlan(c.id, d.id); } catch (e) { toast(`Окно Proforma не открылось: ${(e && e.message) || 'неизвестная ошибка'}`, 'err', null, 10000); }
+        return;
+      }
       if ((act === 'doc-share' || act === 'doc-del') && d) {
         const li = btn.closest('[data-doc]');
         const rec = d.docs.find((x) => x.id === (li && li.dataset.doc));
