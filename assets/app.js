@@ -3428,16 +3428,35 @@ window.CrmSupabaseStore = (() => {
 
     const emit = () => hooks && hooks.onData(Array.from(map.values()));
 
+    /* ⭐05.11.2026. Порядок версий считаем по часам БАЗЫ: колонка updated_at строки и ответ crm_merge.
+       updated_at внутри документа ставит устройство по своим часам, он может идти назад.
+       rowAt: id -> время строки, которую мы знаем (мс). loads: документы, изменившиеся, пока идёт loadAll:
+       её снимок мог быть сделан раньше, такой документ из снимка не берём. */
+    const rowAt = new Map();
+    const loads = new Set();
+    const msOf = (t) => { const n = Date.parse(t); return Number.isFinite(n) ? n : 0; };
+    const touch = (id) => loads.forEach((s) => s.add(id));
+
     async function loadAll() {
       const fresh = new Map();
-      for (let from = 0; ; from += PAGE) {
-        const { data, error } = await sb.from('crm_docs').select('id,data').eq('kind', 'client').range(from, from + PAGE - 1);
-        if (error) throw new Error(error.message);
-        for (const row of data) fresh.set(row.id, { ...row.data, id: row.id });
-        if (data.length < PAGE) break;
+      const at = new Map();
+      const touched = new Set();
+      loads.add(touched);
+      try {
+        for (let from = 0; ; from += PAGE) {
+          const { data, error } = await sb.from('crm_docs').select('id,data,updated_at').eq('kind', 'client').range(from, from + PAGE - 1);
+          if (error) throw new Error(error.message);
+          for (const row of data) { fresh.set(row.id, { ...row.data, id: row.id }); at.set(row.id, msOf(row.updated_at)); }
+          if (data.length < PAGE) break;
+        }
+      } finally { loads.delete(touched); }
+      for (const id of touched) {
+        if (map.has(id)) { fresh.set(id, map.get(id)); at.set(id, rowAt.get(id) || 0); }
+        else { fresh.delete(id); at.delete(id); }
       }
-      map.clear();
+      map.clear(); rowAt.clear();
       for (const [k, v] of fresh) map.set(k, v);
+      for (const [k, v] of at) rowAt.set(k, v);
       emit();
     }
 
@@ -3446,9 +3465,11 @@ window.CrmSupabaseStore = (() => {
       channel = sb.channel('exded-crm-docs')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'crm_docs' }, (p) => {
           if (p.eventType === 'DELETE') {
-            if (p.old && p.old.id) map.delete(p.old.id);
+            if (p.old && p.old.id) { map.delete(p.old.id); rowAt.delete(p.old.id); touch(p.old.id); }
           } else if (p.new && p.new.kind === 'client') {
             map.set(p.new.id, { ...p.new.data, id: p.new.id });
+            rowAt.set(p.new.id, msOf(p.new.updated_at));
+            touch(p.new.id);
           }
           emit();
         })
@@ -3539,6 +3560,8 @@ window.CrmSupabaseStore = (() => {
       async refresh() { try { await loadAll(); } catch {} },
       // то же самое, но с честной ошибкой: по кнопке «Обновить» надо знать, вышло или нет
       async pull() { await loadAll(); },
+      // приложение пропускало документы, пока шло сохранение; теперь просит их ещё раз
+      again() { emit(); },
       // ⚠️ Шлём ТОЛЬКО изменённые поля, склеивает их сама база (crm_merge).
       // Раньше здесь уходил весь документ, и правка одного затирала правку другого,
       // сделанную в это же время в другом поле того же клиента.
@@ -3558,6 +3581,7 @@ window.CrmSupabaseStore = (() => {
           const { error } = await sb.from('crm_docs').upsert({ id: doc.id, kind: 'client', data: body, updated_at: new Date().toISOString() });
           if (error) throw new Error(error.message);
           map.set(doc.id, { ...body, id: doc.id });
+          touch(doc.id);
           return;
         }
 
@@ -3566,10 +3590,15 @@ window.CrmSupabaseStore = (() => {
         const lDiff = Boolean(extra && extra.log && list.includes('log') && !v3Off);
         for (const k of list) if (!(dDiff && k === 'deals') && !(lDiff && k === 'log')) patch[k] = body[k] === undefined ? null : body[k];
         if (dDiff || lDiff) {
-          const { error: e3 } = await sb.rpc('crm_merge_v3', { p_id: doc.id, p_patch: patch, p_deals: dDiff ? extra.deals : null, p_log: lDiff ? extra.log : null });
+          const { data: ts3, error: e3 } = await sb.rpc('crm_merge_v3', { p_id: doc.id, p_patch: patch, p_deals: dDiff ? extra.deals : null, p_log: lDiff ? extra.log : null });
           if (!e3) {
-            const cur = map.get(doc.id) || {};
-            map.set(doc.id, { ...cur, ...patch, deals: body.deals, log: body.log, id: doc.id });
+            // строка из живой синхронизации уже новее или это наша же: в ней и чужие правки, её не трогаем
+            if ((rowAt.get(doc.id) || 0) < msOf(ts3)) {
+              const cur = map.get(doc.id) || {};
+              map.set(doc.id, { ...cur, ...patch, deals: body.deals, log: body.log, id: doc.id });
+              rowAt.set(doc.id, msOf(ts3));
+              touch(doc.id);
+            }
             return;
           }
           if (!/crm_merge_v3/.test(e3.message || '')) throw new Error(e3.message);
@@ -3577,7 +3606,7 @@ window.CrmSupabaseStore = (() => {
           console.warn('[EXDED CRM] Слияние сделок и истории выключено: запустите 14_sliyanie-sdelok-istoriya.sql в Supabase');
           return this.save(doc, keys);
         }
-        const { error } = await sb.rpc('crm_merge', { p_id: doc.id, p_patch: patch });
+        const { data: ts, error } = await sb.rpc('crm_merge', { p_id: doc.id, p_patch: patch });
         if (error) {
           // функции ещё нет — работаем по-старому, но говорим об этом в консоль
           if (/crm_merge/.test(error.message || '')) {
@@ -3587,7 +3616,11 @@ window.CrmSupabaseStore = (() => {
           }
           throw new Error(error.message);
         }
-        map.set(doc.id, { ...(map.get(doc.id) || {}), ...patch, id: doc.id });
+        if ((rowAt.get(doc.id) || 0) < msOf(ts)) {
+          map.set(doc.id, { ...(map.get(doc.id) || {}), ...patch, id: doc.id });
+          rowAt.set(doc.id, msOf(ts));
+          touch(doc.id);
+        }
       },
       async remove(id) {
         const { error } = await sb.from('crm_docs').delete().eq('id', id);
@@ -4644,6 +4677,7 @@ window.CrmSupabaseStore = (() => {
   const lastSent = new Map();    // id -> { at, values: { поле: json } }
   const CLASH_WINDOW = 90 * 1000;
   const inflight = new Map();    // id -> updated_at отправляемой версии
+  const skippedBusy = new Set(); // из базы пришло, пока здесь шло сохранение: принять после него
   const creating = new Set();
   const deleting = new Set();
   const korbBusy = new Set();    // в корзину / из корзины прямо сейчас: живая синхронизация не перекладывает
@@ -5117,12 +5151,14 @@ window.CrmSupabaseStore = (() => {
     for (const [id, d] of incoming) {
       if (deleting.has(id)) continue;
       const local = state.clients.get(id);
-      if (local && dirty.has(id)) continue;
-      if (!local || (d.updated_at || '') >= (local.updated_at || '')) {
-        if (overwritten(id, d)) { clash = true; lastSent.delete(id); }
-        state.clients.set(id, d);
-        logSeen(d);        // правки с другого устройства он записал сам — здесь их не дублируем
-      }
+      /* ⭐05.11.2026. Нет несохранённых правок и ничего не летит — база права, время документа не сравниваем.
+         Его ставит устройство по своим часам: запись с более ранним временем, дошедшая последней, или часы
+         с разницей заставляли устройство отбрасывать всё из базы до перезагрузки.
+         Пока своя правка в пути, документ пропускаем: flush() попросит его снова. */
+      if (local && (dirty.has(id) || inflight.has(id))) { skippedBusy.add(id); continue; }
+      if (overwritten(id, d)) { clash = true; lastSent.delete(id); }
+      state.clients.set(id, d);
+      logSeen(d);        // правки с другого устройства он записал сам — здесь их не дублируем
     }
     for (const id of Array.from(state.clients.keys())) {
       if (!incoming.has(id) && !dirty.has(id) && !inflight.has(id) && !creating.has(id) && !korbBusy.has(id)) { state.clients.delete(id); if (!trash.has(id)) logForget(id); }
@@ -5291,6 +5327,7 @@ window.CrmSupabaseStore = (() => {
       scheduleSave(id, 5000);
     } finally {
       if (inflight.get(id) === snap.updated_at) inflight.delete(id);
+      if (skippedBusy.has(id) && !dirty.has(id) && !inflight.has(id)) { skippedBusy.delete(id); if (store && store.again) store.again(); else if (store && store.refresh) store.refresh(); }
     }
   }
 
